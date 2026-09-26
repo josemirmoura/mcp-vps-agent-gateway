@@ -21,6 +21,11 @@ This project assumes the AI model, external content and remote clients can all b
 | Broker exposure | Root daemon reachable remotely | Unix socket only |
 | Audit leakage | Logs capture passwords | redaction + short retention |
 | Destructive mistake | delete/reconfigure production | approval policy + typed tools + validation/rollback |
+| Approval fatigue | Agent spams elevation requests | out-of-band approval, rate limit, cooldown, request coalescing |
+| Shared-state escalation | Gateway writes privileged SQLite file | Broker is sole DB owner; narrow IPC only |
+| Audit tampering | Root process rewrites local history | hash chain + remote checkpoints/forwarding |
+| Unsafe kernel fallback | openat2/Landlock unavailable | capability detection; fail closed or documented safe fallback |
+| Egress abuse | Full enables arbitrary outbound network | network capability approved separately from Full |
 
 ## Mandatory security tests
 
@@ -35,7 +40,13 @@ This project assumes the AI model, external content and remote clients can all b
 - long command times out.
 - process explosion is contained.
 - secret values are redacted.
-- duplicate idempotency keys do not repeat the action.
+- duplicate idempotency keys do not repeat replay-safe actions.
+- non-replay-safe writes are never blindly retried.
+- repeated elevation requests trigger cooldown/rate limiting.
+- Gateway cannot open the privileged SQLite database.
+- audit record removal/hash-chain mutation is detected.
+- Full without explicit network capability cannot use unrestricted egress.
+- missing openat2/Landlock is visible in health/security posture.
 
 ## Important principle
 
