@@ -1,30 +1,21 @@
 mode: full
 
-filesystem:
-  read:
-    - "*"
-  write:
-    - "*"
+# Full is a convenience preset. The lease stores the exact capabilities
+# approved by the human. Unrestricted network is NOT implied.
+capabilities:
+  - shell.admin
+  - filesystem.read:any
+  - filesystem.write:any
+  - docker.admin
+  - systemd.admin
 
 network:
-  mode: unrestricted
-
-services:
-  inspect:
-    - "*"
-  manage:
-    - "*"
-
-docker:
-  inspect:
-    - "*"
-  manage:
-    - "*"
-
-privilege:
-  shell: admin
-  admin: allow
+  mode: allowlist
+  destinations: []
+  unrestricted_requires_separate_approval: true
 
 lease:
   required: true
   max_ttl_minutes: 60
+  out_of_band_approval: true
+  step_up_auth: true
