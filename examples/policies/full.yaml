@@ -1,4 +1,5 @@
 mode: full
+enabled: false
 
 # Full is a convenience preset. The lease stores the exact capabilities
 # approved by the human. Unrestricted network is NOT implied.
