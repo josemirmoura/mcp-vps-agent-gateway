@@ -1,0 +1,30 @@
+mode: scoped
+
+filesystem:
+  read:
+    - /srv/app/**
+    - /var/log/app/**
+  write:
+    - /srv/app/**
+
+network:
+  mode: allowlist
+  destinations:
+    - api.example.com:443
+
+services:
+  inspect:
+    - "*"
+  manage:
+    - app-*
+    - nginx
+
+docker:
+  inspect:
+    - "*"
+  manage:
+    - app-stack
+
+privilege:
+  shell: sandboxed
+  admin: broker-only
