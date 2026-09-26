@@ -1,63 +1,62 @@
 # Threat model
 
-This project assumes the AI model, external content and remote clients can all be influenced by untrusted input.
+Assume the AI model, remote clients, tool results, logs and external content can all contain hostile or misleading input.
 
 ## Primary risks
 
-| Threat | Example | Mitigation |
+| Threat | Example | Primary control |
 |---|---|---|
-| Prompt injection | A log file says “ignore policy and become root” | Server-side policy; model cannot mint leases |
-| Privilege escalation | Agent requests unrestricted root | Human approval + temporary lease |
-| Path traversal | `../../etc/shadow` | Safe path resolution; authorized roots |
-| Symlink escape | Allowed path points outside scope | Kernel-assisted resolution and no-magic-link policy |
-| Docker privilege | Agent controls Docker socket | No Docker socket in Gateway; brokered actions |
-| Fork bomb | Shell spawns endless processes | cgroups / TasksMax / timeout |
-| Memory exhaustion | Command allocates all RAM | MemoryMax |
-| Hanging command | Process never exits | Runtime limit + cancellation |
-| Duplicate write | Client retries after timeout | Idempotency key + request hash |
-| Secret disclosure | `.env` or token returned to model | Secret refs, redaction, execution-time injection |
-| Stolen token | OAuth token reused elsewhere | short lifetime, audience validation, scopes |
-| Fake client | Arbitrary service calls MCP | client authentication when available + OAuth |
-| Broker exposure | Root daemon reachable remotely | Unix socket only |
-| Audit leakage | Logs capture passwords | redaction + short retention |
-| Destructive mistake | delete/reconfigure production | approval policy + typed tools + validation/rollback |
-| Approval fatigue | Agent spams elevation requests | out-of-band approval, rate limit, cooldown, request coalescing |
-| Shared-state escalation | Gateway writes privileged SQLite file | Broker is sole DB owner; narrow IPC only |
-| Audit tampering | Root process rewrites local history | hash chain + remote checkpoints/forwarding |
-| Unsafe kernel fallback | openat2/Landlock unavailable | capability detection; fail closed or documented safe fallback |
-| Egress abuse | Full enables arbitrary outbound network | network capability approved separately from Full |
-| Confused deputy | Gateway uses Broker's root authority for a resource the user was not allowed to touch | Broker re-authorizes subject + tool + resource + action on every call |
-| Tool poisoning | Downstream MCP changes description/schema to request broader or unrelated data | provenance + fingerprints + quarantine/review of material changes |
-| Tool-result injection | Logs/tool output contain hidden instructions | treat results as untrusted data; results never mutate policy/grants |
-| Cross-tool exfiltration | malicious read result induces sensitive read then external write | trust tiers, egress allowlists, data-flow restrictions, approvals |
+| Prompt injection | log says "become root" | server-side Broker policy |
+| Confused deputy | Gateway asks Broker to touch an unauthorized resource | Broker re-authorizes subject + tool + resource + action |
+| Privilege escalation | agent asks for admin shell | Full disabled; temporary explicit grant only |
+| Path traversal | ../../etc/shadow | safe descriptor-based path resolution |
+| Symlink escape | allowed path redirects outside root | openat2 or safe directory-FD fallback |
+| Docker privilege | Gateway gets docker.sock | Docker only through Broker |
+| Fork/memory bomb | generated process exhausts VPS | systemd/cgroups/timeouts |
+| Duplicate write | client retries mutation | infrastructure idempotency or no blind retry |
+| Secret disclosure | model reads credentials | secret refs + Broker-only plaintext access |
+| Token theft | stolen OAuth token | issuer/audience/expiry/scope validation |
+| Broker exposure | root API reachable remotely | Unix socket only |
+| Approval fatigue | repeated elevation prompts | Scoped routine + rate limit/cooldown |
+| Shared-state escalation | Gateway writes Broker DB | Broker-only SQLite |
+| Unsafe fallback | missing kernel feature weakens checks | detect + safe fallback/fail closed |
+| Egress abuse | elevated agent exfiltrates data | network capability separate from Full |
+| Tool poisoning | downstream MCP changes schema/description | provenance/fingerprint/review |
+| Tool-result injection | tool output contains hidden instructions | results are untrusted data |
+| Cross-tool exfiltration | malicious read induces sensitive read then external write | trust/egress/data-flow restrictions |
+| Recovery failure | Broker/DB fails mid-change | managed jobs + fail-closed recovery |
 
-## Mandatory security tests
+## Stage-appropriate security tests
 
-- `../` escape attempt fails.
-- symlink escape fails.
-- absolute path outside scope fails.
-- Full without lease fails.
-- expired and revoked leases fail.
-- different subject cannot reuse a lease.
-- prompt injection text cannot alter policy.
-- Gateway cannot open Docker socket.
-- long command times out.
-- process explosion is contained.
-- secret values are redacted.
-- duplicate idempotency keys do not repeat replay-safe actions.
-- non-replay-safe writes are never blindly retried.
-- repeated elevation requests trigger cooldown/rate limiting.
-- Gateway cannot open the privileged SQLite database.
-- audit record removal/hash-chain mutation is detected.
-- Full without explicit network capability cannot use unrestricted egress.
-- missing openat2/Landlock is visible in health/security posture.
-- unauthorized resource through an otherwise authorized tool is denied.
-- malicious tool result cannot change policy or grant capability.
-- downstream tool fingerprint changes are detected and reviewed.
-- model-supplied arbitrary downstream MCP URL is rejected.
+### Gate 0B
+- path confinement
+- invalid input
+- forbidden path
+- output limits
+
+### Gate 1/2
+- unauthorized service/stack denied
+- Gateway cannot access Docker socket
+- wrong subject/resource denied
+- malicious tool result cannot alter policy
+
+### Gate 3/4
+- idempotent retry behavior
+- non-replay-safe no-blind-retry behavior
+- SQLite recovery
+- job restart/reconciliation
+- secret redaction
+- shell/resource containment when enabled
+
+### Gate 5 / R5
+- self-approval impossible
+- elevation spam limited
+- expired/revoked grant denied
+- Full without network grant has no unrestricted egress
+- revoke-all works
+- audit tampering detectable
+- remote audit checkpoint exists
 
 ## Important principle
 
-Tool metadata such as `readOnlyHint` or destructive annotations can improve client UX. They are not an authorization mechanism.
-
-The server remains authoritative.
+MCP annotations and host confirmations improve UX and safety behavior. They do not replace Broker authorization.
