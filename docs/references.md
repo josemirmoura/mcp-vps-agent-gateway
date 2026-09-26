@@ -1,35 +1,41 @@
 # Technical references
 
-Re-check versions, availability and product-plan constraints at implementation time.
+Checked: 2026-09-26.
+
+Revalidate versions and product availability at implementation time.
 
 ## OpenAI / ChatGPT
 
-- OpenAI Plugins: https://developers.openai.com/plugins/
-- MCP server guidance: https://developers.openai.com/plugins/build/mcp-server
-- Authentication guidance: https://developers.openai.com/plugins/build/auth
+- MCP server concepts: https://developers.openai.com/plugins/concepts/mcp-server
+- Build an MCP server: https://developers.openai.com/plugins/build/mcp-server
+- Authentication: https://developers.openai.com/plugins/build/auth
 - Security and privacy: https://developers.openai.com/plugins/guides/security-privacy
-- OpenAI Help Center: https://help.openai.com/
+- Plugins availability: https://help.openai.com/en/articles/20001256-plugins-in-chatgpt-and-codex
+- Developer Mode / full MCP availability: https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
 
-## Model Context Protocol
+## MCP
 
-- MCP home: https://modelcontextprotocol.io/
 - MCP specification: https://modelcontextprotocol.io/specification/
+- 2026-07-28 release overview: https://blog.modelcontextprotocol.io/posts/2026-07-28/
+- Tasks extension: https://tasks.extensions.modelcontextprotocol.io/specification/draft/tasks
+- Official Go SDK: https://github.com/modelcontextprotocol/go-sdk
 
-## Linux isolation and filesystem
+The Go SDK is Tier 1 and supports MCP 2026-07-28.
 
-- systemd documentation: https://www.freedesktop.org/software/systemd/man/
-- Linux Landlock: https://docs.kernel.org/userspace-api/landlock.html
-- openat2(2): https://man7.org/linux/man-pages/man2/openat2.2.html
+## Linux
 
-## Containers
+- systemd manuals: https://www.freedesktop.org/software/systemd/man/
+- Landlock: https://docs.kernel.org/userspace-api/landlock.html
+- openat2: https://man7.org/linux/man-pages/man2/openat2.2.html
+
+## Docker
 
 - Docker Engine security: https://docs.docker.com/engine/security/
-- Podman documentation: https://docs.podman.io/
 
-## Authentication
+## Auth
 
-Any standards-compliant OAuth 2.0/OIDC provider may be used. Validate issuer, audience, signature, expiration, subject and scopes server-side.
+Any standards-compliant OAuth/OIDC provider may be used if required by the deployment.
 
-## General rule
+## Principle
 
-Client UX annotations and model instructions can improve behavior, but they are not authorization controls. The server-side policy and execution boundary remain authoritative.
+Client UX annotations, model instructions and host confirmations help behavior but do not replace Broker authorization.
