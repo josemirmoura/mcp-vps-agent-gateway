@@ -1,0 +1,25 @@
+mode: controlled
+
+filesystem:
+  read:
+    - /srv/app/**
+    - /var/log/**
+  write:
+    - /tmp/vps-agent/**
+
+network:
+  mode: blocked
+
+services:
+  inspect:
+    - "*"
+  manage: []
+
+docker:
+  inspect:
+    - "*"
+  manage: []
+
+privilege:
+  shell: sandboxed
+  admin: deny
