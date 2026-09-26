@@ -1,0 +1,30 @@
+mode: full
+
+filesystem:
+  read:
+    - "*"
+  write:
+    - "*"
+
+network:
+  mode: unrestricted
+
+services:
+  inspect:
+    - "*"
+  manage:
+    - "*"
+
+docker:
+  inspect:
+    - "*"
+  manage:
+    - "*"
+
+privilege:
+  shell: admin
+  admin: allow
+
+lease:
+  required: true
+  max_ttl_minutes: 60
