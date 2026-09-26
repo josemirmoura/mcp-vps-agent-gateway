@@ -94,6 +94,72 @@ CONTRIBUTING.md
 LICENSE
 ```
 
+
+## Quick start
+
+> This repository is currently a reference architecture and implementation guide, not a finished binary. The fastest path is to build **Gate 0** first and prove your real MCP client before adding privileged features.
+
+### 1. Clone
+
+```bash
+git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
+cd mcp-vps-agent-gateway
+```
+
+### 2. Read the minimum set
+
+```text
+docs/mvp-first.md
+docs/security-hardening-v2.md
+docs/transport-and-aggregation.md
+AGENTS.md
+```
+
+### 3. Build only Gate 0
+
+Your first implementation should expose only:
+
+```text
+system.info
+file.read_test
+file.write_test
+```
+
+with read/write restricted to a disposable directory such as:
+
+```text
+/tmp/vps-agent-poc/
+```
+
+Do **not** add root access, Docker control, OAuth, Full mode, Approval Service or a generic admin shell yet.
+
+### 4. Test with your real MCP client
+
+Success means:
+
+- the client discovers the tools
+- read works
+- write works when the client/product permits it
+- forbidden paths fail
+- reconnects do not corrupt state
+
+If your real client cannot execute the required write tool, stop there and fix only the client integration path.
+
+### 5. Hand it to a coding agent
+
+You can give an AI coding agent this instruction:
+
+```text
+Read AGENTS.md and docs/mvp-first.md.
+Implement Gate 0 only.
+Do not implement privileged execution, Docker access, Full mode,
+OAuth, Approval Service or any feature beyond Gate 0.
+Add tests for path confinement and clear errors.
+```
+
+After Gate 0 passes, continue with Gate 1 and Gate 2 in [docs/mvp-first.md](docs/mvp-first.md).
+
+
 ## Start here
 
 1. Read [docs/architecture.md](docs/architecture.md).
