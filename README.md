@@ -81,6 +81,7 @@ docs/
   transport-and-aggregation.md
   mvp-first.md
   runtime-semantics-and-recovery.md
+  tool-trust-and-confused-deputy.md
   chatgpt-integration.md
 
 examples/policies/
@@ -169,9 +170,10 @@ After Gate 0 passes, continue with Gate 1 and Gate 2 in [docs/mvp-first.md](docs
 5. Read [docs/transport-and-aggregation.md](docs/transport-and-aggregation.md).
 6. Read [docs/mvp-first.md](docs/mvp-first.md).
 7. Read [docs/runtime-semantics-and-recovery.md](docs/runtime-semantics-and-recovery.md).
-8. Follow [docs/implementation-runbook.md](docs/implementation-runbook.md).
-9. If ChatGPT is your client, read [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
-10. If an AI coding agent is implementing the project, make it read [AGENTS.md](AGENTS.md) first.
+8. Read [docs/tool-trust-and-confused-deputy.md](docs/tool-trust-and-confused-deputy.md).
+9. Follow [docs/implementation-runbook.md](docs/implementation-runbook.md).
+10. If ChatGPT is your client, read [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
+11. If an AI coding agent is implementing the project, make it read [AGENTS.md](AGENTS.md) first.
 
 ## Intended stack
 
