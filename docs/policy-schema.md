@@ -1,10 +1,49 @@
 # Policy schema
 
-Policies are deny-by-default capability documents. Unknown fields and unknown capabilities should fail validation unless a future schema version explicitly allows them.
+Policies are deny-by-default capability documents interpreted authoritatively by the Broker.
 
-## Scoped minimum schema
+Unknown fields, unknown capabilities and invalid enum values fail closed.
 
-```yaml
+## Controlled example
+
+~~~yaml
+version: 1
+mode: controlled
+
+filesystem:
+  read:
+    - /srv/app/**
+  write:
+    - /tmp/vps-agent/**
+
+network:
+  mode: blocked
+  destinations: []
+
+services:
+  inspect:
+    - "*"
+  manage: []
+  actions: []
+
+docker:
+  inspect: []
+  manage: []
+  actions: []
+
+shell:
+  enabled: false
+  cwd_roots: []
+  max_runtime_seconds: 120
+  max_output_bytes: 1048576
+
+privilege:
+  admin: deny
+~~~
+
+## Scoped minimum shape
+
+~~~yaml
 version: 1
 mode: scoped
 
@@ -13,7 +52,7 @@ filesystem:
   write: []
 
 network:
-  mode: blocked | allowlist | unrestricted
+  mode: blocked
   destinations: []
 
 services:
@@ -27,25 +66,30 @@ docker:
   actions: []
 
 shell:
-  enabled: true
+  enabled: false
   cwd_roots: []
   max_runtime_seconds: 300
   max_output_bytes: 1048576
 
 privilege:
-  admin: deny | broker-only
+  admin: broker-only
 
 replay:
   require_idempotency_for_safe_writes: true
   blind_retry_non_replay_safe: false
-```
+~~~
+
+Enable only the capabilities a real stack needs.
 
 ## Full preset
 
-`mode: full` is only a UI/policy convenience preset. It expands into an explicit capability set, for example:
+Full is disabled by default.
 
-```yaml
+~~~yaml
+version: 1
 mode: full
+enabled: false
+
 capabilities:
   - shell.admin
   - filesystem.read:any
@@ -58,19 +102,24 @@ network:
   destinations: []
   unrestricted_requires_separate_approval: true
 
-lease:
+grant:
   required: true
   max_ttl_minutes: 60
-```
+~~~
 
-`network.unrestricted` must never be implicitly added by Full.
+Full is a convenience preset that expands into explicit capabilities.
+
+network.unrestricted is never implicitly added.
 
 ## Validation rules
 
 - unknown keys: reject
+- unknown capabilities: reject
 - unknown enum values: reject
-- write roots without an explicit mode: reject
-- wildcard administrative capabilities require a human-approved lease
-- unrestricted network requires explicit separate approval
+- invalid path roots: reject
+- write roots without explicit permission: reject
+- wildcard administrative capabilities require Full feature enabled plus a valid human-approved grant
+- unrestricted network requires separate explicit approval
 - TTL above server maximum: reject
-- policy changes never take effect merely because the model edited a file; an authoritative reload path must validate and activate them
+- policy activation requires an authoritative Broker reload/activation path
+- editing a policy file through an agent does not automatically activate it
