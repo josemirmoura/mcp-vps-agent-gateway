@@ -223,9 +223,38 @@ State can include:
 - approvals when enabled
 - leases/grants
 - jobs
-- idempotency
+- idempotency / operation journal
 - resource locks
 - audit metadata
+
+### Resource-lock fencing
+
+A resource lock is not just `resource -> owner`.
+
+Use at least:
+
+```text
+resource
+owner/action_id
+monotonic fencing_token
+expires_at
+```
+
+Every acquire after expiry increments the fencing token. A stale owner may not release or commit work against a newer token.
+
+This prevents an ABA race where job A's lock expires, job B acquires the resource, and a late release from A accidentally deletes B's lock.
+
+### Idempotency crash window
+
+Do not perform an external side effect and only then create the idempotency record.
+
+Use an operation journal:
+
+```text
+PENDING -> external effect -> DONE
+```
+
+Create and commit `PENDING` before the external effect. If the Broker crashes after the effect but before `DONE`, a retry must not blindly re-execute. It enters reconciliation and either confirms the external state or returns an indeterminate/reconcile-required result.
 
 Migrate only if measured contention justifies it.
 
