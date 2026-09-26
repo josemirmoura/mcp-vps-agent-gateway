@@ -26,6 +26,10 @@ This project assumes the AI model, external content and remote clients can all b
 | Audit tampering | Root process rewrites local history | hash chain + remote checkpoints/forwarding |
 | Unsafe kernel fallback | openat2/Landlock unavailable | capability detection; fail closed or documented safe fallback |
 | Egress abuse | Full enables arbitrary outbound network | network capability approved separately from Full |
+| Confused deputy | Gateway uses Broker's root authority for a resource the user was not allowed to touch | Broker re-authorizes subject + tool + resource + action on every call |
+| Tool poisoning | Downstream MCP changes description/schema to request broader or unrelated data | provenance + fingerprints + quarantine/review of material changes |
+| Tool-result injection | Logs/tool output contain hidden instructions | treat results as untrusted data; results never mutate policy/grants |
+| Cross-tool exfiltration | malicious read result induces sensitive read then external write | trust tiers, egress allowlists, data-flow restrictions, approvals |
 
 ## Mandatory security tests
 
@@ -47,6 +51,10 @@ This project assumes the AI model, external content and remote clients can all b
 - audit record removal/hash-chain mutation is detected.
 - Full without explicit network capability cannot use unrestricted egress.
 - missing openat2/Landlock is visible in health/security posture.
+- unauthorized resource through an otherwise authorized tool is denied.
+- malicious tool result cannot change policy or grant capability.
+- downstream tool fingerprint changes are detected and reviewed.
+- model-supplied arbitrary downstream MCP URL is rejected.
 
 ## Important principle
 
