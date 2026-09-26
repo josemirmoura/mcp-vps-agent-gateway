@@ -14,7 +14,7 @@ authenticated subject
 + canonical resource
 + requested action
 + current policy
-+ lease/job grant when required
++ grant/job grant when required
 ```
 
 Conceptually:
@@ -123,7 +123,7 @@ has no authority.
 Rules:
 
 - tool output never mutates policy
-- tool output never creates/extends a lease
+- tool output never creates/extends a grant
 - tool output never changes trust tier
 - tool output never registers a new MCP server
 - URLs returned by tools are not automatically fetched or trusted
@@ -174,7 +174,7 @@ Mandatory tests include:
 
 - Gateway asks Broker for an authorized tool on an unauthorized resource -> deny
 - same tool/resource with wrong subject -> deny
-- stale/foreign lease -> deny
+- stale/foreign grant -> deny
 - malicious tool result containing policy-changing instructions -> ignored
 - downstream tool schema changes materially -> quarantined pending review
 - dynamically supplied MCP URL from model/tool result -> rejected
