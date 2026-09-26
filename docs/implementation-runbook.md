@@ -4,6 +4,8 @@ This is the recommended implementation order. Do not start with unrestricted Ful
 
 **Normative hardening:** also read `docs/security-hardening-v2.md`. Where wording conflicts, Hardening v2 wins.
 
+**Execution rule:** follow `docs/mvp-first.md` before implementing the complete sequence below. Runtime edge cases are defined in `docs/runtime-semantics-and-recovery.md`.
+
 ## 1. Project layout
 
 Create:
