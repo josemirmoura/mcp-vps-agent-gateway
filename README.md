@@ -64,7 +64,7 @@ AI Client / ChatGPT
 - The agent cannot grant itself additional privileges.
 - Shell commands are constrained by timeout, cgroups/systemd and output limits.
 - Filesystem access must resist path traversal and symlink escapes.
-- Write operations should be idempotent when practical.
+- Replay-safe writes require idempotency keys; non-replay-safe/destructive writes require stronger confirmation and locking.
 - Jobs can outlive a disconnected MCP request.
 - Audit logs capture actions and decisions, not entire conversations.
 - Secrets should be referenced or injected at execution time instead of returned to the model.
@@ -76,6 +76,8 @@ docs/
   architecture.md
   implementation-runbook.md
   threat-model.md
+  security-hardening-v2.md
+  policy-schema.md
   chatgpt-integration.md
 
 examples/policies/
@@ -93,9 +95,11 @@ LICENSE
 
 1. Read [docs/architecture.md](docs/architecture.md).
 2. Read [docs/threat-model.md](docs/threat-model.md).
-3. Follow [docs/implementation-runbook.md](docs/implementation-runbook.md).
-4. If ChatGPT is your client, read [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
-5. If an AI coding agent is implementing the project, make it read [AGENTS.md](AGENTS.md) first.
+3. Read [docs/security-hardening-v2.md](docs/security-hardening-v2.md).
+4. Read [docs/policy-schema.md](docs/policy-schema.md).
+5. Follow [docs/implementation-runbook.md](docs/implementation-runbook.md).
+6. If ChatGPT is your client, read [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
+7. If an AI coding agent is implementing the project, make it read [AGENTS.md](AGENTS.md) first.
 
 ## Intended stack
 
