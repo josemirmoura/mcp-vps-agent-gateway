@@ -78,6 +78,7 @@ docs/
   threat-model.md
   security-hardening-v2.md
   policy-schema.md
+  transport-and-aggregation.md
   chatgpt-integration.md
 
 examples/policies/
@@ -97,9 +98,10 @@ LICENSE
 2. Read [docs/threat-model.md](docs/threat-model.md).
 3. Read [docs/security-hardening-v2.md](docs/security-hardening-v2.md).
 4. Read [docs/policy-schema.md](docs/policy-schema.md).
-5. Follow [docs/implementation-runbook.md](docs/implementation-runbook.md).
-6. If ChatGPT is your client, read [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
-7. If an AI coding agent is implementing the project, make it read [AGENTS.md](AGENTS.md) first.
+5. Read [docs/transport-and-aggregation.md](docs/transport-and-aggregation.md).
+6. Follow [docs/implementation-runbook.md](docs/implementation-runbook.md).
+7. If ChatGPT is your client, read [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
+8. If an AI coding agent is implementing the project, make it read [AGENTS.md](AGENTS.md) first.
 
 ## Intended stack
 
