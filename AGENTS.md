@@ -9,7 +9,9 @@ Before editing:
 1. `README.md`
 2. `docs/architecture.md`
 3. `docs/threat-model.md`
-4. `docs/implementation-runbook.md`
+4. `docs/security-hardening-v2.md`
+5. `docs/policy-schema.md`
+6. `docs/implementation-runbook.md`
 
 ## Non-negotiable rules
 
@@ -22,12 +24,16 @@ Before editing:
 7. Authorization is enforced server-side.
 8. Never commit secrets.
 9. Never print secrets in logs or responses.
-10. SQLite is sufficient initially.
+10. SQLite is sufficient initially, and only the Broker may open the state database.
 11. Do not add Kubernetes, Redis, OPA, a service mesh or other infrastructure without demonstrated need.
-12. Meaningful writes should be idempotent where practical.
+12. Replay-safe writes MUST require idempotency keys; non-replay-safe/destructive writes MUST use stronger confirmation/locking and MUST NOT be blindly retried.
 13. Long-running operations use persistent jobs.
 14. Critical configuration changes validate before apply.
 15. MCP/ChatGPT is an adapter; the domain must remain client-independent.
+16. Elevation approval must happen out-of-band from the MCP action channel.
+17. `network.unrestricted` is never implied by Full and requires separate approval.
+18. Audit must be tamper-evident and remotely anchored/checkpointed.
+19. Kernel security-feature absence must be detected and reported; insecure silent fallback is forbidden.
 
 ## Implementation order
 
