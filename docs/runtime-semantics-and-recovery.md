@@ -40,6 +40,32 @@ Rules:
 
 Migrate only if measured contention becomes material.
 
+### Resource-lock fencing
+
+Locks with TTL/deadline must include a monotonically increasing fencing token.
+
+A stale job can never release a resource or commit a protected step using an older token. Release is compare-and-delete on resource + owner/action_id + fencing token.
+
+This closes the classic ABA race:
+
+```text
+A acquires token 1
+A stalls and expires
+B acquires token 2
+A wakes up late
+A must NOT release/overwrite B
+```
+
+### Idempotency crash window
+
+For replay-protected effects, create an operation journal row before the external side effect:
+
+```text
+PENDING -> effect -> DONE
+```
+
+If the Broker crashes after the effect but before DONE, the next attempt does not re-execute automatically. It enters action-specific reconciliation or returns an indeterminate/reconcile-required result.
+
 ## 3. Idempotency is infrastructure metadata
 
 Do not depend on the LLM to invent a stable idempotency key.
