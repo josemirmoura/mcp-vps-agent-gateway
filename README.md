@@ -2,7 +2,7 @@
 
 A security-first reference architecture for connecting an AI assistant such as ChatGPT to a Linux VPS through MCP, while keeping authorization and privilege enforcement on the server.
 
-> **Status:** architecture and implementation runbook. Reference code can be added incrementally.
+> **Status:** reference architecture with an MVP-first implementation path. The full design is a north star, not the first milestone.
 
 ## Why this project exists
 
@@ -79,6 +79,8 @@ docs/
   security-hardening-v2.md
   policy-schema.md
   transport-and-aggregation.md
+  mvp-first.md
+  runtime-semantics-and-recovery.md
   chatgpt-integration.md
 
 examples/policies/
@@ -99,9 +101,11 @@ LICENSE
 3. Read [docs/security-hardening-v2.md](docs/security-hardening-v2.md).
 4. Read [docs/policy-schema.md](docs/policy-schema.md).
 5. Read [docs/transport-and-aggregation.md](docs/transport-and-aggregation.md).
-6. Follow [docs/implementation-runbook.md](docs/implementation-runbook.md).
-7. If ChatGPT is your client, read [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
-8. If an AI coding agent is implementing the project, make it read [AGENTS.md](AGENTS.md) first.
+6. Read [docs/mvp-first.md](docs/mvp-first.md).
+7. Read [docs/runtime-semantics-and-recovery.md](docs/runtime-semantics-and-recovery.md).
+8. Follow [docs/implementation-runbook.md](docs/implementation-runbook.md).
+9. If ChatGPT is your client, read [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
+10. If an AI coding agent is implementing the project, make it read [AGENTS.md](AGENTS.md) first.
 
 ## Intended stack
 
