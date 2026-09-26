@@ -1,71 +1,77 @@
 # Build vs adopt
 
-Before implementing this architecture from scratch, evaluate whether an existing MCP server or remote-control product already satisfies the real use case.
+Checked: 2026-09-26.
 
-## Gate -1: decide intentionally
+Before building a major component, evaluate existing solutions.
+
+## Gate -1
 
 Ask:
 
 1. Does an existing product connect to the actual target client?
 2. Does it support the required operations?
-3. Does its security model match the risk tolerance?
-4. Can it enforce server-side scopes rather than relying on model behavior?
-5. Can it be self-hosted or otherwise meet privacy/control requirements?
-6. Does it provide a usable recovery path?
+3. Does it enforce permissions server-side?
+4. Can it be self-hosted or meet control/privacy requirements?
+5. Does it provide recovery/revocation?
+6. Does adapting it cost less than maintaining a new privileged control plane?
 
-Possible outcomes:
+Outcome:
 
-- **Adopt**: existing solution already meets requirements.
-- **Adapt**: existing open-source solution is close enough to extend/fork.
-- **Build**: requirements justify the reference architecture in this repository.
+- Adopt
+- Adapt/fork
+- Build
 
-## Examples worth evaluating
-
-These projects/products solve adjacent problems and should be evaluated rather than ignored:
+## Useful comparison points
 
 ### VPS Guardian MCP
 
-Published MCP server focused on structured, safety-checked VPS operations. It deliberately avoids a general-purpose shell tool and uses explicit confirmations for mutations.
+Published VPS-focused MCP server with structured, safety-checked operations and no general-purpose shell tool.
 
-Useful comparison points:
+As of the checked date its documented path is a VPS-side Python server plus a local npm launcher over SSH/stdIO. This is a strong benchmark for:
 
-- typed operations
-- narrow mutation model
-- SSH/stdIO deployment path
-- packaged releases
-- practical operator workflow
+- typed VPS operations
+- narrow mutation surface
+- confirmations
+- diagnostics and rollback workflows
+- packaged release discipline
+
+It solves a somewhat different client-transport problem from the target remote ChatGPT Web architecture.
+
+Project:
+https://github.com/murzirius/VPS-Guardian-MCP
 
 ### Remote Desktop Commander
 
-Hosted remote MCP service that exposes filesystem and terminal access to supported AI clients using a remote MCP endpoint with OAuth.
+Hosted remote MCP service for filesystem and terminal access, using Streamable HTTP and OAuth with a paired device agent.
 
-Useful comparison points:
+It is a strong benchmark for:
 
-- remote-client UX
-- authentication
+- remote MCP UX
+- device pairing/revocation
+- OAuth flow
 - terminal/filesystem ergonomics
-- operational maturity
+- multi-client support
 
-### Generic MCP gateways
+Its hosted service implementation is not the self-hosted Broker architecture described here.
 
-Projects that proxy/aggregate remote MCP servers can solve transport and aggregation, but they generally do not replace the privileged Linux Broker or server-side VPS authorization model described here.
+Project:
+https://github.com/desktop-commander/remote-desktop-commander
 
-## Why this project may still be justified
+## Why build this architecture
 
-This architecture is specifically optimized for:
+Building remains justified if the required combination is:
 
-- a self-controlled VPS security boundary
-- Controlled / Scoped / temporarily elevated capabilities
-- server-side authorization independent of the model
-- typed Linux/Docker/systemd operations plus optional shell
+- self-controlled VPS boundary
+- ChatGPT Web as target
+- server-side Scoped policy
+- typed Linux/Docker/systemd operations
+- optional controlled shell
+- optional temporary elevation
 - explicit recovery semantics
-- direct remote MCP integration as the client ecosystem permits
+- operator-owned privileged Broker
 
 ## Rule
 
-Do not build a component merely because it appears in the north-star architecture.
+Do not build a component merely because it exists in the north-star diagram.
 
-Build it only when:
-
-- an existing solution does not satisfy the requirement, and
-- a completed MVP gate demonstrates the missing capability is actually needed.
+Build only when an existing solution does not satisfy the requirement and the previous MVP gate demonstrates the capability is needed.
