@@ -2,183 +2,281 @@
 
 ## Goal
 
-Provide an AI client with useful operational access to a Linux server without making the model itself a trusted security component.
+Give an AI client useful operational access to a Linux VPS while keeping the VPS, not the model, in control of authorization and privilege.
 
-## Components
+> **The LLM is never the security boundary.**
 
-### MCP Gateway
+## Canonical runtime
 
-Runs as an unprivileged service account.
+The reference design has two project-owned processes, both implemented in Go:
 
-Responsibilities:
+~~~text
+ChatGPT / MCP client
+        |
+        | MCP Streamable HTTP
+        v
++-----------------------------+
+| vps-agent-gateway           |
+| unprivileged                |
+|                             |
+| MCP + auth + schemas        |
+| canonical tool names        |
+| response shaping            |
+| optional human web UI       |
++-------------+---------------+
+              |
+              | Unix Domain Socket
+              v
++-------------+---------------+
+| vps-agent-broker            |
+| privileged, local-only      |
+|                             |
+| authoritative policy        |
+| SQLite + locks + jobs       |
+| secrets + audit             |
+| files + systemd + Docker    |
+| sandboxed execution         |
++-------------+---------------+
+              |
+              v
+     Linux / systemd / Docker
+~~~
 
-- MCP transport
-- tool schemas
-- OAuth/OIDC token validation
-- request validation
-- policy pre-checks
-- lease validation
-- idempotency handling
-- normalized responses
-- minimal audit metadata
+The existing reverse proxy or a supported private tunnel is ingress infrastructure, not a third project service.
+
+## Why Go for both processes
+
+The official MCP Go SDK is Tier 1 and supports MCP specification 2026-07-28. One language reduces packaging, dependency and maintenance cost while keeping the process-level privilege boundary.
+
+Another supported language is possible, but the reference implementation should not add runtime diversity without evidence that it helps.
+
+## Gateway
+
+The Gateway runs without root.
+
+It may:
+
+- expose MCP over Streamable HTTP
+- validate OAuth/OIDC tokens when required
+- validate input schemas
+- normalize tool names and resources
+- perform non-authoritative preflight checks
+- call the Broker through a Unix socket
+- later host a human approval web route
 
 It must not:
 
 - run as root
-- open the Docker socket
-- decide privileged policy alone
-- expose secrets unnecessarily
+- access the Docker socket
+- open the privileged SQLite database
+- read plaintext secret storage
+- become the authoritative authorization point
+- approve its own elevation
 
-### Policy Engine
+## Broker
 
-Authoritative server-side policy.
+The Broker is the privileged security boundary.
 
-Dimensions can include:
+Every privileged call is re-authorized against:
 
-- filesystem read/write roots
-- network policy
-- Docker stack scope
-- systemd unit scope
-- shell privilege
-- TTL
-- human approval requirement
+~~~text
+subject
++ canonical tool
++ canonical resource
++ action
++ current policy
++ lease/job grant when required
+~~~
 
-Recommended presets:
+The Broker owns:
 
-- Controlled
-- Scoped
-- Full
-
-### Approval Service
-
-Creates temporary capability leases after human authorization.
-
-An agent may request elevation. It must not be able to approve its own request.
-
-Recommended controls:
-
-- OAuth/OIDC login
-- step-up authentication
-- MFA or passkey
-- explicit scope display
-- explicit TTL
-- revocation
-
-### Execution Broker
-
-Small privileged daemon reachable only through a Unix Domain Socket.
-
-Responsibilities:
-
-- re-check authorization
+- authoritative policy evaluation
+- SQLite state
+- idempotency
+- resource locks
+- durable jobs
 - safe filesystem operations
-- sandboxed process execution
-- Docker operations
-- systemd operations
-- job management
-- audit events
+- Docker/systemd operations
+- process sandboxing
+- secret resolution
+- audit
 
-The broker should have a deliberately small API.
+The Gateway is treated as an untrusted deputy.
 
-### Runtime state
+## Policy is a module, not a service
 
-Suggested paths:
+The Policy Engine lives inside the Broker. It is not a third daemon.
 
-```text
-/etc/vps-agent/      sensitive configuration
-/run/vps-agent/      Unix sockets
-/var/lib/vps-agent/  SQLite, jobs, audit state
-```
+Policies are deny-by-default capability documents.
 
-## Trust boundaries
+Presets:
 
-```text
-Internet / AI Client
-        |
-        | untrusted requests
-        v
-MCP Gateway
-        |
-        | authenticated + validated IPC
-        v
-Execution Broker
-        |
-        | privileged OS operations
-        v
-Linux kernel / Docker / systemd
-```
+- Controlled — inspection plus narrowly gated writes
+- Scoped — autonomous actions inside an explicit perimeter
+- Full — optional temporary capability bundle
 
-Every boundary should validate independently.
+Full is disabled by default.
 
-## Full access
+## Approval is a flow, not necessarily a daemon
 
-Full access is a temporary capability, not a permanent default.
+Routine work should use Scoped and require no human interruption.
 
-A typical lease contains:
+If temporary elevation is later enabled, the agent may create a request, but approval occurs outside the MCP action channel.
 
-```json
-{
-  "subject": "user-id",
-  "mode": "full",
-  "scopes": [
-    "shell.admin",
-    "filesystem.full",
-    "docker.admin",
-    "systemd.admin",
-    "network.unrestricted"
-  ],
-  "issued_at": "...",
-  "expires_at": "..."
-}
-```
+A separate Approval Service process is not required by the reference design. A human route may live in the unprivileged Gateway if:
 
-The client only needs an opaque lease handle.
+- the human uses OAuth/OIDC step-up, MFA or passkey
+- approval is bound to a one-time nonce
+- the Broker independently validates the signed assertion and nonce
+- no MCP tool can approve the request
+- replay is prevented
+
+A separate approval service remains an option for larger deployments.
+
+## Full
+
+Full is not a single root bit.
+
+It expands into explicit capabilities such as:
+
+~~~text
+shell.admin
+filesystem.read:any
+filesystem.write:any
+docker.admin
+systemd.admin
+~~~
+
+Unrestricted network egress is not implied and requires separate approval.
+
+Full is disabled by default, temporary, revocable and unavailable until MVP and recovery gates pass.
+
+## Transport
+
+Use MCP Streamable HTTP at a stable HTTPS endpoint.
+
+For MCP 2026-07-28 the protocol core is stateless. Do not build custom WebSocket or transport-session machinery. Jobs and leases use explicit application handles.
+
+Let the official SDK handle protocol negotiation and backward compatibility.
 
 ## Filesystem
 
-Do not authorize a path by string prefix.
+Never authorize paths with string-prefix checks.
 
-Use safe path resolution. On modern Linux, `openat2()` with appropriate resolve flags can help constrain path traversal, magic links and symlink escapes.
+Preferred implementation:
 
-## Process sandbox
+- openat2 with restrictive resolution flags
 
-Prefer native Linux mechanisms first:
+Fallback:
+
+- carefully implemented directory-FD walk with openat/fstatat/O_NOFOLLOW semantics, or
+- fail closed for privileged writes
+
+Never silently fall back to string-based authorization.
+
+## Process isolation
+
+Baseline controls:
 
 - systemd transient units
 - cgroups
-- `NoNewPrivileges`
-- filesystem protection
-- private temp directories
-- process limits
-- memory limits
-- runtime limits
-- Landlock when available
+- NoNewPrivileges
+- PrivateTmp
+- filesystem restrictions
+- MemoryMax
+- TasksMax
+- runtime deadline
+- output limit
+- cancellation
+
+Landlock is defense-in-depth when available. Its absence is reported but does not disable baseline controls.
 
 ## Docker
 
-Do not give the MCP Gateway access to `/var/run/docker.sock`.
+The Gateway never gets /var/run/docker.sock.
 
-Docker control is effectively administrative. Route it through the broker and enforce stack-level policy.
+Docker operations are typed Broker operations authorized against canonical stacks and actions.
 
-## Long-running work
+## Jobs
 
-Use an explicit job model:
+The internal durable job model is authoritative:
 
-- `job.start`
-- `job.status`
-- `job.tail`
-- `job.cancel`
+~~~text
+job.start
+job.status
+job.tail
+job.cancel
+~~~
 
-A job should remain identifiable even if the MCP client disconnects.
+Jobs do not depend on an HTTP connection remaining open.
 
-## Storage
+If the target MCP client later supports the MCP Tasks extension reliably, an adapter may map internal jobs to that extension without changing Broker semantics.
 
-SQLite is enough for the first implementation:
+## State
 
-- approvals
-- leases
+SQLite is the initial store and only the Broker opens it.
+
+Transactions are short. Never keep a database transaction open while an external command, deploy, migration or Docker action runs.
+
+State can include:
+
+- approvals when enabled
+- leases/grants
 - jobs
 - idempotency
-- audit events
+- resource locks
+- audit metadata
 
-Use WAL mode and include the database in backup policy.
+Migrate only if measured contention justifies it.
+
+## Secrets
+
+Prefer native Linux mechanisms first:
+
+- root-owned files outside the repository
+- systemd credentials
+
+The Broker resolves secret references and injects values only into target processes.
+
+The Gateway and model-facing tools do not expose plaintext secret retrieval.
+
+## Audit by maturity
+
+Gate 1:
+- structured local audit in journald or append-oriented JSON
+
+Scoped production:
+- durable sequence/integrity checks
+
+Before Full production:
+- tamper-evident hash chain
+- remote checkpoint/forwarding
+- tested incident recovery
+
+Remote audit infrastructure is not a Gate 0 prerequisite.
+
+## Downstream tool trust
+
+If downstream MCP servers are later aggregated:
+
+- upstreams are allowlisted out-of-band
+- tool names are deterministic and namespaced
+- material schema/description changes are fingerprinted and reviewed
+- tool results are untrusted data
+- results never mutate policy, create leases, register servers or expose secrets
+
+## First-version non-goals
+
+The first implementation is not:
+
+- a universal MCP gateway
+- a multi-tenant control plane
+- a distributed scheduler
+- a generic root-shell service
+- a Kubernetes project
+- a replacement for SSH
+- an attempt to support every MCP client
+
+Its first goal is:
+
+> Safely prove that the actual target AI client can perform a small, valuable, auditable operation on one VPS.
