@@ -1,8 +1,9 @@
+version: 1
 mode: full
 enabled: false
 
-# Full is a convenience preset. The lease stores the exact capabilities
-# approved by the human. Unrestricted network is NOT implied.
+# Full is a convenience preset. The capability grant stores exactly what
+# the human approved. Unrestricted network is NOT implied.
 capabilities:
   - shell.admin
   - filesystem.read:any
@@ -15,7 +16,7 @@ network:
   destinations: []
   unrestricted_requires_separate_approval: true
 
-lease:
+grant:
   required: true
   max_ttl_minutes: 60
   out_of_band_approval: true
