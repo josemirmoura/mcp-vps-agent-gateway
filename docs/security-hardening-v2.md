@@ -1,167 +1,173 @@
-# Security Hardening v2
+# Security hardening
 
-This document closes seven implementation gaps identified during architecture review. These rules supersede weaker or ambiguous wording in earlier documents.
+These rules define the security posture beyond the base architecture.
 
-## 1. Elevation approval is out-of-band
+## 1. Authorization belongs to the Broker
 
-The MCP client may request elevation, but it must never approve that request through the same agent-controlled action channel.
+The Gateway is not trusted to authorize privileged work.
 
-Required properties:
+Every privileged operation binds:
 
-- approval happens in a separate human-authenticated surface
-- use OAuth/OIDC plus step-up authentication
-- prefer MFA or passkey for elevated capabilities
-- approval URLs expire quickly
-- GET parameters never encode an approval decision
-- elevation requests are rate-limited
-- duplicate requests are coalesced
-- cooldowns prevent approval fatigue
-- optionally notify a separate trusted device or channel
+~~~text
+subject
++ canonical tool
++ resource
++ action
++ policy
++ grant when required
+~~~
 
-The AI can create a pending request and receive a request handle. Only the human approval surface can convert it into a lease.
+No ambient authority is inherited from a previous tool call or conversation step.
 
-## 2. Full is a convenience preset, not one giant capability
+## 2. Elevation is exceptional and out-of-band
 
-Internally, authorization must remain capability-based.
+Routine work uses Scoped.
 
-A Full request expands into explicit capabilities such as:
+If elevation is enabled later:
 
-```text
+- MCP can request elevation
+- MCP cannot approve elevation
+- human approval uses a separate authenticated web flow or equivalent trusted surface
+- use step-up auth and preferably MFA/passkey
+- bind approval to a one-time nonce/request
+- apply rate limits, cooldowns and duplicate coalescing
+- approval URLs expire
+- GET parameters never encode approval decisions
+
+Full remains disabled until R5 criteria are met.
+
+## 3. Full is capability-based
+
+Full is a convenience label for explicit capabilities.
+
+Examples:
+
+~~~text
 shell.admin
 filesystem.read:any
 filesystem.write:any
 docker.admin
 systemd.admin
-network.egress:<allowlist>
-```
+~~~
 
-`network.unrestricted` is never implied automatically. It must be separately visible and separately approved because unrestricted egress substantially increases exfiltration risk.
+network.unrestricted is separate and must never be implied.
 
-The UI may offer a Full preset for convenience, but the lease stores the exact approved capability set.
+## 4. Replay safety
 
-## 3. Strong write replay rules
+Every state-changing tool is classified:
 
-Every state-changing tool must declare one of two replay classes:
+### replay-safe
+- infrastructure-managed idempotency identity required
+- same identity + same normalized request returns the stored result
+- same identity + different request conflicts
 
-### Replay-safe write
+### non-replay-safe
+- never blindly retried
+- use action IDs
+- use resource locks/state
+- require risk-appropriate confirmation/authorization
 
-Must require an idempotency key.
+The LLM is not responsible for inventing a stable idempotency key.
 
-Rules:
+## 5. SQLite ownership
 
-- same key + same normalized request hash returns the stored result
-- same key + different request hash returns conflict
-- the server never silently executes twice
+Only the Broker opens the privileged SQLite database.
 
-### Non-replay-safe or destructive write
+Gateway and human approval routes use narrow Broker APIs.
 
-If an operation cannot be made reliably idempotent, it must require:
+Transactions are short. External commands never run inside open database transactions.
 
-- an operation-specific lock or transaction state
-- an explicit unique action identifier
-- confirmation or elevated authorization proportional to risk
-- a clear result that prevents blind client retry
+## 6. Filesystem safety
 
-A generic shell command cannot be assumed idempotent merely because it carries an idempotency key.
+Never authorize paths using string prefixes.
 
-## 4. Single owner for SQLite
+Preferred:
+- openat2 with restrictive resolution flags
 
-The Gateway and Approval UI must not open the privileged state database.
+Fallback:
+- secure directory-FD walk using openat/fstatat/O_NOFOLLOW semantics
 
-Required model:
+If neither is safely available, privileged writes fail closed.
 
-- the Broker is the sole process that opens and mutates SQLite
-- the Gateway requests state operations through a narrow Unix-socket API
-- the Approval Service uses a separate authorized IPC path or socket
-- Unix peer credentials should be checked where practical
-- database-file permissions do not grant the Gateway write access
+## 7. Kernel capability detection
 
-This avoids a shared writable file becoming a privilege-escalation bridge.
+Broker health reports relevant capabilities.
 
-## 5. Audit logs must be tamper-evident
+If Landlock is unavailable:
+- retain systemd/cgroup sandboxing
+- report degraded defense-in-depth
+- do not disable other controls
 
-Local root can always destroy local evidence. Therefore the project must not claim that local logs are tamper-proof.
+If openat2 is unavailable:
+- use the documented safe fallback or fail closed
 
-Required design:
+## 8. Tool and result trust
 
-- monotonically sequenced audit records
-- each record hashes the previous record
-- periodic signed or authenticated checkpoints of the chain head
-- remote anchoring or forwarding to a separate destination
-- detection of sequence gaps or hash-chain breaks
+Tool output, logs, web content and downstream MCP results are untrusted data.
 
-Examples of remote destinations include another host, object storage with retention controls, or a dedicated logging service.
+They never:
 
-The goal is to make silent history rewriting detectable outside the compromised host.
+- mutate policy
+- create/extend grants
+- change trust tier
+- register a new MCP server
+- expose secrets
+- bypass network policy
 
-## 6. Kernel capability detection and secure fallback
+Downstream MCP servers are configured out-of-band and material tool changes are fingerprinted/reviewed.
 
-At startup, the Broker must detect relevant kernel features and report them in `system.health`.
+## 9. Secret handling
 
-### openat2 unavailable
+Default VPS mechanisms:
 
-Do not fall back to string-prefix path authorization.
+- root-owned files outside Git
+- systemd credentials
 
-Acceptable options:
+Gateway cannot read plaintext secret storage.
 
-- a carefully implemented directory-FD component walk using openat/fstatat/O_NOFOLLOW semantics, or
-- fail closed for Scoped/Full filesystem writes until a safe fallback is available
+No generic secret.read_plaintext tool.
 
-### Landlock unavailable
+Redact likely credentials from logs/output where practical.
 
-Continue with the documented systemd/cgroup sandbox, but report the security posture as degraded. The lack of Landlock never disables timeout, cgroup, filesystem or privilege controls.
+## 10. Audit grows with privilege
 
-## 7. Scoped policy has a concrete schema
+### R1/R2
+Structured local audit is sufficient.
 
-Scoped is an explicit capability document, not a vague concept.
+### R3/R4
+Add durable ordering/integrity checks and tested retention.
 
-Minimum dimensions:
+### R5 / Full
+Require:
+- monotonically sequenced records
+- hash-chain integrity
+- checkpoint/signature or authenticated chain head
+- remote anchoring/forwarding
+- detection of sequence gaps or chain breaks
 
-```yaml
-mode: scoped
+Do not claim local root logs are tamper-proof.
 
-filesystem:
-  read: []
-  write: []
+## 11. Mandatory negative tests
 
-network:
-  mode: blocked | allowlist | unrestricted
-  destinations: []
+Before the relevant maturity stage passes, test:
 
-services:
-  inspect: []
-  manage: []
-  actions: []
+- path traversal denied
+- symlink escape denied
+- unauthorized service/stack denied
+- wrong subject denied
+- stale/revoked grant denied
+- replay-safe retry executes once
+- non-replay-safe action not blindly retried
+- malicious tool result cannot grant capability
+- arbitrary downstream MCP URL rejected
+- Gateway cannot open Docker socket
+- Gateway cannot open privileged SQLite
+- missing kernel features never cause insecure silent fallback
 
-docker:
-  inspect: []
-  manage: []
-  actions: []
+Before R5 also test:
 
-shell:
-  enabled: true
-  cwd_roots: []
-  max_runtime_seconds: 300
-  max_output_bytes: 1048576
-
-privilege:
-  admin: deny | broker-only
-```
-
-Unknown fields or unknown capabilities must fail validation by default.
-
-## Additional mandatory tests
-
-- agent cannot approve its own elevation request
-- repeated elevation requests trigger rate limits/cooldown
-- Full lease without network capability cannot access arbitrary egress
-- Gateway cannot open the SQLite state database
-- Approval UI cannot open the SQLite state database
-- audit hash-chain verification succeeds on intact logs
-- audit tampering or record removal is detected
-- openat2 absence never causes prefix-based authorization
-- Landlock absence is visible in health status
-- unknown Scoped-policy fields are rejected
-- non-replay-safe writes are never automatically retried
-
-These requirements are part of the production acceptance gate.
+- elevation spam rate-limited
+- self-approval impossible
+- Full without network capability lacks unrestricted egress
+- audit tampering detectable
+- revoke-all works
