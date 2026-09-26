@@ -163,6 +163,8 @@ Before the relevant maturity stage passes, test:
 - Gateway cannot open Docker socket
 - Gateway cannot open privileged SQLite
 - missing kernel features never cause insecure silent fallback
+- stale resource-lock owner cannot release or commit after a newer fencing token exists
+- crash after external effect but before idempotency completion does not cause blind duplicate execution
 
 Before R5 also test:
 
