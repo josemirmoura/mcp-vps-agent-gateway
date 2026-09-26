@@ -1,120 +1,157 @@
 # MCP VPS Agent Gateway
 
-Arquitetura de referência orientada a segurança para conectar um assistente de IA, como o ChatGPT, a uma VPS Linux via MCP, mantendo autorização e privilégios sob controle do servidor.
+Arquitetura de referência orientada a segurança para conectar ChatGPT ou outro cliente MCP a uma VPS Linux sem transformar o modelo em fronteira de segurança.
 
-## Ideia central
+> **Status: PRE-ALPHA / DOCS-FIRST.** Ainda não existe binário pronto para produção nem release estável.
 
-A experiência desejada é próxima à de um agente de desenvolvimento local:
+## O que é
 
-- **Controlled** — o agente investiga e pede aprovação para mudanças relevantes.
-- **Scoped** — autonomia dentro de um perímetro explicitamente autorizado.
-- **Full** — acesso administrativo temporário, concedido por uma pessoa e com expiração automática.
+O alvo é:
 
-Regra principal:
+~~~text
+ChatGPT Web / cliente MCP
+        |
+        | Streamable HTTP
+        v
+vps-agent-gateway      sem root
+        |
+        | Unix socket
+        v
+vps-agent-broker       privilegiado, somente local
+        |
+        v
+Linux / systemd / Docker
+~~~
+
+O Gateway cuida de MCP, autenticação e schemas.
+
+O Broker é a fronteira real de segurança: policy, estado, jobs, filesystem, Docker/systemd, secrets e execução privilegiada.
 
 > **O LLM nunca é a fronteira de segurança.**
 
-O modelo solicita ações. O servidor decide se elas podem acontecer.
+## O que ainda não é
 
-## Arquitetura
+Hoje este repositório não é:
 
-```text
-ChatGPT / Cliente MCP
-        |
-        v
-MCP Gateway (sem root)
-        |
-        v
-Policy Engine
-        |
-        v
-Execution Broker (privilegiado e mínimo)
-        |
-        v
-Linux / Docker / systemd / arquivos / jobs
-```
+- software plug-and-play
+- imagem Docker pronta
+- release de produção
+- shell root genérico para IA
+- garantia de que todo plano do ChatGPT aceite MCP privado com escrita
 
-## Princípios
+A arquitetura completa é o norte. A implementação começa pequena.
 
-- Gateway sem root.
-- Gateway sem acesso direto ao Docker socket.
-- Operações privilegiadas passam por broker local.
-- Política aplicada server-side.
-- Full somente com autorização humana e TTL.
-- O agente não pode elevar a si próprio.
-- Shell com timeout, limites de memória/processos e limite de saída.
-- Filesystem protegido contra path traversal e escapes por symlink.
-- Escritas idempotentes quando possível.
-- Jobs longos persistentes.
-- Auditoria de ações e decisões.
-- Segredos referenciados/injetados, evitando exposição ao modelo.
+## Modos
 
+- **Controlled** — inspeção com mudanças estreitamente controladas.
+- **Scoped** — autonomia dentro de um perímetro explícito.
+- **Full** — pacote temporário de capabilities, opcional e desligado por padrão.
+
+O trabalho rotineiro deve acontecer em Scoped. Full é excepcional.
+
+## Stack de referência
+
+- **Gateway:** Go + SDK MCP oficial para Go
+- **Broker:** Go
+- **IPC:** Unix Domain Socket
+- **Transporte:** MCP Streamable HTTP
+- **Estado:** SQLite, aberto somente pelo Broker
+- **Isolamento:** systemd transient units + cgroups
+- **Segredos:** systemd credentials e/ou arquivos root-owned
+- **Sandbox adicional:** Landlock quando disponível
+- **Entrada:** reverse proxy existente ou túnel privado suportado
+
+Sem Kubernetes, Redis, service mesh ou daemon separado de policy.
 
 ## Início rápido
 
-> Este repositório é, neste momento, uma arquitetura de referência e um guia de implementação, não um binário pronto. O caminho mais rápido é construir primeiro o **Gate 0** e provar o cliente MCP real antes de adicionar privilégios.
-
 ### 1. Clone
 
-```bash
+~~~bash
 git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
 cd mcp-vps-agent-gateway
-```
+~~~
 
-### 2. Leia o mínimo necessário
+### 2. Leia primeiro
 
-```text
+~~~text
+docs/README.md
+docs/project-status.md
 docs/mvp-first.md
-docs/security-hardening-v2.md
-docs/transport-and-aggregation.md
+docs/architecture.md
 AGENTS.md
-```
+~~~
 
-### 3. Implemente somente o Gate 0
+### 3. Faça o Gate 0A antes de código privilegiado
 
-A primeira versão deve expor apenas:
+Valide qual caminho real do ChatGPT será usado.
 
-```text
+Em 2026-09-26, a OpenAI documenta MCP privado completo com write/modify em Developer Mode para Business, Enterprise e Edu. Não assuma que Plus Web aceita um MCP privado customizado com escrita.
+
+Veja [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
+
+### 4. Implemente somente o Gate 0B
+
+Exponha apenas:
+
+~~~text
 system.info
 file.read_test
 file.write_test
-```
+~~~
 
-com leitura e escrita restritas a um diretório descartável, por exemplo:
+Restrinja arquivos a:
 
-```text
+~~~text
 /tmp/vps-agent-poc/
-```
+~~~
 
-Ainda **não** adicione root, controle de Docker, OAuth, modo Full, Approval Service ou shell administrativo genérico.
+Ainda não adicione root, Docker, SQLite, Full, approval ou shell genérico.
 
-### 4. Teste com o cliente MCP real
+### 5. Entregue isto a um agente de código
 
-O Gate 0 passa quando:
+~~~text
+Leia AGENTS.md, docs/README.md e docs/mvp-first.md.
+Implemente somente o Gate 0B usando Go e o SDK MCP oficial para Go.
+Não implemente execução privilegiada, Docker, Full, approval,
+SQLite ou shell genérico.
+Adicione testes de confinamento de caminhos, entradas inválidas e erros claros.
+~~~
 
-- o cliente descobre as ferramentas
-- leitura funciona
-- escrita funciona quando o produto/cliente permitir
-- caminhos proibidos falham
-- reconexões não corrompem estado
+## Escada de implementação
 
-Se o cliente real não conseguir executar a ferramenta de escrita necessária, pare aí e resolva somente a camada de integração.
+~~~text
+Gate -1   Adotar / adaptar / construir
+Gate 0A   Provar a superfície real do ChatGPT
+Gate 0B   POC MCP seguro de leitura/escrita
+Gate 1    Uma ação privilegiada tipada
+Gate 2    Um stack real em Scoped
+Gate 3    Estado/jobs/secrets duráveis
+Gate 4    Escritas validadas mais amplas
+Gate 5    Elevação temporária opcional
+~~~
 
-### 5. Entregue a um agente de código
+Cada gate precisa justificar a próxima camada.
 
-Você pode passar esta instrução:
+## Segurança central
 
-```text
-Leia AGENTS.md e docs/mvp-first.md.
-Implemente somente o Gate 0.
-Não implemente execução privilegiada, acesso Docker, modo Full,
-OAuth, Approval Service ou qualquer recurso além do Gate 0.
-Adicione testes de confinamento de caminhos e erros claros.
-```
+- Gateway nunca roda como root.
+- Gateway nunca recebe Docker socket.
+- Broker reautoriza toda chamada privilegiada.
+- Policy é deny-by-default e autoritativa dentro do Broker.
+- Só o Broker abre o SQLite.
+- Writes replay-safe usam idempotência gerada pela infraestrutura.
+- Writes non-replay-safe nunca recebem retry cego.
+- Filesystem resiste a traversal e symlink escape.
+- Resultados de tools são dados não confiáveis.
+- O modelo não registra MCP downstream dinamicamente.
+- Full nasce desligado e não implica rede irrestrita.
+- Secrets não são expostos por ferramenta genérica de leitura.
 
-Depois que o Gate 0 passar, avance para Gate 1 e Gate 2 em [docs/mvp-first.md](docs/mvp-first.md).
+## Documentação
 
+A ordem canônica e as regras de precedência estão em [docs/README.md](docs/README.md).
 
-Comece por [docs/architecture.md](docs/architecture.md) e depois siga [docs/implementation-runbook.md](docs/implementation-runbook.md).
+## Licença
 
-Licença: Apache-2.0.
+Apache-2.0. Veja [LICENSE](LICENSE).
