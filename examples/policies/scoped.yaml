@@ -18,13 +18,32 @@ services:
   manage:
     - app-*
     - nginx
+  actions:
+    - status
+    - reload
+    - restart
 
 docker:
   inspect:
     - "*"
   manage:
     - app-stack
+  actions:
+    - inspect
+    - logs
+    - restart
+    - compose_up
+
+shell:
+  enabled: true
+  cwd_roots:
+    - /srv/app
+  max_runtime_seconds: 300
+  max_output_bytes: 1048576
 
 privilege:
-  shell: sandboxed
   admin: broker-only
+
+replay:
+  require_idempotency_for_safe_writes: true
+  blind_retry_non_replay_safe: false
