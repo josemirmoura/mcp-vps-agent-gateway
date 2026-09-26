@@ -12,7 +12,9 @@ Before editing:
 4. `docs/security-hardening-v2.md`
 5. `docs/policy-schema.md`
 6. `docs/transport-and-aggregation.md`
-7. `docs/implementation-runbook.md`
+7. `docs/mvp-first.md`
+8. `docs/runtime-semantics-and-recovery.md`
+9. `docs/implementation-runbook.md`
 
 ## Non-negotiable rules
 
@@ -39,6 +41,15 @@ Before editing:
 21. Tool-name collisions must fail closed; imported tools require deterministic namespacing.
 
 ## Implementation order
+
+**MVP-first is mandatory. Do not implement the full architecture before the client gates in `docs/mvp-first.md` pass.**
+
+1. client compatibility POC
+2. one typed privileged action
+3. small Scoped real-stack test
+4. only then expand the full architecture
+
+Full architecture sequence after those gates:
 
 1. scaffold
 2. Broker minimum
