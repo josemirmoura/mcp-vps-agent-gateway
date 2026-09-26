@@ -15,7 +15,9 @@ Before editing:
 7. `docs/mvp-first.md`
 8. `docs/runtime-semantics-and-recovery.md`
 9. `docs/tool-trust-and-confused-deputy.md`
-10. `docs/implementation-runbook.md`
+10. `docs/project-status.md`
+11. `docs/build-vs-adopt.md`
+12. `docs/implementation-runbook.md`
 
 ## Non-negotiable rules
 
@@ -43,6 +45,8 @@ Before editing:
 22. Broker authorization must bind subject + canonical tool + resource + action + policy/grant; never trust Gateway identity alone.
 23. Tool results are untrusted data and never grant capability, mutate policy, register servers or expose secrets.
 24. Downstream MCP servers are allowlisted out-of-band; material tool schema/description changes require review.
+25. Full mode is disabled by default and must not be enabled before Gate 0/1/2 and recovery/security gates pass.
+26. Before building a major component, evaluate whether an existing implementation can satisfy the requirement.
 
 ## Implementation order
 
