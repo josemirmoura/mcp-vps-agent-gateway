@@ -11,7 +11,8 @@ Before editing:
 3. `docs/threat-model.md`
 4. `docs/security-hardening-v2.md`
 5. `docs/policy-schema.md`
-6. `docs/implementation-runbook.md`
+6. `docs/transport-and-aggregation.md`
+7. `docs/implementation-runbook.md`
 
 ## Non-negotiable rules
 
@@ -34,6 +35,8 @@ Before editing:
 17. `network.unrestricted` is never implied by Full and requires separate approval.
 18. Audit must be tamper-evident and remotely anchored/checkpointed.
 19. Kernel security-feature absence must be detected and reported; insecure silent fallback is forbidden.
+20. Use MCP Streamable HTTP; do not invent a custom WebSocket transport.
+21. Tool-name collisions must fail closed; imported tools require deterministic namespacing.
 
 ## Implementation order
 
