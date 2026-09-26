@@ -1,100 +1,138 @@
 # MVP-first implementation track
 
-The complete architecture is the north star. It is **not** the first implementation milestone.
+The full architecture is the north star. It is not the first milestone.
 
-The project must prove the client path and real operational value before building Approval Service, Full mode, remote audit anchoring or advanced sandbox layers.
+## Gate -1 — Adopt, adapt, or build
 
-## Gate 0 — client compatibility before privileged code
+Evaluate existing products and open-source MCP servers first.
 
-Build the smallest possible MCP server, running as an unprivileged user.
+Choose deliberately:
+
+- Adopt if an existing solution already satisfies the requirements.
+- Adapt if an existing implementation is close enough.
+- Build only when the required combination is missing.
+
+The differentiating target here is:
+
+~~~text
+ChatGPT Web
++ self-controlled VPS
++ server-side policy
++ Scoped autonomy
++ optional temporary elevation
++ Broker under operator control
+~~~
+
+## Gate 0A — Prove the ChatGPT product surface
+
+This happens before privileged code.
+
+Primary target: ChatGPT Web.
+
+As of 2026-09-26, OpenAI documents full private MCP write/modify in Developer Mode for Business, Enterprise and Edu. Plugin availability varies by plan, surface, region and included app capabilities.
+
+Do not assume that a private custom write-capable MCP can be attached directly to Plus Web.
+
+Choose and validate one supported route:
+
+1. Private development route — a workspace/plan that supports private full MCP write.
+2. Plus Web route — an eligible plugin/app whose remote MCP write capability is available on Plus Web.
+3. Protocol-only route — MCP Inspector while the distribution route is unresolved.
+
+### Gate 0A success
+
+Record:
+
+~~~text
+target_surface:
+target_plan:
+integration_route:
+read_available:
+write_available:
+private_or_published:
+tested_date:
+~~~
+
+If strict Plus Web is required and no supported write route exists yet, stop at protocol development or change only the distribution route. Do not weaken the server.
+
+## Gate 0B — Safe MCP POC
+
+Build the smallest server as an unprivileged user.
+
+Reference implementation: Go + official MCP Go SDK.
 
 Expose only:
 
-```text
+~~~text
 system.info
 file.read_test
 file.write_test
-```
+~~~
 
-Restrictions:
+Restrict file access to:
 
-- read/write only inside a disposable directory such as `/tmp/vps-agent-poc/`
-- no root
-- no Docker
-- no systemd writes
-- no SQLite
-- no Approval Service
-- no Full mode
-- no external secrets
+~~~text
+/tmp/vps-agent-poc/
+~~~
 
-Connect this POC to the **actual target client**.
+Do not add root, Docker, systemd writes, SQLite, external secrets, Full, approval or generic shell.
 
-For this project, ChatGPT Web is the primary client target.
+### Gate 0B success
 
-### Gate 0 success
-
-- ChatGPT discovers the tools
+- MCP Inspector passes
+- the chosen ChatGPT route discovers the tools when available
 - read works
 - write works when the client/product permits it
-- forbidden path fails
+- forbidden paths fail
 - errors are understandable
-- reconnect does not corrupt state
+- retry/reconnect behavior is safe
 
-If the real client cannot execute the required write tool, stop. Change only the client integration path. Do not build the privileged architecture yet.
+## Gate 1 — One typed privileged action
 
-## Gate 1 — prove one privileged operational action
+Add the minimal Broker.
 
-After Gate 0 passes, add the minimal privileged Broker.
+~~~text
+vps-agent-gateway  (non-root)
+        |
+   Unix socket
+        v
+vps-agent-broker   (privileged)
+~~~
 
-Keep only:
+Expose:
 
-```text
+~~~text
 system.info
 file.read_test
 service.status
 service.restart
-```
+~~~
 
-`service.restart` must be restricted to **one disposable or non-critical test service**.
+service.restart is limited to one disposable or non-critical unit.
 
-At this point the architecture has two processes:
-
-```text
-MCP Gateway (non-root)
-        |
-   Unix socket
-        v
-Broker (privileged, minimal)
-```
-
-No Approval Service yet. No Full mode. No general admin shell.
+Still exclude generic admin shell, Full, approval UI, broad Docker administration and remote audit infrastructure.
 
 ### Gate 1 success
 
-The real client can:
+The client can inspect, restart and re-check one test service, produce an audit record and fail safely on unauthorized units.
 
-1. inspect the test service
-2. restart it through a typed operation
-3. verify final health
-4. receive a precise audit record
+## Gate 2 — Scoped real-stack pilot
 
-## Gate 2 — Scoped value test
+Define one explicit Scoped policy for one real stack.
 
-Add a small explicit Scoped policy for one real application stack.
+Add only capabilities demonstrated by real need, such as:
 
-Recommended first capabilities:
-
-```text
+~~~text
 system.info
 file.read
-docker.logs OR service.status
-service.restart OR docker.action(restart)
+service.status
+service.restart
+docker.logs
+docker.action(restart)
 job.status
-```
+~~~
 
-Do not add a generic root shell yet.
-
-Run real tasks for several days and record:
+Use it for several days and measure:
 
 - task frequency
 - success/failure rate
@@ -103,42 +141,47 @@ Run real tasks for several days and record:
 - missing capabilities
 - recovery time
 
-Only capabilities demonstrated by real work should be added.
+Gate 2 passes when Scoped solves useful work without routine elevation.
 
-## Gate 3 — add complexity only when justified
+## Gate 3 — Durability
 
-Add these components only after evidence:
+Add only when needed:
 
-- SQLite: when durable jobs/idempotency/leases are needed
-- OAuth/OIDC: when the remote integration requires authenticated user identity
-- Approval Service: when temporary administrative elevation becomes a real use case
-- Full mode: only after Scoped proves insufficient
-- Landlock: defense-in-depth after the baseline sandbox works
-- remote audit anchoring: before broad administrative production use
-- tool aggregation: only when multiple upstream MCP servers are actually connected
+- SQLite owned by Broker
+- durable jobs
+- infrastructure-generated idempotency identity
+- logical resource locks
+- systemd credentials / secret references
+- stronger structured audit
 
-## Language choice
+## Gate 4 — Broader writes
 
-The architecture does not require two languages.
+Based on demonstrated need, add:
 
-Using TypeScript for MCP and Go for the Broker is a valid target, but the MVP should minimize runtime diversity.
+- file.write / file.patch
+- validated configuration updates
+- additional typed Docker/systemd actions
+- sandboxed shell.exec inside Scoped roots
 
-If the currently supported official SDK and implementation environment make it practical, two small Go binaries or another single-language split are acceptable, provided privilege separation remains intact.
+A generic shell is not a prerequisite for useful operation.
 
-Do not merge Gateway and privileged Broker into one root process merely to reduce line count.
+## Gate 5 — Temporary elevation
 
-## What not to optimize for
+Only if Scoped is demonstrably insufficient:
 
-Do not optimize for:
+- elevation requests
+- out-of-band human approval
+- temporary capability leases
+- revoke-all
+- remote audit anchoring
+- Full feature flag
 
-- total feature completeness
-- arbitrary root automation
-- supporting every MCP client
-- a universal MCP multiplexer
-- theoretical scalability
+Only after those controls pass should shell.exec_admin be considered.
 
-Optimize first for:
+## Rule
 
-> Can the actual AI client safely and reliably perform a small set of valuable operations on one real server?
+Every new component needs evidence from the previous gate.
 
-That is the MVP.
+Optimize first for this question:
+
+> Can the actual target client safely and reliably complete valuable work on one real server?
