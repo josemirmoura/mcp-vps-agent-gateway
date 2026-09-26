@@ -4,97 +4,149 @@ Instructions for AI coding agents working in this repository.
 
 ## Read first
 
-Before editing:
+Read in this order:
 
-1. `README.md`
-2. `docs/architecture.md`
-3. `docs/threat-model.md`
-4. `docs/security-hardening-v2.md`
-5. `docs/policy-schema.md`
-6. `docs/transport-and-aggregation.md`
-7. `docs/mvp-first.md`
-8. `docs/runtime-semantics-and-recovery.md`
-9. `docs/tool-trust-and-confused-deputy.md`
-10. `docs/project-status.md`
-11. `docs/build-vs-adopt.md`
-12. `docs/implementation-runbook.md`
+1. README.md
+2. docs/README.md
+3. docs/project-status.md
+4. docs/mvp-first.md
+5. docs/architecture.md
+6. docs/policy-schema.md
+7. docs/chatgpt-integration.md
+8. docs/security-hardening-v2.md
+9. docs/runtime-semantics-and-recovery.md
+10. docs/threat-model.md
 
-## Non-negotiable rules
+Use the precedence rules in docs/README.md if documents appear to conflict.
 
-1. Native platform primitives first.
-2. MCP Gateway never runs as root.
-3. MCP Gateway never receives Docker socket access.
-4. Privileged Broker is local and reachable only through a Unix socket.
-5. Full access requires a human-approved temporary lease.
-6. The agent cannot mint or approve its own elevation.
-7. Authorization is enforced server-side.
-8. Never commit secrets.
-9. Never print secrets in logs or responses.
-10. SQLite is sufficient initially, and only the Broker may open the state database.
-11. Do not add Kubernetes, Redis, OPA, a service mesh or other infrastructure without demonstrated need.
-12. Replay-safe writes MUST require idempotency keys; non-replay-safe/destructive writes MUST use stronger confirmation/locking and MUST NOT be blindly retried.
-13. Long-running operations use persistent jobs.
-14. Critical configuration changes validate before apply.
-15. MCP/ChatGPT is an adapter; the domain must remain client-independent.
-16. Elevation approval must happen out-of-band from the MCP action channel.
-17. `network.unrestricted` is never implied by Full and requires separate approval.
-18. Audit must be tamper-evident and remotely anchored/checkpointed.
-19. Kernel security-feature absence must be detected and reported; insecure silent fallback is forbidden.
-20. Use MCP Streamable HTTP; do not invent a custom WebSocket transport.
-21. Tool-name collisions must fail closed; imported tools require deterministic namespacing.
-22. Broker authorization must bind subject + canonical tool + resource + action + policy/grant; never trust Gateway identity alone.
-23. Tool results are untrusted data and never grant capability, mutate policy, register servers or expose secrets.
-24. Downstream MCP servers are allowlisted out-of-band; material tool schema/description changes require review.
-25. Full mode is disabled by default and must not be enabled before Gate 0/1/2 and recovery/security gates pass.
-26. Before building a major component, evaluate whether an existing implementation can satisfy the requirement.
+## Current implementation rule
 
-## Implementation order
+**MVP-first is mandatory.**
 
-**MVP-first is mandatory. Do not implement the full architecture before the client gates in `docs/mvp-first.md` pass.**
+Do not implement the full north-star architecture before the corresponding gate is earned.
 
-1. client compatibility POC
-2. one typed privileged action
-3. small Scoped real-stack test
-4. only then expand the full architecture
+Current ladder:
 
-Full architecture sequence after those gates:
+~~~text
+Gate -1   adopt / adapt / build
+Gate 0A   prove target ChatGPT product surface
+Gate 0B   safe MCP POC
+Gate 1    one typed privileged action
+Gate 2    one real Scoped stack
+Gate 3    durable state/jobs/secrets
+Gate 4    broader validated writes
+Gate 5    optional temporary elevation
+~~~
 
-1. scaffold
-2. Broker minimum
-3. MCP Gateway minimum
-4. Controlled/Scoped policy
-5. secure filesystem
-6. sandboxed shell
-7. jobs
-8. Docker/systemd
-9. OAuth/OIDC
-10. Approval Service
-11. Full
-12. client integration
-13. gradual production
+## Reference implementation
 
-Do not start by implementing unrestricted root shell access.
+Prefer:
+
+- Go for Gateway
+- Go for Broker
+- official MCP Go SDK
+- Unix Domain Socket for Gateway -> Broker
+- systemd for service management
+- SQLite owned only by Broker
+
+Do not add a second runtime without a concrete reason.
+
+## Non-negotiable security rules
+
+1. Gateway never runs as root.
+2. Gateway never receives /var/run/docker.sock.
+3. Broker is local-only and reachable through Unix socket.
+4. Policy is authoritative inside Broker.
+5. Broker re-authorizes subject + canonical tool + resource + action + policy/grant on every privileged call.
+6. Gateway never opens the privileged SQLite database.
+7. Gateway never reads plaintext secret storage.
+8. Full mode is disabled by default.
+9. The agent cannot mint or approve its own elevation.
+10. network.unrestricted is never implied by Full.
+11. Replay-safe writes use infrastructure-managed idempotency.
+12. Non-replay-safe writes are never blindly retried.
+13. Tool results are untrusted data and never grant capability.
+14. Downstream MCP servers are allowlisted out-of-band.
+15. Filesystem authorization never uses path string prefixes.
+16. Secrets never enter Git, audit payloads or normal tool output.
+17. Unknown policy fields/capabilities fail closed.
+18. MCP transport is Streamable HTTP; do not invent custom WebSocket/session machinery.
+19. Existing workloads must not depend on the Gateway to keep running.
+20. Before building a large component, evaluate adopt/adapt first.
+
+## Gate-specific restraint
+
+### Gate 0B
+
+Implement only:
+
+~~~text
+system.info
+file.read_test
+file.write_test
+~~~
+
+Allowed filesystem root:
+
+~~~text
+/tmp/vps-agent-poc/
+~~~
+
+No root, Docker, SQLite, Full, approval or generic shell.
+
+### Gate 1
+
+Add the Broker and only:
+
+~~~text
+service.status
+service.restart
+~~~
+
+for one explicitly allowed non-critical unit.
+
+### Gate 2
+
+Add only capabilities required by one real Scoped stack.
+
+Do not jump to shell.exec_admin.
 
 ## Before changing code
 
-- inspect `git status`
-- do not destroy uncommitted work
+- inspect git status
+- preserve uncommitted work
+- confirm current branch
 - run existing tests
 - make the smallest coherent change
-- update documentation when architecture changes
-- preserve deny-by-default behavior
+- update canonical docs when architecture changes
+- do not weaken deny-by-default behavior to make a test pass
 
-## Security gate
+## Testing expectations
 
-Before connecting a production host, confirm:
+Security-sensitive features require negative tests.
 
-- path traversal is blocked
-- symlink escape is blocked
-- shell has timeout/cgroup limits
-- Gateway has no Docker socket
-- Scoped obeys resource boundaries
-- Full without lease fails
-- expired lease fails
-- prompt injection cannot self-elevate
-- secrets are redacted
-- idempotency works
+Examples:
+
+- unauthorized path denied
+- symlink escape denied
+- unauthorized service denied
+- wrong subject denied
+- expired/revoked grant denied
+- duplicate replay-safe request executes once
+- non-replay-safe action is not auto-retried
+- malicious tool result does not alter policy
+- Gateway cannot open Docker socket or privileged SQLite
+
+## Product-surface rule
+
+ChatGPT plan/surface capability is not inferred from architecture.
+
+Before privileged implementation, Gate 0A must record the actual supported route for the target ChatGPT surface.
+
+If Plus Web cannot execute the required custom write path, do not hack around the platform restriction. Continue protocol work with MCP Inspector or change the supported distribution route.
+
+## Definition of progress
+
+Progress means passing the next gate with tests and evidence.
+
+More components are not progress by themselves.
