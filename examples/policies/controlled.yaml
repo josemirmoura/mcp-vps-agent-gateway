@@ -1,3 +1,4 @@
+version: 1
 mode: controlled
 
 filesystem:
@@ -9,17 +10,24 @@ filesystem:
 
 network:
   mode: blocked
+  destinations: []
 
 services:
   inspect:
     - "*"
   manage: []
+  actions: []
 
 docker:
-  inspect:
-    - "*"
+  inspect: []
   manage: []
+  actions: []
+
+shell:
+  enabled: false
+  cwd_roots: []
+  max_runtime_seconds: 120
+  max_output_bytes: 1048576
 
 privilege:
-  shell: sandboxed
   admin: deny
