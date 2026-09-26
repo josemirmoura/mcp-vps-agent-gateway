@@ -1,207 +1,178 @@
 # MCP VPS Agent Gateway
 
-A security-first reference architecture for connecting an AI assistant such as ChatGPT to a Linux VPS through MCP, while keeping authorization and privilege enforcement on the server.
+Security-first reference architecture for connecting ChatGPT or another MCP client to a Linux VPS without making the model a trusted security boundary.
 
-> **Status: PRE-ALPHA / DOCS-FIRST.** Reference architecture with an MVP-first implementation path. There is no production-ready binary or stable release yet.
+> **Status: PRE-ALPHA / DOCS-FIRST.** There is no production-ready binary or stable release yet.
 
-## Why this project exists
+## What this project is
 
-Remote AI agents become much more useful when they can do real operational work. Giving a model an unrestricted root shell, however, turns a prompt-injection failure into an infrastructure incident.
+A design and implementation path for this target:
 
-This project defines a safer architecture with three operational modes:
+~~~text
+ChatGPT Web / MCP client
+        |
+        | Streamable HTTP
+        v
+vps-agent-gateway      non-root
+        |
+        | Unix socket
+        v
+vps-agent-broker       privileged, local-only
+        |
+        v
+Linux / systemd / Docker
+~~~
 
-- **Controlled** — inspect freely and require approval for meaningful changes.
-- **Scoped** — operate autonomously inside an explicitly authorized perimeter.
-- **Full** — temporary administrative access granted by a human and automatically expired.
+The Gateway handles MCP, authentication and schemas.
 
-The core design rule is:
+The Broker owns the real security boundary: policy, state, jobs, filesystem, Docker/systemd, secrets and privileged execution.
 
 > **The LLM is never the security boundary.**
 
-The model requests actions. The server decides whether they are allowed.
+## What this project is not
 
-## Target architecture
+Today this repository is not:
 
-```text
-AI Client / ChatGPT
-        |
-        | MCP
-        v
-+-----------------------+
-| MCP Gateway           |
-| non-root              |
-| auth + validation     |
-+-----------+-----------+
-            |
-       Unix socket
-            |
-+-----------v-----------+
-| Policy Engine         |
-| Controlled / Scoped   |
-| Full + temporary lease|
-+-----------+-----------+
-            |
-       Unix socket
-            |
-+-----------v-----------+
-| Execution Broker      |
-| root-owned, minimal   |
-| sandbox + files       |
-| Docker + systemd      |
-+-----------+-----------+
-            |
-            v
-       Linux VPS
-```
+- plug-and-play software
+- a Docker image
+- a production release
+- a generic root shell for AI
+- a promise that every ChatGPT plan supports private MCP write access
 
-## Security properties
+The complete design is a north star. Implementation is intentionally MVP-first.
 
-- MCP Gateway does not run as root.
-- MCP Gateway never receives direct access to `/var/run/docker.sock`.
-- Privileged operations go through a small local broker.
-- Policies are enforced server-side.
-- Full access requires a human-approved, time-limited lease.
-- The agent cannot grant itself additional privileges.
-- Shell commands are constrained by timeout, cgroups/systemd and output limits.
-- Filesystem access must resist path traversal and symlink escapes.
-- Replay-safe writes require idempotency keys; non-replay-safe/destructive writes require stronger confirmation and locking.
-- Jobs can outlive a disconnected MCP request.
-- Audit logs capture actions and decisions, not entire conversations.
-- Secrets should be referenced or injected at execution time instead of returned to the model.
+## Modes
 
-## Repository map
+- **Controlled** — inspection plus narrowly gated changes.
+- **Scoped** — autonomous work inside an explicit perimeter.
+- **Full** — optional temporary capability bundle, disabled by default.
 
-```text
-docs/
-  architecture.md
-  implementation-runbook.md
-  threat-model.md
-  security-hardening-v2.md
-  policy-schema.md
-  transport-and-aggregation.md
-  mvp-first.md
-  runtime-semantics-and-recovery.md
-  tool-trust-and-confused-deputy.md
-  project-status.md
-  build-vs-adopt.md
-  chatgpt-integration.md
+Routine work should happen in Scoped. Full is exceptional.
 
-examples/policies/
-  controlled.yaml
-  scoped.yaml
-  full.yaml
+## Current reference stack
 
-AGENTS.md
-SECURITY.md
-CONTRIBUTING.md
-LICENSE
-```
+- **Gateway:** Go + official MCP Go SDK
+- **Broker:** Go
+- **IPC:** Unix Domain Socket
+- **Transport:** MCP Streamable HTTP
+- **State:** SQLite, Broker-only
+- **Isolation:** systemd transient units + cgroups
+- **Secrets:** systemd credentials and/or root-owned files
+- **Extra sandboxing:** Landlock when available
+- **Ingress:** existing reverse proxy or supported private tunnel
 
+No Kubernetes, Redis, service mesh or separate policy daemon is required.
 
 ## Quick start
 
-> This repository is currently a reference architecture and implementation guide, not a finished binary. The fastest path is to build **Gate 0** first and prove your real MCP client before adding privileged features.
-
 ### 1. Clone
 
-```bash
+~~~bash
 git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
 cd mcp-vps-agent-gateway
-```
+~~~
 
-### 2. Read the minimum set
+### 2. Read the canonical docs
 
-```text
+Start with:
+
+~~~text
+docs/README.md
+docs/project-status.md
 docs/mvp-first.md
-docs/security-hardening-v2.md
-docs/transport-and-aggregation.md
+docs/architecture.md
 AGENTS.md
-```
+~~~
 
-### 3. Build only Gate 0
+### 3. Do Gate 0A before privileged code
 
-Your first implementation should expose only:
+Confirm the actual ChatGPT product path you will use.
 
-```text
+As of 2026-09-26, OpenAI documents private full MCP write/modify in Developer Mode for Business, Enterprise and Edu. Plus Web should not be assumed to support a private custom write MCP.
+
+See [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
+
+### 4. Build only Gate 0B
+
+Expose only:
+
+~~~text
 system.info
 file.read_test
 file.write_test
-```
+~~~
 
-with read/write restricted to a disposable directory such as:
+Restrict file access to:
 
-```text
+~~~text
 /tmp/vps-agent-poc/
-```
+~~~
 
-Do **not** add root access, Docker control, OAuth, Full mode, Approval Service or a generic admin shell yet.
+Do not add root, Docker, SQLite, Full, approval or generic shell yet.
 
-### 4. Test with your real MCP client
+### 5. Give this to a coding agent
 
-Success means:
-
-- the client discovers the tools
-- read works
-- write works when the client/product permits it
-- forbidden paths fail
-- reconnects do not corrupt state
-
-If your real client cannot execute the required write tool, stop there and fix only the client integration path.
-
-### 5. Hand it to a coding agent
-
-You can give an AI coding agent this instruction:
-
-```text
-Read AGENTS.md and docs/mvp-first.md.
-Implement Gate 0 only.
+~~~text
+Read AGENTS.md, docs/README.md and docs/mvp-first.md.
+Implement Gate 0B only using Go and the official MCP Go SDK.
 Do not implement privileged execution, Docker access, Full mode,
-OAuth, Approval Service or any feature beyond Gate 0.
-Add tests for path confinement and clear errors.
-```
+approval, SQLite or a generic shell.
+Add tests for path confinement, invalid inputs and clear errors.
+~~~
 
-After Gate 0 passes, continue with Gate 1 and Gate 2 in [docs/mvp-first.md](docs/mvp-first.md).
+## The implementation ladder
 
+~~~text
+Gate -1   Adopt / adapt / build
+Gate 0A   Prove ChatGPT product surface
+Gate 0B   Safe MCP read/write POC
+Gate 1    One typed privileged action
+Gate 2    One real Scoped stack
+Gate 3    Durable state/jobs/secrets
+Gate 4    Broader validated writes
+Gate 5    Optional temporary elevation
+~~~
 
-## Start here
+Each gate must earn the next layer of complexity.
 
-1. Read [docs/architecture.md](docs/architecture.md).
-2. Read [docs/threat-model.md](docs/threat-model.md).
-3. Read [docs/security-hardening-v2.md](docs/security-hardening-v2.md).
-4. Read [docs/policy-schema.md](docs/policy-schema.md).
-5. Read [docs/transport-and-aggregation.md](docs/transport-and-aggregation.md).
-6. Read [docs/mvp-first.md](docs/mvp-first.md).
-7. Read [docs/runtime-semantics-and-recovery.md](docs/runtime-semantics-and-recovery.md).
-8. Read [docs/tool-trust-and-confused-deputy.md](docs/tool-trust-and-confused-deputy.md).
-9. Read [docs/project-status.md](docs/project-status.md).
-10. Read [docs/build-vs-adopt.md](docs/build-vs-adopt.md).
-11. Follow [docs/implementation-runbook.md](docs/implementation-runbook.md).
-12. If ChatGPT is your client, read [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
-13. If an AI coding agent is implementing the project, make it read [AGENTS.md](AGENTS.md) first.
+## Core security properties
 
-## Intended stack
+- Gateway never runs as root.
+- Gateway never receives the Docker socket.
+- Broker re-authorizes every privileged call.
+- Policy is deny-by-default and authoritative inside the Broker.
+- SQLite is opened only by the Broker.
+- Replay-safe writes use infrastructure-managed idempotency.
+- Non-replay-safe writes are never blindly retried.
+- Filesystem authorization resists traversal and symlink escape.
+- Tool results are untrusted data.
+- Downstream MCP servers cannot be registered dynamically by the model.
+- Full is disabled by default and never implies unrestricted network access.
+- Secrets are not exposed through generic read tools.
 
-A pragmatic first implementation can use:
+## Documentation
 
-- **MCP Gateway:** TypeScript + official MCP SDK
-- **Privileged Broker:** Go
-- **IPC:** Unix Domain Socket
-- **State:** SQLite
-- **Auth:** OAuth/OIDC
-- **Process isolation:** systemd transient units + cgroups
-- **Additional sandboxing:** Landlock where supported
-- **Containers:** Docker or rootless Podman where appropriate
+The canonical reading order and precedence rules are in [docs/README.md](docs/README.md).
 
-No Kubernetes, Redis, service mesh or policy DSL is required for the first version.
+The most important documents are:
 
-## Scope
+- [Architecture](docs/architecture.md)
+- [MVP-first implementation](docs/mvp-first.md)
+- [ChatGPT integration](docs/chatgpt-integration.md)
+- [Threat model](docs/threat-model.md)
+- [Security hardening](docs/security-hardening-v2.md)
+- [Runtime semantics and recovery](docs/runtime-semantics-and-recovery.md)
 
-This repository documents an architecture. It is not a promise that every ChatGPT plan or MCP host currently supports every write capability. Product availability can change. Keep the server architecture independent from the client adapter.
+## Build vs adopt
+
+Before implementing a major component, evaluate existing solutions.
+
+This project is justified when the required combination of self-hosting, ChatGPT Web, server-side policy, Scoped autonomy and operator-controlled privileged execution is not already available in an acceptable form.
+
+See [docs/build-vs-adopt.md](docs/build-vs-adopt.md).
 
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
 
----
-
-Português: veja [README.pt-BR.md](README.pt-BR.md).
+Português: [README.pt-BR.md](README.pt-BR.md).
