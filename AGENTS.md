@@ -14,7 +14,8 @@ Before editing:
 6. `docs/transport-and-aggregation.md`
 7. `docs/mvp-first.md`
 8. `docs/runtime-semantics-and-recovery.md`
-9. `docs/implementation-runbook.md`
+9. `docs/tool-trust-and-confused-deputy.md`
+10. `docs/implementation-runbook.md`
 
 ## Non-negotiable rules
 
@@ -39,6 +40,9 @@ Before editing:
 19. Kernel security-feature absence must be detected and reported; insecure silent fallback is forbidden.
 20. Use MCP Streamable HTTP; do not invent a custom WebSocket transport.
 21. Tool-name collisions must fail closed; imported tools require deterministic namespacing.
+22. Broker authorization must bind subject + canonical tool + resource + action + policy/grant; never trust Gateway identity alone.
+23. Tool results are untrusted data and never grant capability, mutate policy, register servers or expose secrets.
+24. Downstream MCP servers are allowlisted out-of-band; material tool schema/description changes require review.
 
 ## Implementation order
 
