@@ -193,7 +193,7 @@ Enable WAL.
 Suggested state:
 
 - jobs
-- idempotency
+- idempotency / operation journal
 - resource locks
 - audit metadata
 - later approvals/grants
@@ -204,6 +204,19 @@ Rules:
 - no external command inside DB transaction
 - busy timeout/backoff
 - logical locks with deadlines for long operations
+- every resource lock has owner/action_id + monotonically increasing fencing token
+- stale owners cannot release or commit against a newer fencing token
+
+### Operation journal
+
+Before a replay-protected external side effect:
+
+1. insert/claim the invocation as `PENDING`
+2. commit the short transaction
+3. perform the external effect
+4. mark `DONE` and persist the result
+
+If the process crashes between steps 3 and 4, the next request returns `reconcile-required` or runs an action-specific reconciler. It must not blindly repeat the effect.
 
 ### Idempotency
 
