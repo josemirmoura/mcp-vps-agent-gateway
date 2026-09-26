@@ -2,7 +2,7 @@
 
 A security-first reference architecture for connecting an AI assistant such as ChatGPT to a Linux VPS through MCP, while keeping authorization and privilege enforcement on the server.
 
-> **Status:** reference architecture with an MVP-first implementation path. The full design is a north star, not the first milestone.
+> **Status: PRE-ALPHA / DOCS-FIRST.** Reference architecture with an MVP-first implementation path. There is no production-ready binary or stable release yet.
 
 ## Why this project exists
 
@@ -82,6 +82,8 @@ docs/
   mvp-first.md
   runtime-semantics-and-recovery.md
   tool-trust-and-confused-deputy.md
+  project-status.md
+  build-vs-adopt.md
   chatgpt-integration.md
 
 examples/policies/
@@ -171,9 +173,11 @@ After Gate 0 passes, continue with Gate 1 and Gate 2 in [docs/mvp-first.md](docs
 6. Read [docs/mvp-first.md](docs/mvp-first.md).
 7. Read [docs/runtime-semantics-and-recovery.md](docs/runtime-semantics-and-recovery.md).
 8. Read [docs/tool-trust-and-confused-deputy.md](docs/tool-trust-and-confused-deputy.md).
-9. Follow [docs/implementation-runbook.md](docs/implementation-runbook.md).
-10. If ChatGPT is your client, read [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
-11. If an AI coding agent is implementing the project, make it read [AGENTS.md](AGENTS.md) first.
+9. Read [docs/project-status.md](docs/project-status.md).
+10. Read [docs/build-vs-adopt.md](docs/build-vs-adopt.md).
+11. Follow [docs/implementation-runbook.md](docs/implementation-runbook.md).
+12. If ChatGPT is your client, read [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
+13. If an AI coding agent is implementing the project, make it read [AGENTS.md](AGENTS.md) first.
 
 ## Intended stack
 
