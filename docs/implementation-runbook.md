@@ -2,6 +2,8 @@
 
 This is the recommended implementation order. Do not start with unrestricted Full access.
 
+**Normative hardening:** also read `docs/security-hardening-v2.md`. Where wording conflicts, Hardening v2 wins.
+
 ## 1. Project layout
 
 Create:
@@ -156,7 +158,7 @@ Autonomous operations within explicitly authorized resources.
 
 ### Full
 
-Broad administrative capabilities only while a valid temporary lease exists.
+A convenience preset that expands into explicit capabilities while a valid temporary lease exists. `network.unrestricted` is not implied and requires separate approval.
 
 Validate policy files against a schema before loading them.
 
@@ -181,6 +183,8 @@ Implement:
 - optional pre-change backup
 
 On modern Linux, `openat2()` with appropriate resolve flags can be part of this implementation.
+
+At startup, detect whether `openat2()` is available. If it is not, either use a secure directory-FD component walk (`openat`/`fstatat`/`O_NOFOLLOW` semantics) or fail closed for Scoped/Full writes. Never fall back to string-prefix authorization.
 
 Security tests must include:
 
@@ -227,7 +231,7 @@ Prefer native Linux controls:
 - `TasksMax`
 - `RuntimeMaxSec`
 
-Add Landlock as an extra layer when supported.
+Add Landlock as an extra layer when supported. If unavailable, keep the systemd/cgroup sandbox active and report a degraded security posture through health/status.
 
 ## 8. Persistent jobs
 
@@ -368,9 +372,13 @@ The human approval page should display:
 
 Prefer step-up auth, MFA or passkey for Full.
 
+Approval must be out-of-band from the MCP action channel. The approval surface must be separately authenticated and inaccessible to the agent as a tool. Rate-limit elevation requests, coalesce duplicates and enforce cooldowns to prevent approval fatigue.
+
 The agent may create the request. It must never approve it.
 
 ## 13. Leases
+
+An elevated lease should be capability-granular, even when the UI calls the preset Full. `network.unrestricted` must be separately approved.
 
 A Full lease should be:
 
@@ -422,7 +430,7 @@ Full means intentionally granted authority, not zero observability.
 
 ## 15. SQLite
 
-SQLite is sufficient initially.
+SQLite is sufficient initially, but the Broker must be the **sole process that opens the privileged state database**. Gateway and Approval Service use narrow IPC APIs and never receive filesystem write access to the database.
 
 Suggested tables:
 
@@ -491,7 +499,9 @@ Enable WAL mode and include the database in backups.
 
 ## 16. Idempotency
 
-Every meaningful write should accept an `idempotency_key`.
+Every replay-safe write MUST require an `idempotency_key`.
+
+Each state-changing operation must be classified as `replay-safe` or `non-replay-safe`. Non-replay-safe/destructive operations must use stronger confirmation, locks/transaction state and clear action IDs; clients must never blindly retry them.
 
 Behavior:
 
@@ -568,6 +578,8 @@ Example:
 ```
 
 Keep raw output only where necessary and use short retention.
+
+Audit history must be tamper-evident: sequence records, hash-chain each event, periodically checkpoint/sign the chain head, and anchor/forward checkpoints to a separate remote destination. Local root logs alone are not considered tamper-proof.
 
 ## 20. Critical-change validation
 
