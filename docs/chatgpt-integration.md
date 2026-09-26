@@ -1,114 +1,120 @@
 # ChatGPT integration
 
-## Client independence
+## Target
 
-Keep the server architecture independent from ChatGPT. Treat ChatGPT/MCP as an adapter over the same domain and broker.
+Desired experience:
 
-This prevents product-plan changes from forcing a server redesign.
+~~~text
+ChatGPT Web
+   -> plugin/app/MCP
+   -> VPS Agent Gateway
+   -> Broker
+   -> VPS
+~~~
 
-## Connection patterns
+The server architecture is client-independent. The ChatGPT distribution path is a separate product constraint.
 
-Depending on current OpenAI product availability, a deployment may use:
+## Current product constraint
 
-### Private MCP path
+**Checked: 2026-09-26.**
 
-Use when the account/workspace supports private MCP with the required write capabilities.
+OpenAI currently documents full private MCP support, including write/modify actions in Developer Mode, for ChatGPT Business, Enterprise and Edu:
 
-Possible shape:
+https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
 
-```text
-ChatGPT
-  |
-Private MCP / Plugin
-  |
-Secure MCP transport
-  |
-Gateway bound locally or privately
-```
+The plugin directory is available across ChatGPT plans, but availability and capabilities vary by plan, surface, region, role and the apps included in a plugin:
 
-### Published plugin path
+https://help.openai.com/en/articles/20001256-plugins-in-chatgpt-and-codex
 
-If private write-capable MCP is not available for the target plan, the same Gateway can be exposed through a reviewable HTTPS endpoint and packaged according to the current plugin requirements.
+Therefore the project must not assume that a private custom write-capable MCP can be attached directly to ChatGPT Plus Web.
 
-```text
-ChatGPT
-  |
-Published plugin
-  |
-HTTPS + OAuth/OIDC
-  |
-MCP Gateway
-```
+## Route A — Private development
 
-## Required POC
+Use a plan/workspace that currently supports private full MCP write in Developer Mode.
 
-Before integrating production services, expose only:
+This is the simplest private testing route.
 
-- `system.info`
-- `file.write_test`
-- `permissions.status`
+## Route B — Plus Web
 
-`file.write_test` must write only inside a disposable test directory.
+If Plus Web is a hard requirement, the practical path is an eligible plugin/app whose remote MCP capabilities are available on that surface.
 
-Validate:
+This can require:
 
-1. read works;
-2. write works;
-3. forbidden write fails;
-4. host confirmations behave as expected;
-5. auth identity is correct.
+- stable public HTTPS MCP endpoint
+- plugin/app packaging
+- authentication
+- review/submission requirements
+- actual availability on the target Plus account
 
-If the client plan blocks write tools, do not weaken server security or disguise writes as reads. Change the client integration path, not the core architecture.
+Do not mark Plus Web complete until the plugin/app is visible there and a write tool executes successfully.
 
-## Tool set
+## Route C — Protocol development
 
-Suggested first tools:
+Use MCP Inspector while the ChatGPT distribution path is unresolved.
 
-Read-only:
+This lets Gateway/Broker engineering proceed without pretending the product surface is already available.
 
-```text
-system.info
-system.health
-file.read
-service.list
-service.status
-docker.list
-docker.inspect
-docker.logs
-job.status
-job.tail
-permissions.status
-audit.recent
-```
+## Gate 0A artifact
 
-Write:
+Before privileged implementation, record:
 
-```text
-file.write
-file.patch
-shell.exec
-service.action
-docker.action
-job.start
-job.cancel
-permissions.request_elevation
-```
+~~~text
+target_surface:
+target_plan:
+integration_route:
+read_available:
+write_available:
+private_or_published:
+tested_date:
+~~~
 
-Full-only:
+## Transport
 
-```text
-shell.exec_admin
-```
+Use MCP Streamable HTTP over HTTPS, typically at /mcp.
+
+Official guidance:
+
+https://developers.openai.com/plugins/concepts/mcp-server
+https://developers.openai.com/plugins/build/mcp-server
+
+Do not create a custom WebSocket protocol.
 
 ## Authentication
 
-Validate at least:
+For private user data or write actions, use the authentication required by the current MCP/OpenAI integration.
+
+For OAuth/OIDC, validate:
 
 - issuer
-- audience
+- audience/resource
+- signature
 - expiration
 - scopes
 - subject
-- signature
 
-Use client-authentication mechanisms supported by the current platform when available. Do not rely only on source IP, User-Agent, a static shared header or a secret URL.
+Authentication identifies the caller. Broker policy still decides authorization.
+
+## Tool ladder
+
+Gate 0B:
+
+~~~text
+system.info
+file.read_test
+file.write_test
+~~~
+
+Gate 1:
+
+~~~text
+system.info
+file.read_test
+service.status
+service.restart
+~~~
+
+Do not expose the full north-star tool catalog before the gates justify it.
+
+## Host confirmations
+
+Host confirmations improve UX and safety. They do not replace server-side authorization.
