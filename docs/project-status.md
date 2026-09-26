@@ -1,103 +1,97 @@
 # Project status and maturity
 
-## Current maturity
+## Current stage
 
-**Stage: pre-alpha / docs-first reference architecture.**
+**PRE-ALPHA / DOCS-FIRST**
 
-As of the current repository state:
+There is currently:
 
-- there is no production-ready implementation
-- there is no supported binary
-- there is no Docker image
-- there is no stable API compatibility promise
-- there is no production release
-- the documented security model has not yet been validated by a long-running production deployment of this repository
+- no supported production binary
+- no Docker image
+- no stable release
+- no compatibility promise
+- no long-running production validation of this repository's implementation
 
-The repository is intentionally a design and implementation guide first.
+The architecture and gates are the product today.
 
-## What is ready
+## Maturity ladder
 
-- architecture
-- threat model
-- security hardening rules
-- policy model
-- transport guidance
-- MVP-first gates
-- runtime/recovery semantics
-- agent implementation instructions
+### R0 — Architecture only
 
-## What is not ready
+Documentation exists. No executable reference implementation.
 
-- install-and-run package
-- production-grade Broker
-- production-grade MCP Gateway
-- Approval Service
-- stable Full mode
-- long-term compatibility guarantees
+### R1 — Product path + Gate 0B
 
-## Production-readiness levels
-
-### R0 — Documentation only
-
-Architecture exists. No executable reference implementation.
-
-### R1 — Gate 0 POC
-
-Real MCP client can discover and execute safe test read/write tools in a disposable directory.
+- Gate 0A records the actual ChatGPT/client integration route.
+- MCP Inspector passes.
+- Safe read/write POC works only in the disposable test root.
 
 ### R2 — Typed privileged pilot
 
-A minimal Broker performs one tightly scoped privileged action against a non-critical test service.
+- Gateway and Broker are separate processes.
+- One non-critical service can be inspected/restarted through typed tools.
+- Unauthorized resources fail closed.
+- Local audit exists.
 
-### R3 — Scoped production pilot
+### R3 — Scoped pilot
 
-A real application stack is operated under an explicit Scoped policy with audit and recovery tests.
+- One real stack runs under explicit Scoped policy.
+- Durable operational behavior has been tested for several days.
+- Recovery and denial cases are exercised.
+- Routine work does not require Full.
 
-### R4 — Hardened production
+### R4 — Hardened Scoped production
 
-Required production controls are validated, including authentication, durable state, recovery, secret handling and security gates.
+- authentication required by the deployment is validated
+- Broker-owned durable state is tested
+- jobs/retries/locks are tested
+- secret delivery is tested
+- backup/recovery is tested
+- operational monitoring exists
+
+The project may be described as production-capable for its documented Scoped use case only after R4.
 
 ### R5 — Elevated/Full production
 
-Temporary administrative capabilities have undergone dedicated security review and production validation.
+In addition to R4:
 
-Do not describe the project as production-ready before R4.
+- Full feature flag explicitly enabled
+- out-of-band approval works
+- temporary grants/expiry work
+- revoke-all works
+- network elevation is separately controlled
+- tamper-evident audit + remote checkpointing works
+- shell/admin recovery behavior is tested
 
-## Full mode default
+## Full default
 
-Full mode is **disabled by default**.
+Reference default:
 
-An implementation must require an explicit server-side enablement before Full capability requests are even accepted.
-
-Recommended default:
-
-```yaml
+~~~yaml
 features:
   full_mode_enabled: false
-```
+~~~
 
-Enabling Full should require:
+Full is not required to call the project successful.
 
-- Gate 0, Gate 1 and Gate 2 passed
-- security/recovery tests passed
-- out-of-band approval working
-- emergency `revoke-all` tested
-- explicit operator decision
+A strong Scoped implementation is a valid production endpoint.
 
-## Maturity signals
+## Evidence over popularity
 
-Stars and forks can be useful community signals but are not security or production-readiness guarantees.
+Stars and forks are community signals, not production evidence.
 
-Prefer objective evidence:
+Prefer:
 
-- releases
 - reproducible builds
 - automated tests
-- security policy
-- published threat model
-- real deployment history
-- incident/recovery evidence
-- maintenance activity
+- releases
+- deployment history
+- documented recovery tests
+- incident learnings
+- dependency maintenance
+- security review
 - external review
 
-This repository should report its maturity honestly as it evolves.
+## Current next milestone
+
+The next milestone is **Gate 0A + Gate 0B**, not another architecture subsystem.
