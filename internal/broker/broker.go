@@ -2,6 +2,7 @@ package broker
 
 import (
 	"context"
+	"errors"
 	"crypto/subtle"
 	"crypto/sha256"
 	"encoding/hex"
