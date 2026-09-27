@@ -146,6 +146,7 @@ Safe removal preserves configuration and audit state. Purge requires explicit co
 - [Docker first-run flow](docs/installer-flow.md)
 - [Architecture](docs/architecture.md)
 - [Authentication](docs/authentication.md)
+- [Multi-instance](docs/multi-instance.md)
 - [ChatGPT integration](docs/chatgpt-integration.md)
 - [Threat model](docs/threat-model.md)
 - [Security hardening](docs/security-hardening-v2.md)
