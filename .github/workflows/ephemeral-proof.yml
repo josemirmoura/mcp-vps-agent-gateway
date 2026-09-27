@@ -39,6 +39,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p proof/runtime
 
           sudo groupadd --system vps-agent 2>/dev/null || true
           if ! id vps-agent >/dev/null 2>&1; then
@@ -105,6 +106,8 @@ jobs:
 
           PROOF_TOKEN="$(openssl rand -hex 24)"
           ADMIN_TOKEN="$(openssl rand -hex 24)"
+          echo "::add-mask::$PROOF_TOKEN"
+          echo "::add-mask::$ADMIN_TOKEN"
           {
             echo "VPS_AGENT_BROKER_SOCKET=/run/vps-agent/broker.sock"
             echo "VPS_AGENT_LISTEN=127.0.0.1:18080"
@@ -145,14 +148,29 @@ jobs:
           sudo systemctl start vps-agent-broker.service
           sudo systemctl start vps-agent-gateway.service
 
+          ready=0
           for i in $(seq 1 40); do
-            if curl -fsS http://127.0.0.1:18080/healthz >/dev/null; then
+            if curl -fsS http://127.0.0.1:18080/healthz >/dev/null 2>&1 && test -S /run/vps-agent/broker.sock; then
+              ready=1
               break
             fi
             sleep 0.25
           done
+
+          if [ "$ready" != "1" ]; then
+            sudo systemctl status vps-agent-broker.service --no-pager > proof/runtime/broker-status-on-failure.txt 2>&1 || true
+            sudo systemctl status vps-agent-gateway.service --no-pager > proof/runtime/gateway-status-on-failure.txt 2>&1 || true
+            sudo journalctl -u vps-agent-broker.service --no-pager > proof/runtime/broker-journal-on-failure.txt 2>&1 || true
+            sudo journalctl -u vps-agent-gateway.service --no-pager > proof/runtime/gateway-journal-on-failure.txt 2>&1 || true
+            stat -c '%A %U:%G %n' /run/vps-agent /var/lib/vps-agent > proof/runtime/directories-on-failure.txt 2>&1 || true
+            echo "Broker/Gateway readiness failed"
+            cat proof/runtime/broker-status-on-failure.txt || true
+            cat proof/runtime/broker-journal-on-failure.txt || true
+            exit 1
+          fi
+
           curl -fsS http://127.0.0.1:18080/healthz
-          test -S /run/vps-agent/broker.sock
+          stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent
 
       - name: Capture before state
         shell: bash
@@ -234,7 +252,8 @@ jobs:
               "file_content": read("proof/runtime/file-content.txt"),
           }
           evidence["audit"] = read("proof/audit-status.json")
-          evidence["proof_client_exit_code"] = int(os.environ.get("PROOF_RC", "0"))
+          raw_rc = os.environ.get("PROOF_RC", "1")
+          evidence["proof_client_exit_code"] = int(raw_rc) if raw_rc.strip() else 1
           evidence_path.write_text(json.dumps(evidence, indent=2))
           PY
         env:
