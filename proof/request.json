@@ -1,7 +1,6 @@
 {
-  "id": "initial-gate0b-proof",
+  "id": "negative-shadow-proof",
   "subject": "josemir-proof",
-  "type": "file_write_read",
-  "path": "/var/lib/vps-agent/proof/prova-inicial.txt",
-  "content": "MCP VPS Agent Gateway passou pela VPS efemera do GitHub."
+  "type": "file_read_denied",
+  "path": "/etc/shadow"
 }
