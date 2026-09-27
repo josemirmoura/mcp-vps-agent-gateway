@@ -22,9 +22,12 @@ backup_dir="backups/$stamp"
 mkdir -p "$backup_dir"
 chmod 700 backups "$backup_dir"
 
-compose=(docker compose)
+compose=(docker compose -f compose.yaml)
+if [ "${VPS_AGENT_WHOLE_HOST:-0}" = "1" ]; then
+  compose+=(-f compose.host.yaml)
+fi
 if [ -n "${VPS_AGENT_DOMAIN:-}" ] && [ -f compose.https.yaml ]; then
-  compose=(docker compose -f compose.yaml -f compose.https.yaml)
+  compose+=(-f compose.https.yaml)
 fi
 
 echo "Current version: $current"
