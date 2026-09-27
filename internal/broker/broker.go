@@ -727,6 +727,24 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "permission_denied", "operator authentication failed")
 		}
 		return b.decideApproval(ctx, req, "denied")
+	case "admin.audit.tail":
+		if !b.adminOK(req.AdminToken) {
+			return deny(req.ID, "permission_denied", "operator authentication failed")
+		}
+		var in struct {
+			AfterSeq int64 `json:"after_seq"`
+			Limit    int   `json:"limit"`
+		}
+		if len(req.Args) > 0 {
+			if err := json.Unmarshal(req.Args, &in); err != nil {
+				return deny(req.ID, "invalid_args", err.Error())
+			}
+		}
+		records, err := b.State.ListAuditAfter(ctx, in.AfterSeq, in.Limit)
+		if err != nil {
+			return deny(req.ID, "audit_error", err.Error())
+		}
+		return ok(req.ID, map[string]any{"events": records})
 	case "admin.audit.status":
 		if !b.adminOK(req.AdminToken) {
 			return deny(req.ID, "permission_denied", "operator authentication failed")
