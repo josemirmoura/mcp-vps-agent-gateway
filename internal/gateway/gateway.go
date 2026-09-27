@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/ipc"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/securefs"
