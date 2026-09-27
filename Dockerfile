@@ -17,7 +17,7 @@ USER 65532:65532
 ENTRYPOINT ["/usr/local/bin/vps-agent-gateway"]
 
 FROM debian:bookworm-slim AS broker
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates coreutils && rm -rf /var/lib/apt/lists/* &&     groupadd --gid 65532 vps-agent
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates coreutils util-linux && rm -rf /var/lib/apt/lists/* &&     groupadd --gid 65532 vps-agent
 COPY --from=build /out/vps-agent-broker /usr/local/bin/vps-agent-broker
 COPY --from=build /out/vps-agent /usr/local/bin/vps-agent
 USER 0:65532
