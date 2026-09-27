@@ -6,6 +6,7 @@
   <meta name="description" content="Security-first Docker MCP gateway for scoped, auditable ChatGPT administration of a Linux VPS.">
   <title>MCP VPS Agent Gateway</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
 </head>
 <body>
   <header class="hero">
@@ -50,12 +51,19 @@
     <section id="quick-start" class="quick">
       <p class="eyebrow">Quick Start</p>
       <h2>Clone, choose scope, start, verify.</h2>
-      <pre><code>git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
-cd mcp-vps-agent-gateway
-bash scripts/init.sh
-$EDITOR config/policy.yaml
-docker compose up -d --build
+      <div class="code-block">
+        <button class="copy-button" type="button" data-copy-target="quick-start-code" aria-label="Copy all Quick Start commands" title="Copy all commands">
+          <svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h10v10H9z"></path><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg>
+          <svg class="check-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>
+        </button>
+        <pre><code id="quick-start-code">git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git &&
+cd mcp-vps-agent-gateway &&
+sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 /opt/vps-agent-sandbox &&
+bash scripts/init.sh --scope /opt/vps-agent-sandbox &&
+docker compose up -d --build &&
 bash scripts/verify.sh</code></pre>
+      </div>
+      <p>The Quick Start delegates only <code>/opt/vps-agent-sandbox</code>. Change that path to the existing directory you want the MCP to control. The <code>&amp;&amp;</code> chain stops at the first failed step instead of continuing into a broken verification.</p>
       <p>For ChatGPT, add a remote HTTPS endpoint plus OAuth/OIDC, run <code>scripts/verify-public.sh</code>, then <code>scripts/connect-chatgpt.sh</code>. The final script waits for the real audited call before declaring installation complete.</p>
     </section>
 

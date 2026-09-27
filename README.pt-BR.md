@@ -45,17 +45,17 @@ Docker é o mecanismo de empacotamento. O Broker continua sendo um componente pr
 Requisitos: VPS Linux, Docker Engine, plugin Docker Compose, Git, OpenSSL e Python 3.
 
 ~~~bash
-git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
-cd mcp-vps-agent-gateway
-
-bash scripts/init.sh
-$EDITOR .env config/policy.yaml
-
-docker compose up -d --build
+git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git &&
+cd mcp-vps-agent-gateway &&
+sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 /opt/vps-agent-sandbox &&
+bash scripts/init.sh --scope /opt/vps-agent-sandbox &&
+docker compose up -d --build &&
 bash scripts/verify.sh
 ~~~
 
-O bootstrap cria segredos locais aleatórios, ID estável da instância, estado e uma policy do operador **fora do Git**, a partir de config/policy.example.yaml. Defina `VPS_AGENT_SCOPE_ROOT` no `.env` como um diretório existente da VPS que será o teto físico do filesystem e mantenha filesystem, shell e Compose da policy dentro desse teto. O bootstrap não escolhe a autoridade da VPS.
+O Começo rápido delega propositalmente apenas `/opt/vps-agent-sandbox`; troque esse caminho pelo diretório que você quer entregar ao MCP. A cadeia com `&&` para imediatamente se alguma etapa falhar.
+
+O bootstrap cria segredos locais aleatórios, ID estável da instância, estado e uma policy do operador **fora do Git**, a partir de config/policy.example.yaml. `--scope` grava `VPS_AGENT_SCOPE_ROOT` no `.env` e migra os caminhos da policy padrão a partir do escopo anterior. O diretório escolhido precisa existir; agora o bootstrap falha antes de qualquer build Docker quando ele não existe. A autoridade continua sendo escolhida explicitamente pelo usuário.
 
 A verificação local prova health, negação de token inválido, chamada MCP real de system.info e integridade do audit chain. **A instalação ainda não terminou.**
 

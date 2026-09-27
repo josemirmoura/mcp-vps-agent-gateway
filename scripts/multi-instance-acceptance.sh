@@ -16,9 +16,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-sudo install -d -o "$USER" -g "$USER" -m 0750 "$SCOPE_ROOT"
+sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 "$SCOPE_ROOT"
 
-bash scripts/init.sh >"$EVIDENCE_DIR/bootstrap-${INSTANCE_KEY}.txt"
+bash scripts/init.sh --scope "$SCOPE_ROOT" >"$EVIDENCE_DIR/bootstrap-${INSTANCE_KEY}.txt"
 
 python3 - "$INSTANCE_KEY" "$INSTANCE_NAME" "$SCOPE_ROOT" <<'PY'
 import pathlib, sys
@@ -27,7 +27,6 @@ p = pathlib.Path(".env")
 lines = p.read_text().splitlines()
 updates = {
     "VPS_AGENT_INSTANCE_NAME": name,
-    "VPS_AGENT_SCOPE_ROOT": scope,
     "VPS_AGENT_SUBJECT": "multi-operator",
     "VPS_AGENT_AUTH_MODE": "static",
     "VPS_AGENT_BIND_ADDRESS": "127.0.0.1",
@@ -52,10 +51,6 @@ for k,v in updates.items():
         out.append(f"{k}={v}")
 p.write_text("\n".join(out)+"\n")
 
-policy=pathlib.Path("config/policy.yaml")
-text=policy.read_text()
-text=text.replace("/opt/my-app", scope)
-policy.write_text(text)
 PY
 
 set -a

@@ -20,10 +20,11 @@ Then Docker Compose starts the package. No separate wizard or native installer o
 ~~~bash
 git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
 cd mcp-vps-agent-gateway
-bash scripts/init.sh
+sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 /opt/vps-agent-sandbox
+bash scripts/init.sh --scope /opt/vps-agent-sandbox
 ~~~
 
-The bootstrap checks Docker Compose, creates .env with random local secrets and a stable instance ID when needed, creates config/policy.yaml from the versioned template, creates the local state directory, and validates Compose syntax. It does not decide the scope.
+The user supplies the scoped root explicitly. The bootstrap checks Docker Compose, creates .env with random local secrets and a stable instance ID when needed, creates config/policy.yaml from the versioned template, persists the selected scope, migrates template policy paths from the previous scope, creates the local state directory, and validates Compose syntax. If the scoped root does not exist, bootstrap fails before the Docker build instead of allowing Compose to fail later.
 
 ## Physical filesystem ceiling
 
@@ -32,7 +33,7 @@ The default `compose.yaml` bind-mounts only `VPS_AGENT_SCOPE_ROOT` into the Brok
 For deliberate whole-host filesystem authority, set `VPS_AGENT_WHOLE_HOST=1` in `.env` **and** add `compose.host.yaml`. The persisted flag lets lifecycle commands reuse the same deployment mode; the override sets the Broker's physical root to `/`. Neither is part of the default Scoped command.
 ## Phase 2 — The user chooses MCP authority
 
-The operator edits config/policy.yaml. The user decides exactly which VPS resources are delegated.
+The operator may edit config/policy.yaml after bootstrap for finer-grained authority. The user decides exactly which VPS resources are delegated.
 
 One root or several logical roots are valid when they fit under `VPS_AGENT_SCOPE_ROOT`. Whole-host `/` requires the explicit `compose.host.yaml` override.
 

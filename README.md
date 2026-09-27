@@ -45,17 +45,17 @@ Docker is the packaging mechanism. The Broker is still a privileged component an
 Requirements: Linux VPS, Docker Engine, Docker Compose plugin, Git, OpenSSL and Python 3.
 
 ~~~bash
-git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
-cd mcp-vps-agent-gateway
-
-bash scripts/init.sh
-$EDITOR .env config/policy.yaml
-
-docker compose up -d --build
+git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git &&
+cd mcp-vps-agent-gateway &&
+sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 /opt/vps-agent-sandbox &&
+bash scripts/init.sh --scope /opt/vps-agent-sandbox &&
+docker compose up -d --build &&
 bash scripts/verify.sh
 ~~~
 
-The bootstrap creates random local secrets, a stable instance ID, local state and an **untracked** operator policy from config/policy.example.yaml. Set `VPS_AGENT_SCOPE_ROOT` in `.env` to an existing host directory that forms the physical filesystem ceiling, then keep filesystem, shell and Compose paths in policy inside that ceiling. It never chooses VPS authority for you.
+The Quick Start deliberately delegates only `/opt/vps-agent-sandbox`; replace that path with the directory you want the MCP to control. The `&&` chain stops at the first failed step.
+
+The bootstrap creates random local secrets, a stable instance ID, local state and an **untracked** operator policy from config/policy.example.yaml. `--scope` persists `VPS_AGENT_SCOPE_ROOT` in `.env` and migrates template policy paths from the previous scoped root. The selected directory must already exist; bootstrap now fails before any Docker build if it does not. The user still chooses the authority explicitly.
 
 Local verification proves health, invalid-token denial, a real MCP system.info call and audit-chain integrity. **Installation is still not complete.**
 

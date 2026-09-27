@@ -12,15 +12,36 @@ set +a
 
 docker compose config -q
 
+broker_id="$(docker compose ps -a -q broker 2>/dev/null || true)"
+gateway_id="$(docker compose ps -a -q gateway 2>/dev/null || true)"
+if [ -z "$broker_id" ] || [ -z "$gateway_id" ]; then
+  echo "ERROR: Broker/Gateway containers have not both been created." >&2
+  echo "Run docker compose up -d --build successfully before verify.sh." >&2
+  docker compose ps -a >&2 || true
+  exit 1
+fi
+
 echo "Waiting for containers..."
+ready=0
 for _ in $(seq 1 60); do
-  broker="$(docker inspect -f '{{.State.Health.Status}}' mcp-vps-agent-broker-1 2>/dev/null || true)"
-  gateway="$(docker inspect -f '{{.State.Health.Status}}' mcp-vps-agent-gateway-1 2>/dev/null || true)"
+  broker="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$broker_id" 2>/dev/null || true)"
+  gateway="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$gateway_id" 2>/dev/null || true)"
   if [ "$broker" = "healthy" ] && [ "$gateway" = "healthy" ]; then
+    ready=1
+    break
+  fi
+  if [ "$broker" = "unhealthy" ] || [ "$gateway" = "unhealthy" ] || [ "$broker" = "exited" ] || [ "$gateway" = "exited" ] || [ "$broker" = "dead" ] || [ "$gateway" = "dead" ]; then
     break
   fi
   sleep 1
 done
+
+if [ "$ready" != "1" ]; then
+  echo "ERROR: Broker/Gateway did not become healthy." >&2
+  docker compose ps -a >&2 || true
+  docker compose logs --no-color --tail 80 broker gateway >&2 || true
+  exit 1
+fi
 
 docker compose ps
 

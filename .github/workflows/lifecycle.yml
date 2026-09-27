@@ -16,17 +16,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Prepare stock scoped root
+      - name: Prepare explicit scoped root
         run: |
-          sudo mkdir -p /opt/my-app
-          sudo chmod 0777 /opt/my-app
+          sudo rm -rf /opt/my-app /opt/vps-agent-lifecycle-scope
+          sudo install -d -o "$USER" -g "$USER" -m 0750 /opt/vps-agent-lifecycle-scope
 
-      - name: Bootstrap stock package
+      - name: Missing default scope fails before Docker
         run: |
-          bash scripts/init.sh
+          if bash scripts/init.sh > /tmp/bootstrap-missing-scope.txt 2>&1; then
+            echo "bootstrap unexpectedly accepted a missing default scope" >&2
+            exit 1
+          fi
+          grep -q 'VPS_AGENT_SCOPE_ROOT does not exist: /opt/my-app' /tmp/bootstrap-missing-scope.txt
           test -f .env
           test -f config/policy.yaml
-          grep -q '^VPS_AGENT_SCOPE_ROOT=/opt/my-app$' .env
+
+      - name: Bootstrap explicit scope and migrate template policy
+        run: |
+          bash scripts/init.sh --scope /opt/vps-agent-lifecycle-scope
+          grep -q '^VPS_AGENT_SCOPE_ROOT=/opt/vps-agent-lifecycle-scope$' .env
+          grep -q '/opt/vps-agent-lifecycle-scope' config/policy.yaml
+          ! grep -q '/opt/my-app' config/policy.yaml
           ! grep -q 'CHANGE_ME_' .env
 
       - name: Start and verify stock package
@@ -117,10 +127,10 @@ jobs:
           test ! -e .env
           test ! -e config/policy.yaml
           test ! -e state
-          test -d /opt/my-app
+          test -d /opt/vps-agent-lifecycle-scope
 
       - name: Cleanup
         if: always()
         run: |
           docker compose down -v --remove-orphans || true
-          sudo rm -rf /opt/my-app
+          sudo rm -rf /opt/my-app /opt/vps-agent-lifecycle-scope
