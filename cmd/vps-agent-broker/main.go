@@ -9,6 +9,7 @@ import (
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/broker"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/ipc"
+	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/jobs"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/policy"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/securefs"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/state"
@@ -34,7 +35,9 @@ func main() {
 	defer store.Close()
 
 	b := &broker.Broker{
-		Policy: cfg, FS: fs, State: store, Services: broker.SystemdManager{},
+		Policy: cfg, FS: fs, State: store,
+		Services: broker.SystemdManager{}, Docker: broker.DockerCLI{},
+		Jobs: &jobs.Manager{State: store, Runner: jobs.SystemdRunner{}},
 		AdminToken: os.Getenv("VPS_AGENT_ADMIN_TOKEN"),
 	}
 
