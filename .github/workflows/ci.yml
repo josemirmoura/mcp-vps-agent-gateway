@@ -23,6 +23,26 @@ jobs:
         run: go mod download
       - name: Validate shell scripts
         run: bash -n scripts/*.sh
+      - name: Validate integrated-auth Compose model
+        env:
+          VPS_AGENT_ADMIN_TOKEN: ci-admin-token
+          VPS_AGENT_STATIC_TOKEN: ci-static-token
+          VPS_AGENT_SUBJECT: ci-operator
+          VPS_AGENT_SCOPE_ROOT: /tmp/vps-agent-ci
+          VPS_AGENT_AUTH_MODE: integrated
+          VPS_AGENT_DOMAIN: mcp.example.invalid
+          VPS_AGENT_PUBLIC_URL: https://mcp.example.invalid/mcp
+          VPS_AGENT_OIDC_ISSUER: https://mcp.example.invalid
+          VPS_AGENT_OAUTH_RESOURCE: https://mcp.example.invalid/mcp
+          VPS_AGENT_EDGE_NETWORK: ci-edge
+          VPS_AGENT_TRAEFIK_CERTRESOLVER: letsencrypt
+          VPS_AGENT_LETSENCRYPT_EMAIL: ops@example.invalid
+          ZITADEL_MASTERKEY: 0123456789abcdef0123456789abcdef
+          ZITADEL_POSTGRES_PASSWORD: ci-postgres-password
+          ZITADEL_BOOTSTRAP_ADMIN_PASSWORD: CI-Bootstrap-Password-123
+          ZITADEL_BOOTSTRAP_PAT_EXPIRATION: 2099-01-01T00:00:00Z
+          ZITADEL_LOGIN_PAT_EXPIRATION: 2099-01-01T00:00:00Z
+        run: docker compose -f compose.yaml -f compose.integrated-auth.yaml -f compose.integrated-auth.proxy.yaml config -q
       - name: Format ephemeral workspace
         run: gofmt -w $(find . -name '*.go' -type f -print)
       - name: Vet
