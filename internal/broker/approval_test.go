@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/jobs"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/policy"
+	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/sandbox"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/state"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/wire"
 )
