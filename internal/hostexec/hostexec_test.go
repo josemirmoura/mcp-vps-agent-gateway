@@ -69,4 +69,11 @@ func TestCommandRejectsUnknownExecutable(t *testing.T) {
 		t.Fatalf("unknown executable should fail closed, got name=%q args=%v", name, args)
 	}
 }
-
+ 
+func TestHostInspectionCommandsAreExplicitlyAllowed(t *testing.T) {
+	for _, name := range []string{"cat", "getent", "hostname"} {
+		if !commandAllowed(name) {
+			t.Fatalf("%s must be explicitly allowlisted for typed host inspection", name)
+		}
+	}
+}
