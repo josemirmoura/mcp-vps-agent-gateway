@@ -69,3 +69,46 @@ func TestPrefixConfusionDenied(t *testing.T) {
 		t.Fatal("prefix-confused path must be denied")
 	}
 }
+
+
+func TestMkdirAllCanCreateConfiguredRoot(t *testing.T) {
+	base := t.TempDir()
+	targetRoot := filepath.Join(base, "new-root")
+	m, err := New([]string{targetRoot}, []string{targetRoot}, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.MkdirAll(targetRoot, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(targetRoot)
+	if err != nil || !info.IsDir() {
+		t.Fatalf("configured root was not created: info=%v err=%v", info, err)
+	}
+	if err := m.WriteFileAtomic(filepath.Join(targetRoot, "index.html"), []byte("<3")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMkdirAllRejectsOutsideAndSymlink(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "allowed")
+	if err := os.MkdirAll(root, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	m, err := New([]string{root}, []string{root}, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.MkdirAll(filepath.Join(base, "outside"), 0o750); err == nil {
+		t.Fatal("outside directory creation was allowed")
+	}
+
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(root, "link")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	if err := m.MkdirAll(filepath.Join(root, "link", "child"), 0o750); err == nil {
+		t.Fatal("symlink directory component was followed")
+	}
+}
