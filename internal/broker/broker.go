@@ -572,6 +572,140 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "job_error", err.Error())
 		}
 		return ok(req.ID, map[string]any{"job_id": req.Resource, "cancelled": true})
+	case "package.list":
+		var in struct { Limit int `json:"limit"` }
+		if len(req.Args) > 0 {
+			if err := json.Unmarshal(req.Args, &in); err != nil {
+				return deny(req.ID, "invalid_args", err.Error())
+			}
+		}
+		rows, err := packageList(ctx, in.Limit)
+		if err != nil {
+			return deny(req.ID, "package_error", err.Error())
+		}
+		filtered := make([]map[string]any, 0, len(rows))
+		for _, row := range rows {
+			name, _ := row["name"].(string)
+			if b.Policy.CanPackage(name, "list") {
+				filtered = append(filtered, row)
+			}
+		}
+		return ok(req.ID, map[string]any{"packages": filtered})
+	case "package.update", "package.install", "package.remove":
+		action := strings.TrimPrefix(req.Tool, "package.")
+		if !b.Policy.CanPackage(req.Resource, action) {
+			return deny(req.ID, "permission_denied", "package action is outside policy")
+		}
+		if req.InvocationID == "" {
+			return deny(req.ID, "invocation_required", "package action requires invocation id")
+		}
+		return b.adminMutation(ctx, req, "apt", func() (any, error) {
+			out, err := aptAction(ctx, action, req.Resource)
+			return map[string]any{"action": action, "package": req.Resource, "output": out}, err
+		})
+	case "user.list":
+		rows, err := userList()
+		if err != nil {
+			return deny(req.ID, "identity_error", err.Error())
+		}
+		filtered := make([]map[string]any, 0, len(rows))
+		for _, row := range rows {
+			name, _ := row["name"].(string)
+			if b.Policy.CanUser(name, "list") {
+				filtered = append(filtered, row)
+			}
+		}
+		return ok(req.ID, map[string]any{"users": filtered})
+	case "user.inspect":
+		if !b.Policy.CanUser(req.Resource, "inspect") {
+			return deny(req.ID, "permission_denied", "user inspection is outside policy")
+		}
+		row, err := userInspect(req.Resource)
+		if err != nil {
+			return deny(req.ID, "identity_error", err.Error())
+		}
+		return ok(req.ID, row)
+	case "user.add", "user.delete", "user.lock", "user.unlock":
+		action := strings.TrimPrefix(req.Tool, "user.")
+		if !b.Policy.CanUser(req.Resource, action) {
+			return deny(req.ID, "permission_denied", "user action is outside policy")
+		}
+		if req.InvocationID == "" {
+			return deny(req.ID, "invocation_required", "user action requires invocation id")
+		}
+		var in struct { CreateHome bool `json:"create_home"` }
+		if len(req.Args) > 0 {
+			if err := json.Unmarshal(req.Args, &in); err != nil {
+				return deny(req.ID, "invalid_args", err.Error())
+			}
+		}
+		return b.adminMutation(ctx, req, "identity:user:"+req.Resource, func() (any, error) {
+			out, err := userAction(ctx, action, req.Resource, in.CreateHome)
+			return map[string]any{"action": action, "user": req.Resource, "output": out}, err
+		})
+	case "group.list":
+		rows, err := groupList()
+		if err != nil {
+			return deny(req.ID, "identity_error", err.Error())
+		}
+		filtered := make([]map[string]any, 0, len(rows))
+		for _, row := range rows {
+			name, _ := row["name"].(string)
+			if b.Policy.CanGroup(name, "list") {
+				filtered = append(filtered, row)
+			}
+		}
+		return ok(req.ID, map[string]any{"groups": filtered})
+	case "group.inspect":
+		if !b.Policy.CanGroup(req.Resource, "inspect") {
+			return deny(req.ID, "permission_denied", "group inspection is outside policy")
+		}
+		row, err := groupInspect(req.Resource)
+		if err != nil {
+			return deny(req.ID, "identity_error", err.Error())
+		}
+		return ok(req.ID, row)
+	case "group.add", "group.delete":
+		action := strings.TrimPrefix(req.Tool, "group.")
+		if !b.Policy.CanGroup(req.Resource, action) {
+			return deny(req.ID, "permission_denied", "group action is outside policy")
+		}
+		if req.InvocationID == "" {
+			return deny(req.ID, "invocation_required", "group action requires invocation id")
+		}
+		return b.adminMutation(ctx, req, "identity:group:"+req.Resource, func() (any, error) {
+			out, err := groupAction(ctx, action, req.Resource)
+			return map[string]any{"action": action, "group": req.Resource, "output": out}, err
+		})
+	case "firewall.status":
+		if !b.Policy.CanFirewall("status") {
+			return deny(req.ID, "permission_denied", "firewall status is disabled by policy")
+		}
+		out, err := firewallStatus(ctx)
+		if err != nil {
+			return deny(req.ID, "firewall_error", err.Error())
+		}
+		return ok(req.ID, map[string]any{"status": out})
+	case "firewall.action":
+		var in struct {
+			Action   string `json:"action"`
+			Port     string `json:"port"`
+			Protocol string `json:"protocol"`
+			Source   string `json:"source"`
+		}
+		if err := json.Unmarshal(req.Args, &in); err != nil {
+			return deny(req.ID, "invalid_args", err.Error())
+		}
+		if !b.Policy.CanFirewall(in.Action) {
+			return deny(req.ID, "permission_denied", "firewall action is disabled by policy")
+		}
+		if req.InvocationID == "" {
+			return deny(req.ID, "invocation_required", "firewall action requires invocation id")
+		}
+		return b.adminMutation(ctx, req, "firewall", func() (any, error) {
+			out, err := firewallAction(ctx, in.Action, in.Port, in.Protocol, in.Source)
+			return map[string]any{"action": in.Action, "port": in.Port, "protocol": in.Protocol, "source": in.Source, "output": out}, err
+		})
 	case "permissions.request_elevation":
 		return b.requestElevation(ctx, req)
 	case "admin.approval.list":
@@ -628,6 +762,50 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 	default:
 		return deny(req.ID, "unknown_tool", "unknown broker tool")
 	}
+}
+
+func (b *Broker) adminMutation(ctx context.Context, req wire.Request, lockResource string, fn func() (any, error)) wire.Response {
+	if b.State == nil {
+		return deny(req.ID, "state_required", "administrative mutation requires durable state")
+	}
+	requestHash, err := state.HashRequest(map[string]any{
+		"subject": req.Subject, "tool": req.Tool, "resource": req.Resource, "args": json.RawMessage(req.Args),
+	})
+	if err != nil {
+		return deny(req.ID, "hash_error", err.Error())
+	}
+	decision, cached, err := b.State.BeginOperation(ctx, req.InvocationID, req.Subject, req.Tool, requestHash)
+	if err != nil {
+		return deny(req.ID, "state_error", err.Error())
+	}
+	switch decision {
+	case state.OperationCached:
+		return wire.Response{ID: req.ID, OK: true, Result: cached}
+	case state.OperationConflict:
+		return deny(req.ID, "idempotency_conflict", "invocation id reused with different administrative request")
+	case state.OperationReconcile:
+		return deny(req.ID, "reconcile_required", "previous administrative action outcome is uncertain; inspect state before retry")
+	}
+	lock, err := b.State.AcquireLock(ctx, lockResource, req.InvocationID, 30*time.Minute)
+	if err != nil {
+		return deny(req.ID, "resource_busy", err.Error())
+	}
+	defer b.State.ReleaseLock(context.Background(), lock)
+
+	value, err := fn()
+	if err != nil {
+		// Deliberately keep the journal pending: root-level commands may have
+		// partially changed the host even when their process exits non-zero.
+		return deny(req.ID, "admin_action_error", err.Error())
+	}
+	result, err := json.Marshal(value)
+	if err != nil {
+		return deny(req.ID, "encode_error", err.Error())
+	}
+	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
+		return deny(req.ID, "state_error", "administrative action completed but journal update failed: "+err.Error())
+	}
+	return wire.Response{ID: req.ID, OK: true, Result: result}
 }
 
 type shellStartArgs struct {
