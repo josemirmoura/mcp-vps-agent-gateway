@@ -11,6 +11,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
+	"golang.org/x/oauth2"
 )
 
 type AuthConfig struct {
@@ -120,6 +121,40 @@ func NewOIDCVerifier(ctx context.Context, issuer, audience string) (mcpauth.Toke
 		scopes = append(scopes, strings.Fields(claims.Scope)...)
 		return &mcpauth.TokenInfo{
 			UserID: claims.Subject, Scopes: scopes, Expiration: tok.Expiry,
+		}, nil
+	}, nil
+}
+
+// NewIntegratedOIDCVerifier is deliberately specific to the bundled ZITADEL
+// deployment. ZITADEL DCR currently issues opaque bearer access tokens and
+// accepts RFC 8707 resource values without narrowing the token audience. The
+// resource server therefore validates each bearer token online at the issuer's
+// OIDC UserInfo endpoint and binds the resulting stable subject again at the
+// Broker. This exception is not exposed as a generic "skip audience" switch.
+func NewIntegratedOIDCVerifier(ctx context.Context, issuer string) (mcpauth.TokenVerifier, error) {
+	if issuer == "" {
+		return nil, errors.New("issuer is required")
+	}
+	provider, err := oidc.NewProvider(ctx, issuer)
+	if err != nil {
+		return nil, err
+	}
+	return func(ctx context.Context, raw string, _ *http.Request) (*mcpauth.TokenInfo, error) {
+		if strings.TrimSpace(raw) == "" {
+			return nil, mcpauth.ErrInvalidToken
+		}
+		info, err := provider.UserInfo(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: raw}))
+		if err != nil || info.Subject == "" {
+			return nil, mcpauth.ErrInvalidToken
+		}
+		// RequireBearerToken needs a non-expired TokenInfo. UserInfo has just
+		// validated this opaque token online, so this short local validity
+		// window only covers the current request and never outlives revocation
+		// checks performed on the next request.
+		return &mcpauth.TokenInfo{
+			UserID:     info.Subject,
+			Scopes:     []string{"openid"},
+			Expiration: time.Now().Add(time.Minute),
 		}, nil
 	}, nil
 }
