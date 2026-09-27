@@ -24,11 +24,18 @@ type runtimeMetrics struct {
 	httpRequests uint64
 	httpFailures uint64
 	authFailures uint64
+	ipcFailures  uint64
 	tools        map[string]toolMetric
 }
 
 func newRuntimeMetrics() *runtimeMetrics {
 	return &runtimeMetrics{started: time.Now().UTC(), tools: make(map[string]toolMetric)}
+}
+
+func (m *runtimeMetrics) observeIPCFailure() {
+	m.mu.Lock()
+	m.ipcFailures++
+	m.mu.Unlock()
 }
 
 func (m *runtimeMetrics) observeTool(tool string, started time.Time, err error) {
@@ -115,7 +122,7 @@ func (m *runtimeMetrics) handler(instanceID, instanceName string) http.Handler {
 			"instance_id": instanceID, "instance_name": instanceName,
 			"uptime_seconds": int64(time.Since(m.started).Seconds()),
 			"http_requests_total": m.httpRequests, "http_failures_total": m.httpFailures,
-			"auth_failures_total": m.authFailures, "tools": tools,
+			"auth_failures_total": m.authFailures, "ipc_failures_total": m.ipcFailures, "tools": tools,
 		}
 		m.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
