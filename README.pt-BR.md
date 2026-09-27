@@ -2,7 +2,7 @@
 
 Plano de controle MCP orientado a segurança para permitir que ChatGPT ou outro cliente MCP trabalhe numa VPS Linux com a autoridade escolhida explicitamente pelo dono da VPS.
 
-> **Status: pre-alpha / pacote Docker de referência executável.** O pacote está sendo validado em máquinas Ubuntu limpas e efêmeras do GitHub. Ainda não é um release estável de produção.
+> **Status: candidato a release no que depende de aceitação automatizada.** Os workflows em Ubuntu 24.04 validam o pacote Docker de ponta a ponta. Um release estável ainda depende do gate externo OAuth no ChatGPT Web e de uma chamada real auditada contra o deployment alvo.
 
 ## A ideia
 
@@ -42,48 +42,64 @@ Docker é o mecanismo de empacotamento. O Broker continua sendo um componente pr
 
 ## Começo rápido
 
-Requisitos: VPS Linux, Docker Engine, plugin Docker Compose, Git e OpenSSL.
+Requisitos: VPS Linux, Docker Engine, plugin Docker Compose, Git, OpenSSL e Python 3.
 
 ~~~bash
 git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
 cd mcp-vps-agent-gateway
 
 bash scripts/init.sh
-~~~
+$EDITOR config/policy.yaml
 
-Depois edite config/policy.yaml e .env.
-
-~~~bash
 docker compose up -d --build
 bash scripts/verify.sh
 ~~~
 
-HTTPS automático opcional com Caddy:
+O bootstrap cria segredos locais aleatórios, ID estável da instância, estado e uma policy do operador **fora do Git**, a partir de config/policy.example.yaml. Ele nunca escolhe a autoridade da VPS.
+
+A verificação local prova health, negação de token inválido, chamada MCP real de system.info e integridade do audit chain. **A instalação ainda não terminou.**
+
+### HTTPS público + ChatGPT
+
+Para uma conexão do ChatGPT com escrita, use um Authorization Server OAuth/OIDC aderente ao padrão MCP e configure endpoint público, issuer, audience/resource e subject esperado no .env. Bearer estático fica restrito a laboratório/acceptance local.
+
+~~~dotenv
+VPS_AGENT_DOMAIN=mcp.exemplo.com
+VPS_AGENT_PUBLIC_URL=https://mcp.exemplo.com/mcp
+VPS_AGENT_AUTH_MODE=oidc
+VPS_AGENT_OIDC_ISSUER=https://auth.exemplo.com
+VPS_AGENT_OIDC_AUDIENCE=https://mcp.exemplo.com/mcp
+VPS_AGENT_SUBJECT=<subject-esperado-do-token>
+~~~
+
+Depois:
 
 ~~~bash
 docker compose -f compose.yaml -f compose.https.yaml up -d --build
-~~~
-
-Defina VPS_AGENT_PUBLIC_URL no .env e execute:
-
-~~~bash
+bash scripts/verify-public.sh
 bash scripts/connect-chatgpt.sh
 ~~~
 
-O script mostra o tutorial do ChatGPT Web e depois espera uma **chamada real e auditada de system.info vinda do ChatGPT**. Mostrar o tutorial não conclui a instalação.
+O verificador público exige HTTPS, discovery OAuth e negação fail-closed sem autenticação. O script de conexão mostra o fluxo atual do ChatGPT Web e espera uma **nova chamada auditada de system.info feita pelo ChatGPT**.
 
 ~~~text
 tutorial
- -> usuário conecta o ChatGPT
+ -> app OAuth conectado no ChatGPT
  -> ChatGPT chama o MCP
- -> Broker confirma subject
- -> policy autoriza
+ -> Gateway autentica
+ -> Broker valida subject + policy
+ -> operação autorizada chega à VPS
  -> audit registra
  -> INSTALAÇÃO CONCLUÍDA
 ~~~
 
-Se a chamada real não chegar, a instalação continua incompleta.
+Sem a chamada real, a instalação permanece incompleta.
 
+Orientação oficial verificada em 27/09/2026: Full MCP com escrita/modificação está documentado no ChatGPT Web para Business, Enterprise e Edu. Pro fica limitado a read/fetch. MCP autenticado com escrita usa OAuth 2.1; o ChatGPT não apresenta API keys customizadas.
+
+Fontes oficiais:
+- https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
+- https://developers.openai.com/plugins/build/auth
 ## Caixa de ferramentas
 
 A implementação atual inclui filesystem completo em escopo, shell/jobs sandboxed, systemd tipado, Docker/Compose, diagnósticos, pacotes, usuários/grupos, UFW, elevação fora do canal MCP, SQLite exclusivo do Broker, journal de operações, fencing locks e audit hash-chain.
@@ -111,11 +127,25 @@ O GitHub Actions valida vet, race detector, govulncheck, simulação adversarial
 
 Veja [validação da implementação](docs/implementation-validation.md).
 
+## Operação
+
+~~~bash
+bash scripts/diagnose.sh status
+bash scripts/diagnose.sh logs 200
+bash scripts/diagnose.sh audit 100
+
+bash scripts/update.sh
+bash scripts/remove.sh safe
+VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge
+~~~
+
+A remoção segura preserva configuração e auditoria. O purge exige confirmação explícita e remove apenas artefatos do MCP. O update faz backup da configuração/estado, usa Git fast-forward, verifica o runtime novo e restaura código/estado anterior se a verificação falhar.
 ## Documentação
 
 - [Modelo do produto](docs/product-model.md)
 - [Fluxo Docker e primeira execução](docs/installer-flow.md)
 - [Arquitetura](docs/architecture.md)
+- [Autenticação](docs/authentication.md)
 - [Integração ChatGPT](docs/chatgpt-integration.md)
 - [Threat model](docs/threat-model.md)
 - [Hardening](docs/security-hardening-v2.md)
