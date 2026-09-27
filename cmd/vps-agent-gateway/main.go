@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -35,18 +36,39 @@ func main() {
 		log.Printf("using broker socket %s", socket)
 	}
 
+	issuer := strings.TrimRight(os.Getenv("VPS_AGENT_OIDC_ISSUER"), "/")
+	resource := os.Getenv("VPS_AGENT_OAUTH_RESOURCE")
+	if resource == "" {
+		resource = os.Getenv("VPS_AGENT_PUBLIC_URL")
+	}
+	metadataURL := os.Getenv("VPS_AGENT_RESOURCE_METADATA_URL")
+	if metadataURL == "" && resource != "" {
+		metadataURL = metadataURLForResource(resource)
+	}
+
 	authCfg := gateway.AuthConfig{
-		Mode:                getenv("VPS_AGENT_AUTH_MODE", "none"),
-		StaticToken:         os.Getenv("VPS_AGENT_STATIC_TOKEN"),
-		StaticSubject:       getenv("VPS_AGENT_STATIC_SUBJECT", "local-dev"),
-		RequiredScopes:      splitScopes(os.Getenv("VPS_AGENT_REQUIRED_SCOPES")),
-		ResourceMetadataURL: os.Getenv("VPS_AGENT_RESOURCE_METADATA_URL"),
+		Mode:                 getenv("VPS_AGENT_AUTH_MODE", "none"),
+		StaticToken:          os.Getenv("VPS_AGENT_STATIC_TOKEN"),
+		StaticSubject:        getenv("VPS_AGENT_STATIC_SUBJECT", "local-dev"),
+		RequiredScopes:       splitScopes(os.Getenv("VPS_AGENT_REQUIRED_SCOPES")),
+		ResourceMetadataURL:  metadataURL,
+		ResourceIdentifier:   resource,
+	}
+	if issuer != "" {
+		authCfg.AuthorizationServers = []string{issuer}
 	}
 	if authCfg.Mode == "oidc" {
+		if resource == "" {
+			log.Fatal("VPS_AGENT_OAUTH_RESOURCE or VPS_AGENT_PUBLIC_URL is required in oidc mode")
+		}
+		audience := os.Getenv("VPS_AGENT_OIDC_AUDIENCE")
+		if audience == "" {
+			audience = resource
+		}
 		verifier, err := gateway.NewOIDCVerifier(
 			context.Background(),
-			os.Getenv("VPS_AGENT_OIDC_ISSUER"),
-			os.Getenv("VPS_AGENT_OIDC_AUDIENCE"),
+			issuer,
+			audience,
 		)
 		if err != nil {
 			log.Fatalf("configure OIDC: %v", err)
@@ -65,6 +87,14 @@ func main() {
 	}
 	log.Printf("MCP gateway listening on %s/mcp auth=%s", listen, authCfg.Mode)
 	log.Fatal(srv.ListenAndServe())
+}
+
+func metadataURLForResource(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host + "/.well-known/oauth-protected-resource"
 }
 
 func splitScopes(raw string) []string {
