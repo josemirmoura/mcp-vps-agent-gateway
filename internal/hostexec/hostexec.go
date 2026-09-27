@@ -58,10 +58,10 @@ func commandArgs(name string, args ...string) (string, []string) {
 
 func CommandContext(ctx context.Context, name string, args ...string) *exec.Cmd {
 	cmdName, cmdArgs := commandArgs(name, args...)
-	return exec.CommandContext(ctx, cmdName, cmdArgs...)
+	// #nosec G204 -- cmdName is selected by commandArgs from typed Broker operations; raw MCP shell input is not used as the executable name here.\n\treturn exec.CommandContext(ctx, cmdName, cmdArgs...)
 }
 
 func Command(name string, args ...string) *exec.Cmd {
 	cmdName, cmdArgs := commandArgs(name, args...)
-	return exec.Command(cmdName, cmdArgs...)
+	// #nosec G204 -- cmdName is selected by commandArgs from typed Broker operations; raw MCP shell input is not used as the executable name here.\n\treturn exec.Command(cmdName, cmdArgs...)
 }
