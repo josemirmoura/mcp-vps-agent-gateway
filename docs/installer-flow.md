@@ -29,12 +29,12 @@ The bootstrap checks Docker Compose, creates .env with random local secrets and 
 
 The default `compose.yaml` bind-mounts only `VPS_AGENT_SCOPE_ROOT` into the Broker under `/host`. The Broker validates that filesystem, shell cwd and Compose paths in policy remain inside that physical root. A policy escape makes the Broker fail closed.
 
-For deliberate whole-host filesystem authority, set `VPS_AGENT_WHOLE_HOST=1` in `.env` and add `compose.host.yaml`. This is an explicit override and is not part of the default command. Lifecycle scripts preserve this overlay when the flag is set.
+For deliberate whole-host filesystem authority, add `compose.host.yaml`. The override itself sets the Broker's physical root to `/` and enables the explicit whole-host flag. It is not part of the default command.
 ## Phase 2 — The user chooses MCP authority
 
 The operator edits config/policy.yaml. The user decides exactly which VPS resources are delegated.
 
-One root, several roots, or / are all valid explicit choices.
+One root or several logical roots are valid when they fit under `VPS_AGENT_SCOPE_ROOT`. Whole-host `/` requires the explicit `compose.host.yaml` override.
 
 systemd, Docker/Compose, shell, network, packages, users/groups, firewall, and temporary elevation are scoped separately.
 
