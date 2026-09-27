@@ -39,8 +39,9 @@ func (s *Server) Serve(ctx context.Context) error {
 		return err
 	}
 	s.ln = ln
+	// #nosec G302 -- 0660 is intentional: Broker owns the socket and the dedicated Gateway group requires read/write access.
 	if err := os.Chmod(s.socket, 0o660); err != nil {
-		ln.Close()
+		_ = ln.Close()
 		return err
 	}
 
