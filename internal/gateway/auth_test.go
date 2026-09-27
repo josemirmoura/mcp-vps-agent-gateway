@@ -40,7 +40,7 @@ func TestConfiguredVerifierSubject(t *testing.T) {
 		return &mcpauth.TokenInfo{UserID: "subject-123"}, nil
 	})
 	var got string
-	h := (AuthConfig{Mode: "oidc", Verifier: verifier}).Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := (AuthConfig{Mode: "integrated", Verifier: verifier}).Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got = SubjectFromContext(r.Context())
 		w.WriteHeader(http.StatusNoContent)
 	}))
