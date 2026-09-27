@@ -82,6 +82,14 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "permission_denied", err.Error())
 		}
 		return ok(req.ID, map[string]any{"content": string(data), "bytes": len(data)})
+	case "file.mkdir":
+		if b.FS == nil {
+			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		}
+		if req.InvocationID == "" {
+			return deny(req.ID, "invocation_required", "mkdir requires invocation id")
+		}
+		return b.mkdir(ctx, req)
 	case "file.write", "file.write_test":
 		if b.FS == nil {
 			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
@@ -321,6 +329,43 @@ func (b *Broker) adminOK(token string) bool {
 		return false
 	}
 	return subtle.ConstantTimeCompare([]byte(token), []byte(b.AdminToken)) == 1
+}
+
+
+func (b *Broker) mkdir(ctx context.Context, req wire.Request) wire.Response {
+	if b.State == nil {
+		return deny(req.ID, "state_required", "mkdir requires durable state")
+	}
+	requestHash, err := state.HashRequest(map[string]any{
+		"subject": req.Subject, "tool": req.Tool, "resource": req.Resource,
+	})
+	if err != nil {
+		return deny(req.ID, "hash_error", err.Error())
+	}
+	decision, cached, err := b.State.BeginOperation(ctx, req.InvocationID, req.Subject, req.Tool, requestHash)
+	if err != nil {
+		return deny(req.ID, "state_error", err.Error())
+	}
+	switch decision {
+	case state.OperationCached:
+		return wire.Response{ID: req.ID, OK: true, Result: cached}
+	case state.OperationConflict:
+		return deny(req.ID, "idempotency_conflict", "invocation id reused with different request")
+	case state.OperationReconcile:
+		return deny(req.ID, "reconcile_required", "previous mkdir outcome is uncertain")
+	}
+
+	if err := b.FS.MkdirAll(req.Resource, 0o750); err != nil {
+		_ = b.State.AbortOperation(context.Background(), req.InvocationID)
+		return deny(req.ID, "permission_denied", err.Error())
+	}
+	result, _ := json.Marshal(map[string]any{
+		"path": req.Resource, "created": true,
+	})
+	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
+		return deny(req.ID, "state_error", "directory created but operation journal update failed: "+err.Error())
+	}
+	return wire.Response{ID: req.ID, OK: true, Result: result}
 }
 
 func (b *Broker) writeFile(ctx context.Context, req wire.Request, data []byte) wire.Response {
