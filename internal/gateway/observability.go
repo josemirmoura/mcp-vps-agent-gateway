@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -45,7 +46,7 @@ func (m *runtimeMetrics) observeTool(tool string, started time.Time, err error) 
 	m.mu.Unlock()
 	level := slog.LevelInfo
 	if err != nil { level = slog.LevelWarn }
-	slog.Log(nil, level, "mcp_tool", "tool", tool, "duration_ms", time.Since(started).Milliseconds(), "ok", err == nil)
+	slog.Log(context.Background(), level, "mcp_tool", "tool", tool, "duration_ms", time.Since(started).Milliseconds(), "ok", err == nil)
 }
 
 func isPolicyDeny(err error) bool {
@@ -65,6 +66,12 @@ type statusWriter struct {
 func (w *statusWriter) WriteHeader(code int) {
 	w.status = code
 	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+func (w *statusWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok { f.Flush() }
 }
 
 func (m *runtimeMetrics) wrapHTTP(instanceID, instanceName string, next http.Handler) http.Handler {
