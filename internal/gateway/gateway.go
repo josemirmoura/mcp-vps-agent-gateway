@@ -195,8 +195,13 @@ type dockerLogsInput struct {
 
 type dockerActionInput struct {
 	Name        string `json:"name" jsonschema:"canonical Docker container or resource name"`
-	Action      string `json:"action" jsonschema:"typed action; currently restart"`
+	Action      string `json:"action" jsonschema:"typed action: start, stop, or restart"`
 	OperationID string `json:"operation_id,omitempty" jsonschema:"stable retry identity when the client can preserve one"`
+}
+
+type composeInput struct {
+	ProjectDir  string `json:"project_dir" jsonschema:"absolute Docker Compose project directory"`
+	OperationID string `json:"operation_id,omitempty"`
 }
 
 type jobInput struct {
@@ -410,6 +415,15 @@ func NewMCPServer(exec Executor) *mcp.Server {
 			return nil, out, nil
 		})
 
+	mcp.AddTool(server, &mcp.Tool{Name: "docker.list", Description: "List Docker resources visible through server-side policy."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "docker.list", "", "list", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
 	mcp.AddTool(server, &mcp.Tool{Name: "docker.inspect", Description: "Inspect one Docker resource allowed by server-side policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in dockerInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
@@ -438,6 +452,27 @@ func NewMCPServer(exec Executor) *mcp.Server {
 			}
 			return nil, out, nil
 		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "compose.validate", Description: "Validate an authorized Docker Compose project without returning expanded configuration or secrets."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in composeInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "compose.validate", in.ProjectDir, "validate", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	for _, action := range []string{"pull", "up", "down"} {
+		action := action
+		mcp.AddTool(server, &mcp.Tool{Name: "compose." + action, Description: "Perform the typed Docker Compose " + action + " action when policy permits it."},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in composeInput) (*mcp.CallToolResult, map[string]any, error) {
+				var out map[string]any
+				if err := s.call(ctx, "compose."+action, in.ProjectDir, action, nil, &out, true, in.OperationID); err != nil {
+					return nil, out, err
+				}
+				return nil, out, nil
+			})
+	}
 
 	mcp.AddTool(server, &mcp.Tool{Name: "job.status", Description: "Return durable job state for the authenticated subject."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in jobInput) (*mcp.CallToolResult, map[string]any, error) {
