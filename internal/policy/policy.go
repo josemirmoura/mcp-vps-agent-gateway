@@ -59,6 +59,7 @@ type ResourcePolicy struct {
 
 type ShellPolicy struct {
 	Enabled           bool     `yaml:"enabled"`
+	RunAs             string   `yaml:"run_as,omitempty"`
 	CWDRoots          []string `yaml:"cwd_roots"`
 	MaxRuntimeSeconds int      `yaml:"max_runtime_seconds"`
 	MaxOutputBytes    int      `yaml:"max_output_bytes"`
