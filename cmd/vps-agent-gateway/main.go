@@ -15,7 +15,6 @@ import (
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/gateway"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/ipc"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/securefs"
-	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
 )
 
 func main() {
@@ -68,26 +67,16 @@ func main() {
 		slog.Error("unauthenticated_remote_bind_rejected", "listen", listen, "reason", "auth mode none is allowed only on loopback")
 		os.Exit(1)
 	}
-	if os.Getenv("VPS_AGENT_PUBLIC_URL") != "" && authCfg.Mode != "oidc" && authCfg.Mode != "integrated" {
-		slog.Error("public_auth_rejected", "reason", "public MCP configuration requires integrated or oidc auth"); os.Exit(1)
+	if os.Getenv("VPS_AGENT_PUBLIC_URL") != "" && authCfg.Mode != "integrated" {
+		slog.Error("public_auth_rejected", "reason", "public MCP configuration requires integrated auth"); os.Exit(1)
 	}
-	if authCfg.Mode == "oidc" || authCfg.Mode == "integrated" {
+	if authCfg.Mode == "integrated" {
 		if resource == "" || issuer == "" {
-			slog.Error("oidc_config_invalid", "reason", "OAuth resource/public URL and issuer required"); os.Exit(1)
+			slog.Error("integrated_auth_config_invalid", "reason", "OAuth resource/public URL and issuer required"); os.Exit(1)
 		}
-		var verifier mcpauth.TokenVerifier
-		var err error
-		if authCfg.Mode == "integrated" {
-			verifier, err = gateway.NewIntegratedOIDCVerifier(context.Background(), issuer)
-		} else {
-			audience := os.Getenv("VPS_AGENT_OIDC_AUDIENCE")
-			if audience == "" {
-				audience = resource
-			}
-			verifier, err = gateway.NewOIDCVerifier(context.Background(), issuer, audience)
-		}
+		verifier, err := gateway.NewIntegratedOIDCVerifier(context.Background(), issuer)
 		if err != nil {
-			slog.Error("oidc_config_failed", "error", err); os.Exit(1)
+			slog.Error("integrated_auth_config_failed", "error", err); os.Exit(1)
 		}
 		authCfg.Verifier = verifier
 	}
