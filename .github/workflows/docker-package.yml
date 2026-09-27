@@ -13,6 +13,8 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Prepare host proof resources
         shell: bash
