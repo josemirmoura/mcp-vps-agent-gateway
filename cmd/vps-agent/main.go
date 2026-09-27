@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/ipc"
+	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/state"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/wire"
 )
 
@@ -30,6 +31,8 @@ func main() {
 		auditStatus(os.Args[2:])
 	case "audit-tail":
 		auditTail(os.Args[2:])
+	case "wait-tool":
+		waitTool(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -40,6 +43,81 @@ func common(fs *flag.FlagSet) (*string, *string) {
 	socket := fs.String("socket", getenv("VPS_AGENT_BROKER_SOCKET", "/run/vps-agent/broker.sock"), "broker unix socket")
 	token := fs.String("admin-token", os.Getenv("VPS_AGENT_ADMIN_TOKEN"), "operator token; prefer env VPS_AGENT_ADMIN_TOKEN")
 	return socket, token
+}
+
+
+func callResponse(socket string, req wire.Request) (wire.Response, error) {
+	resp, err := (ipc.Client{Socket: socket, Timeout: 10 * time.Second}).Call(context.Background(), req)
+	if err != nil {
+		return resp, err
+	}
+	if !resp.OK {
+		if resp.Error != nil {
+			return resp, fmt.Errorf("%s: %s", resp.Error.Code, resp.Error.Message)
+		}
+		return resp, fmt.Errorf("broker request failed")
+	}
+	return resp, nil
+}
+
+func waitTool(args []string) {
+	fs := flag.NewFlagSet("wait-tool", flag.ExitOnError)
+	socket, token := common(fs)
+	subject := fs.String("subject", "", "expected authenticated subject")
+	tool := fs.String("tool", "system.info", "expected MCP tool name")
+	timeout := fs.Duration("timeout", 5*time.Minute, "maximum wait time")
+	poll := fs.Duration("poll", time.Second, "poll interval")
+	_ = fs.Parse(args)
+	requireToken(*token)
+	if *subject == "" {
+		fmt.Fprintln(os.Stderr, "subject is required")
+		os.Exit(2)
+	}
+
+	statusResp, err := callResponse(*socket, wire.Request{
+		ID: "operator-wait-tool-status", Tool: "admin.audit.status", AdminToken: *token,
+	})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	var status state.AuditStatus
+	if err := json.Unmarshal(statusResp.Result, &status); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if !status.Valid {
+		fmt.Fprintln(os.Stderr, "audit chain is invalid")
+		os.Exit(1)
+	}
+	baseline := status.Events
+	fmt.Printf("Waiting for MCP tool %q from subject %q after audit seq %d...\n", *tool, *subject, baseline)
+
+	deadline := time.Now().Add(*timeout)
+	for time.Now().Before(deadline) {
+		payload, _ := json.Marshal(map[string]any{"after_seq": baseline, "limit": 500})
+		resp, err := callResponse(*socket, wire.Request{
+			ID: "operator-wait-tool-tail", Tool: "admin.audit.tail", AdminToken: *token, Args: payload,
+		})
+		if err == nil {
+			var body struct {
+				Events []state.AuditRecord `json:"events"`
+			}
+			if json.Unmarshal(resp.Result, &body) == nil {
+				for _, rec := range body.Events {
+					if rec.Event.Subject == *subject && rec.Event.Tool == *tool && rec.Event.Decision == "allow" {
+						raw, _ := json.MarshalIndent(rec, "", "  ")
+						fmt.Println(string(raw))
+						fmt.Println("CHATGPT/MCP CONNECTION VERIFIED")
+						return
+					}
+				}
+			}
+		}
+		time.Sleep(*poll)
+	}
+	fmt.Fprintln(os.Stderr, "verification timeout; no matching audited tool call arrived")
+	os.Exit(1)
 }
 
 func listApprovals(args []string) {
@@ -124,7 +202,7 @@ func call(socket string, req wire.Request) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: vps-agent <approvals|approve|deny|revoke-all|audit-status|audit-tail> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: vps-agent <approvals|approve|deny|revoke-all|audit-status|audit-tail|wait-tool> [flags]")
 }
 
 func getenv(name, fallback string) string {
