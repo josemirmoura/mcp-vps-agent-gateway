@@ -17,12 +17,14 @@ if [ -z "$PUBLIC_URL" ]; then
   exit 1
 fi
 
-if [ "${VPS_AGENT_AUTH_MODE:-static}" != "oidc" ]; then
-  echo "ChatGPT public connection requires standards-based OAuth/OIDC for this write-capable VPS MCP." >&2
-  echo "Set VPS_AGENT_AUTH_MODE=oidc and configure a compatible Authorization Server." >&2
-  echo "Static bearer auth remains available only for local/lab acceptance." >&2
-  exit 1
-fi
+case "${VPS_AGENT_AUTH_MODE:-static}" in
+  integrated|oidc) ;;
+  *)
+    echo "ChatGPT public connection requires integrated or external OAuth/OIDC." >&2
+    echo "Run scripts/setup-integrated-auth.sh for the default self-hosted path." >&2
+    exit 1
+    ;;
+esac
 
 bash ./scripts/verify-public.sh
 
@@ -34,7 +36,8 @@ MCP endpoint:
   $PUBLIC_URL
 
 Authentication:
-  OAuth/OIDC discovery via ${VPS_AGENT_RESOURCE_METADATA_URL:-<origin>/.well-known/oauth-protected-resource}
+  ${VPS_AGENT_AUTH_MODE:-oidc} OAuth/OIDC via ${VPS_AGENT_OIDC_ISSUER:-<issuer>}
+  Protected-resource metadata: ${VPS_AGENT_RESOURCE_METADATA_URL:-<origin>/.well-known/oauth-protected-resource}
 
 Expected authenticated subject:
   ${VPS_AGENT_SUBJECT:-operator}
@@ -44,10 +47,11 @@ Current OpenAI flow (checked 2026-09-27):
 2. Enable Developer Mode for your account/workspace as permitted by your role.
 3. Open Settings / Workspace Settings -> Apps -> Create.
 4. Enter the remote HTTPS MCP endpoint above.
-5. Choose OAuth authentication and complete the authorization prompt.
-6. Click Scan Tools, review the discovered tools, then Create the draft app.
-7. Start a new chat and select or @mention the draft app.
-8. Ask ChatGPT exactly:
+5. Choose OAuth authentication. ChatGPT discovers the Authorization Server and registers its client automatically.
+6. Sign in with the VPS operator account created by setup-integrated-auth.sh and approve access.
+7. Click Scan Tools, review the discovered tools, then Create the draft app.
+8. Start a new chat and select or @mention the draft app.
+9. Ask ChatGPT exactly:
 
    Call system.info on my VPS MCP and tell me the hostname.
 
