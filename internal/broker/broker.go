@@ -345,6 +345,25 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "invocation_required", "service mutation requires invocation id")
 		}
 		return b.serviceMutation(ctx, req, action)
+	case "docker.list":
+		if b.Docker == nil {
+			return deny(req.ID, "docker_unavailable", "docker manager is not configured")
+		}
+		all, err := b.Docker.List(ctx)
+		if err != nil {
+			return deny(req.ID, "docker_error", err.Error())
+		}
+		filtered := make([]map[string]any, 0, len(all))
+		for _, row := range all {
+			name, _ := row["Names"].(string)
+			if name == "" {
+				name, _ = row["Name"].(string)
+			}
+			if b.Policy.CanDocker(name, "inspect") || b.Policy.CanDocker(name, "list") {
+				filtered = append(filtered, row)
+			}
+		}
+		return ok(req.ID, map[string]any{"resources": filtered})
 	case "docker.inspect":
 		if b.Docker == nil {
 			return deny(req.ID, "docker_unavailable", "docker manager is not configured")
@@ -387,8 +406,10 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if err := json.Unmarshal(req.Args, &in); err != nil {
 			return deny(req.ID, "invalid_args", err.Error())
 		}
-		if in.Action != "restart" {
-			return deny(req.ID, "unsupported_action", "only restart is implemented")
+		switch in.Action {
+		case "start", "stop", "restart":
+		default:
+			return deny(req.ID, "unsupported_action", "supported Docker actions are start, stop, restart")
 		}
 		if !b.Policy.CanDocker(req.Resource, in.Action) {
 			return deny(req.ID, "permission_denied", "docker action is outside policy")
@@ -396,7 +417,30 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if req.InvocationID == "" {
 			return deny(req.ID, "invocation_required", "docker action requires invocation id")
 		}
-		return b.restartDocker(ctx, req)
+		return b.dockerMutation(ctx, req, in.Action)
+	case "compose.validate":
+		if b.Docker == nil {
+			return deny(req.ID, "docker_unavailable", "docker manager is not configured")
+		}
+		if !b.Policy.CanCompose(req.Resource, "validate") {
+			return deny(req.ID, "permission_denied", "compose project is outside policy")
+		}
+		if err := b.Docker.ComposeValidate(ctx, req.Resource); err != nil {
+			return deny(req.ID, "compose_error", err.Error())
+		}
+		return ok(req.ID, map[string]any{"project_dir": req.Resource, "valid": true})
+	case "compose.pull", "compose.up", "compose.down":
+		if b.Docker == nil {
+			return deny(req.ID, "docker_unavailable", "docker manager is not configured")
+		}
+		action := strings.TrimPrefix(req.Tool, "compose.")
+		if !b.Policy.CanCompose(req.Resource, action) {
+			return deny(req.ID, "permission_denied", "compose action is outside policy")
+		}
+		if req.InvocationID == "" {
+			return deny(req.ID, "invocation_required", "compose mutation requires invocation id")
+		}
+		return b.composeMutation(ctx, req, action)
 	case "job.status":
 		if b.Jobs == nil {
 			return deny(req.ID, "jobs_unavailable", "job manager is not configured")
@@ -748,6 +792,98 @@ func (b *Broker) restartService(ctx context.Context, req wire.Request) wire.Resp
 	result, _ := json.Marshal(map[string]any{"service": req.Resource, "status": status, "restarted": true})
 	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
 		return deny(req.ID, "state_error", "restart completed but operation journal update failed: "+err.Error())
+	}
+	return wire.Response{ID: req.ID, OK: true, Result: result}
+}
+
+func (b *Broker) dockerMutation(ctx context.Context, req wire.Request, action string) wire.Response {
+	if b.State == nil {
+		return deny(req.ID, "state_required", "docker mutation requires durable state")
+	}
+	requestHash, _ := state.HashRequest(map[string]any{
+		"subject": req.Subject, "tool": req.Tool, "resource": req.Resource, "action": action,
+	})
+	decision, cached, err := b.State.BeginOperation(ctx, req.InvocationID, req.Subject, req.Tool, requestHash)
+	if err != nil {
+		return deny(req.ID, "state_error", err.Error())
+	}
+	switch decision {
+	case state.OperationCached:
+		return wire.Response{ID: req.ID, OK: true, Result: cached}
+	case state.OperationConflict:
+		return deny(req.ID, "idempotency_conflict", "invocation id reused with different request")
+	case state.OperationReconcile:
+		return deny(req.ID, "reconcile_required", "previous Docker action outcome is uncertain; inspect before retry")
+	}
+	lock, err := b.State.AcquireLock(ctx, "docker:"+req.Resource, req.InvocationID, 5*time.Minute)
+	if err != nil {
+		return deny(req.ID, "resource_busy", err.Error())
+	}
+	defer b.State.ReleaseLock(context.Background(), lock)
+
+	var info map[string]any
+	switch action {
+	case "start":
+		info, err = b.Docker.Start(ctx, req.Resource)
+	case "stop":
+		info, err = b.Docker.Stop(ctx, req.Resource)
+	case "restart":
+		info, err = b.Docker.Restart(ctx, req.Resource)
+	default:
+		err = fmt.Errorf("unsupported Docker action %q", action)
+	}
+	if err != nil {
+		return deny(req.ID, "docker_error", err.Error())
+	}
+	result, _ := json.Marshal(map[string]any{"resource": req.Resource, "action": action, "inspect": info})
+	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
+		return deny(req.ID, "state_error", "Docker action completed but journal update failed: "+err.Error())
+	}
+	return wire.Response{ID: req.ID, OK: true, Result: result}
+}
+
+func (b *Broker) composeMutation(ctx context.Context, req wire.Request, action string) wire.Response {
+	if b.State == nil {
+		return deny(req.ID, "state_required", "compose mutation requires durable state")
+	}
+	requestHash, _ := state.HashRequest(map[string]any{
+		"subject": req.Subject, "tool": req.Tool, "project_dir": req.Resource, "action": action,
+	})
+	decision, cached, err := b.State.BeginOperation(ctx, req.InvocationID, req.Subject, req.Tool, requestHash)
+	if err != nil {
+		return deny(req.ID, "state_error", err.Error())
+	}
+	switch decision {
+	case state.OperationCached:
+		return wire.Response{ID: req.ID, OK: true, Result: cached}
+	case state.OperationConflict:
+		return deny(req.ID, "idempotency_conflict", "invocation id reused with different request")
+	case state.OperationReconcile:
+		return deny(req.ID, "reconcile_required", "previous Compose action outcome is uncertain; inspect project before retry")
+	}
+	lock, err := b.State.AcquireLock(ctx, "compose:"+req.Resource, req.InvocationID, 15*time.Minute)
+	if err != nil {
+		return deny(req.ID, "resource_busy", err.Error())
+	}
+	defer b.State.ReleaseLock(context.Background(), lock)
+
+	var output string
+	switch action {
+	case "pull":
+		output, err = b.Docker.ComposePull(ctx, req.Resource)
+	case "up":
+		output, err = b.Docker.ComposeUp(ctx, req.Resource)
+	case "down":
+		output, err = b.Docker.ComposeDown(ctx, req.Resource)
+	default:
+		err = fmt.Errorf("unsupported Compose action %q", action)
+	}
+	if err != nil {
+		return deny(req.ID, "compose_error", err.Error())
+	}
+	result, _ := json.Marshal(map[string]any{"project_dir": req.Resource, "action": action, "output": output})
+	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
+		return deny(req.ID, "state_error", "Compose action completed but journal update failed: "+err.Error())
 	}
 	return wire.Response{ID: req.ID, OK: true, Result: result}
 }
