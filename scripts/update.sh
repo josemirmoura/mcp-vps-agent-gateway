@@ -26,7 +26,12 @@ compose=(docker compose -f compose.yaml)
 if [ "${VPS_AGENT_WHOLE_HOST:-0}" = "1" ]; then
   compose+=(-f compose.host.yaml)
 fi
-if [ -n "${VPS_AGENT_DOMAIN:-}" ] && [ -f compose.https.yaml ]; then
+if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ] && [ -f compose.integrated-auth.yaml ]; then
+  compose+=(-f compose.integrated-auth.yaml)
+  if [ "${VPS_AGENT_BUNDLED_PROXY:-0}" = "1" ] && [ -f compose.integrated-auth.proxy.yaml ]; then
+    compose+=(-f compose.integrated-auth.proxy.yaml)
+  fi
+elif [ -n "${VPS_AGENT_DOMAIN:-}" ] && [ -f compose.https.yaml ]; then
   compose+=(-f compose.https.yaml)
 fi
 
