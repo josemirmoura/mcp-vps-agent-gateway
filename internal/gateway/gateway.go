@@ -88,13 +88,15 @@ type Server struct {
 }
 
 type systemInfoOutput struct {
-	Hostname     string `json:"hostname,omitempty"`
-	GOOS         string `json:"goos,omitempty"`
-	GOARCH       string `json:"goarch,omitempty"`
-	CPUs         int    `json:"cpus,omitempty"`
-	Mode         string `json:"mode,omitempty"`
-	InstanceID   string `json:"instance_id,omitempty"`
-	InstanceName string `json:"instance_name,omitempty"`
+	Hostname          string `json:"hostname,omitempty"`
+	GOOS              string `json:"goos,omitempty"`
+	GOARCH            string `json:"goarch,omitempty"`
+	CPUs              int    `json:"cpus,omitempty"`
+	Mode              string `json:"mode,omitempty"`
+	InstanceID        string `json:"instance_id,omitempty"`
+	InstanceName      string `json:"instance_name,omitempty"`
+	PhysicalScopeRoot string `json:"physical_scope_root,omitempty"`
+	WholeHost         bool   `json:"whole_host,omitempty"`
 }
 
 type fileReadInput struct {
