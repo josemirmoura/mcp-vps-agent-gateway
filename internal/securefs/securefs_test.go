@@ -259,3 +259,26 @@ func TestHostRootMappingPreservesCanonicalPaths(t *testing.T) {
 		t.Fatalf("canonical path leaked host prefix: %+v", entries)
 	}
 }
+
+
+func FuzzSelectRootNeverEscapes(f *testing.F) {
+	root := filepath.Clean("/srv/allowed")
+	for _, seed := range []string{"/srv/allowed/file", "/srv/allowed/../etc/passwd", "/srv/allowed2/x", "/etc/shadow", "", "../../etc"} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, target string) {
+		selected, _, err := selectRoot([]string{root}, target)
+		if err != nil {
+			return
+		}
+		if selected != root {
+			t.Fatalf("unexpected selected root %q for %q", selected, target)
+		}
+		abs, err := filepath.Abs(target)
+		if err != nil { return }
+		rel, err := filepath.Rel(root, filepath.Clean(abs))
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+			t.Fatalf("authorized target escaped root: target=%q rel=%q err=%v", target, rel, err)
+		}
+	})
+}
