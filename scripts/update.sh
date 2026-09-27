@@ -38,6 +38,10 @@ if [ "$current" = "$target_sha" ]; then
   echo "Already at target version."
   exit 0
 fi
+if ! git merge-base --is-ancestor "$current" "$target_sha"; then
+  echo "Refusing non-fast-forward update: target $target_sha is not a descendant of $current." >&2
+  exit 1
+fi
 
 echo "Stopping package for a consistent state backup..."
 "${compose[@]}" stop
@@ -59,6 +63,10 @@ rollback() {
 trap rollback ERR
 
 git merge --ff-only "$target"
+if [ "$(git rev-parse HEAD)" != "$target_sha" ]; then
+  echo "Update did not land on the requested target SHA." >&2
+  false
+fi
 docker compose config -q
 
 echo "Building target images before touching the real state database..."
