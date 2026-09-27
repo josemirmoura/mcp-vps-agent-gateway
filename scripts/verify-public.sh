@@ -25,8 +25,8 @@ case "$PUBLIC_URL" in
     exit 1
     ;;
 esac
-if [ "$AUTH_MODE" != "oidc" ]; then
-  echo "Public ChatGPT verification requires VPS_AGENT_AUTH_MODE=oidc." >&2
+if [ "$AUTH_MODE" != "oidc" ] && [ "$AUTH_MODE" != "integrated" ]; then
+  echo "Public ChatGPT verification requires integrated or oidc authentication." >&2
   echo "Static bearer/no-auth is reserved for local/lab acceptance." >&2
   exit 1
 fi
@@ -58,6 +58,23 @@ assert issuer.rstrip("/") in servers, (data, issuer)
 assert "header" in data.get("bearer_methods_supported", []), data
 print("OAUTH DISCOVERY: PASS")
 PY
+
+if [ "$AUTH_MODE" = "integrated" ]; then
+  echo
+  echo "Checking integrated Authorization Server discovery..."
+  curl --fail --silent --show-error "$ISSUER/.well-known/openid-configuration" >/tmp/vps-agent-oidc-discovery.json
+  python3 - "$ISSUER" <<'PY'
+import json,sys
+issuer=sys.argv[1].rstrip("/")
+data=json.load(open("/tmp/vps-agent-oidc-discovery.json"))
+assert data.get("issuer","").rstrip("/") == issuer, data
+registration=data.get("registration_endpoint","")
+assert registration.startswith("https://"), data
+methods=data.get("code_challenge_methods_supported", [])
+assert "S256" in methods, data
+print("INTEGRATED OAUTH DISCOVERY + DCR + PKCE: PASS")
+PY
+fi
 
 echo
 echo "Checking that unauthenticated MCP access fails closed..."
