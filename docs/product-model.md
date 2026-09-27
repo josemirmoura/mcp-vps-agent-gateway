@@ -285,6 +285,7 @@ bash scripts/init.sh --scope /opt/vps-agent-sandbox
 # optionally refine config/policy.yaml and .env
 docker compose up -d --build
 bash scripts/verify.sh
+bash scripts/setup-integrated-auth.sh --domain mcp.example.com
 bash scripts/connect-chatgpt.sh
 ~~~
 
@@ -333,7 +334,7 @@ clone / release bundle
  -> choose exactly what MCP may control
  -> start Gateway + Broker with Docker Compose
  -> validate policy and security
- -> expose authenticated MCP endpoint
+ -> bootstrap integrated OAuth + HTTPS endpoint
  -> show ChatGPT Web connection tutorial
  -> user connects ChatGPT
  -> verify real end-to-end ChatGPT tool call
