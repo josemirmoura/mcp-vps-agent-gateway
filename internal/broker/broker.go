@@ -3,6 +3,8 @@ package broker
 import (
 	"context"
 	"crypto/subtle"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/jobs"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/policy"
+	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/sandbox"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/securefs"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/state"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/wire"
@@ -441,6 +444,11 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "invocation_required", "compose mutation requires invocation id")
 		}
 		return b.composeMutation(ctx, req, action)
+	case "shell.exec", "job.start":
+		if req.InvocationID == "" {
+			return deny(req.ID, "invocation_required", "job start requires invocation id")
+		}
+		return b.startShellJob(ctx, req, false)
 	case "job.status":
 		if b.Jobs == nil {
 			return deny(req.ID, "jobs_unavailable", "job manager is not configured")
@@ -466,7 +474,16 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if err != nil {
 			return deny(req.ID, "job_error", err.Error())
 		}
-		return ok(req.ID, map[string]any{"job_id": req.Resource, "output": out})
+		max := b.Policy.Shell.MaxOutputBytes
+		if max <= 0 {
+			max = 1 << 20
+		}
+		truncated := false
+		if len(out) > max {
+			out = out[len(out)-max:]
+			truncated = true
+		}
+		return ok(req.ID, map[string]any{"job_id": req.Resource, "output": out, "truncated": truncated})
 	case "job.cancel":
 		if b.Jobs == nil {
 			return deny(req.ID, "jobs_unavailable", "job manager is not configured")
@@ -517,6 +534,9 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if !b.Policy.Features.FullModeEnabled || !b.Policy.Enabled {
 			return deny(req.ID, "full_disabled", "full mode is disabled")
 		}
+		if req.InvocationID == "" {
+			return deny(req.ID, "invocation_required", "admin shell requires invocation id")
+		}
 		valid, err := b.State.ValidateGrant(ctx, req.GrantID, req.Subject, "shell.admin")
 		if err != nil {
 			return deny(req.ID, "state_error", err.Error())
@@ -524,10 +544,137 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if !valid {
 			return deny(req.ID, "permission_denied", "valid shell.admin grant required")
 		}
-		return deny(req.ID, "not_implemented", "admin shell stays disabled until Gate 5 environment tests pass")
+		return b.startShellJob(ctx, req, true)
 	default:
 		return deny(req.ID, "unknown_tool", "unknown broker tool")
 	}
+}
+
+type shellStartArgs struct {
+	Command        string `json:"command"`
+	CWD            string `json:"cwd"`
+	RuntimeSeconds int    `json:"runtime_seconds,omitempty"`
+	MemoryBytes    int64  `json:"memory_bytes,omitempty"`
+	TasksMax       int    `json:"tasks_max,omitempty"`
+}
+
+func shellUnit(invocationID string) string {
+	sum := sha256.Sum256([]byte(invocationID))
+	return "vps-agent-job-" + hex.EncodeToString(sum[:8])
+}
+
+func uniqueStrings(in []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(in))
+	for _, v := range in {
+		if v == "" {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
+}
+
+func scopedInaccessiblePaths() []string {
+	return []string{"/boot", "/etc", "/home", "/media", "/mnt", "/opt", "/root", "/run", "/srv", "/var"}
+}
+
+func (b *Broker) startShellJob(ctx context.Context, req wire.Request, admin bool) wire.Response {
+	if b.Jobs == nil || b.State == nil {
+		return deny(req.ID, "jobs_unavailable", "job manager is not configured")
+	}
+	var in shellStartArgs
+	if err := json.Unmarshal(req.Args, &in); err != nil {
+		return deny(req.ID, "invalid_args", err.Error())
+	}
+	if strings.TrimSpace(in.Command) == "" || in.CWD == "" {
+		return deny(req.ID, "invalid_args", "command and cwd are required")
+	}
+	if !b.Policy.CanShellCWD(in.CWD) {
+		return deny(req.ID, "permission_denied", "shell cwd is outside policy or shell is disabled")
+	}
+
+	runtimeLimit := b.Policy.ShellRuntimeLimit()
+	runtimeRequested := time.Duration(in.RuntimeSeconds) * time.Second
+	if runtimeRequested <= 0 {
+		runtimeRequested = runtimeLimit
+	}
+	if runtimeRequested > runtimeLimit {
+		return deny(req.ID, "permission_denied", "requested runtime exceeds shell policy")
+	}
+	memory := in.MemoryBytes
+	if memory <= 0 {
+		memory = b.Policy.ShellMemoryLimit()
+	}
+	if memory > b.Policy.ShellMemoryLimit() {
+		return deny(req.ID, "permission_denied", "requested memory exceeds shell policy")
+	}
+	tasks := in.TasksMax
+	if tasks <= 0 {
+		tasks = b.Policy.ShellTasksLimit()
+	}
+	if tasks > b.Policy.ShellTasksLimit() {
+		return deny(req.ID, "permission_denied", "requested task limit exceeds shell policy")
+	}
+
+	requestHash, err := state.HashRequest(map[string]any{
+		"subject": req.Subject, "tool": req.Tool, "args": in, "admin": admin, "grant_id": req.GrantID,
+	})
+	if err != nil {
+		return deny(req.ID, "hash_error", err.Error())
+	}
+	decision, cached, err := b.State.BeginOperation(ctx, req.InvocationID, req.Subject, req.Tool, requestHash)
+	if err != nil {
+		return deny(req.ID, "state_error", err.Error())
+	}
+	switch decision {
+	case state.OperationCached:
+		return wire.Response{ID: req.ID, OK: true, Result: cached}
+	case state.OperationConflict:
+		return deny(req.ID, "idempotency_conflict", "invocation id reused with different job request")
+	case state.OperationReconcile:
+		return deny(req.ID, "reconcile_required", "previous job start outcome is uncertain; inspect job state")
+	}
+
+	readOnly := append([]string(nil), b.Policy.Filesystem.Read...)
+	readWrite := append([]string(nil), b.Policy.Filesystem.Write...)
+	inaccessible := []string(nil)
+	if !b.Policy.ShellMayReadHost() {
+		inaccessible = scopedInaccessiblePaths()
+	}
+
+	networkMode := b.Policy.Network.Mode
+	if networkMode == "" {
+		networkMode = "blocked"
+	}
+	user := "vps-agent-exec"
+	if admin {
+		user = "root"
+	}
+
+	spec := sandbox.Spec{
+		Unit: shellUnit(req.InvocationID), User: user, Command: in.Command, CWD: in.CWD,
+		ReadOnlyPaths: uniqueStrings(readOnly), ReadWritePaths: uniqueStrings(readWrite),
+		InaccessiblePaths: inaccessible, Runtime: runtimeRequested,
+		MemoryMaxBytes: memory, TasksMax: tasks, NetworkMode: networkMode, Admin: admin,
+	}
+	rec, err := b.Jobs.Start(ctx, req.Subject, req.Tool, in.CWD, req.GrantID, spec)
+	if err != nil {
+		_ = b.State.AbortOperation(context.Background(), req.InvocationID)
+		return deny(req.ID, "job_error", err.Error())
+	}
+	result, err := json.Marshal(rec)
+	if err != nil {
+		return deny(req.ID, "encode_error", err.Error())
+	}
+	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
+		return deny(req.ID, "state_error", "job started but operation journal update failed: "+err.Error())
+	}
+	return wire.Response{ID: req.ID, OK: true, Result: result}
 }
 
 func (b *Broker) requestElevation(ctx context.Context, req wire.Request) wire.Response {
