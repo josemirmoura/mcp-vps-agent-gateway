@@ -167,6 +167,7 @@ The most important documents are:
 - [Threat model](docs/threat-model.md)
 - [Security hardening](docs/security-hardening-v2.md)
 - [Runtime semantics and recovery](docs/runtime-semantics-and-recovery.md)
+- [Product model: full toolbox, scoped authority](docs/product-model.md)
 
 ## Build vs adopt
 
