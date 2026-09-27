@@ -38,6 +38,19 @@ func commandArgs(name string, args ...string) (string, []string) {
 	if root == "" {
 		return name, args
 	}
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("VPS_AGENT_HOST_NSENTER")), "1") ||
+		strings.EqualFold(strings.TrimSpace(os.Getenv("VPS_AGENT_HOST_NSENTER")), "true") {
+		nsArgs := []string{
+			"--target", "1",
+			"--mount", "--uts", "--ipc", "--net", "--pid", "--cgroup",
+			"--root=/proc/1/root",
+			"--wd=/",
+			"--",
+			name,
+		}
+		nsArgs = append(nsArgs, args...)
+		return "nsenter", nsArgs
+	}
 	chrootArgs := []string{root, name}
 	chrootArgs = append(chrootArgs, args...)
 	return "chroot", chrootArgs
