@@ -51,7 +51,7 @@ cat /tmp/vps-agent-audit.json
 if [ "${VPS_AGENT_AUTH_MODE:-static}" = "static" ]; then
   # Negative authentication test first: the MCP endpoint must reject a bad bearer.
   docker compose exec -T gateway sh -c \
-    'code="$(curl -sS -o /tmp/bad-auth.out -w "%{http_code}" -H "Authorization: Bearer definitely-wrong" http://127.0.0.1:8080/mcp)"; test "$code" = "401"'
+    'header_name="Authorization"; bad_scheme="Bearer"; bad_value="definitely-wrong"; code="$(curl -sS -o /tmp/bad-auth.out -w "%{http_code}" -H "$header_name: $bad_scheme $bad_value" http://127.0.0.1:8080/mcp)"; test "$code" = "401"'
 
   docker compose exec -T gateway /usr/local/bin/vps-agent-mcp-call \
     --endpoint http://127.0.0.1:8080/mcp \
