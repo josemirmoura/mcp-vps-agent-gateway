@@ -23,7 +23,7 @@ func packageList(ctx context.Context, limit int) ([]map[string]any, error) {
 	if limit > 2000 {
 		limit = 2000
 	}
-	out, err := exec.CommandContext(ctx, "dpkg-query", "-W", "-f=\${binary:Package}\\t\${Version}\\t\${db:Status-Status}\\n").Output()
+	out, err := exec.CommandContext(ctx, "dpkg-query", "-W", "-f=${binary:Package}\\t${Version}\\t${db:Status-Status}\\n").Output()
 	if err != nil {
 		return nil, err
 	}
