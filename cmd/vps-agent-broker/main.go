@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"os/user"
+	"strconv"
 	"syscall"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/broker"
@@ -60,7 +62,14 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	slog.Info("broker_start", "socket", socket, "instance_id", b.InstanceID, "instance_name", b.InstanceName, "policy", policyFile)
-	if err := ipc.NewServer(socket, b).Serve(ctx); err != nil && ctx.Err() == nil {
+	server := ipc.NewServer(socket, b)
+	server.AllowPeerUIDs(0, 65532)
+	if gatewayUser, err := user.Lookup("vps-agent"); err == nil {
+		if uid, err := strconv.ParseUint(gatewayUser.Uid, 10, 32); err == nil {
+			server.AllowPeerUIDs(uint32(uid))
+		}
+	}
+	if err := server.Serve(ctx); err != nil && ctx.Err() == nil {
 		slog.Error("fatal", "error", err); os.Exit(1)
 	}
 }
