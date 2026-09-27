@@ -271,9 +271,11 @@ A fully privileged all-Docker mode may exist for disposable labs, but should not
 The product goal is **one-command installation**, not "everything must execute inside one container".
 
 
-## Installation is not complete until ChatGPT is connected
+## Installation is not complete until ChatGPT connectivity is verified
 
-The installer must finish with a guided connection phase for ChatGPT Web.
+The ChatGPT Web tutorial is an earlier installation step. It teaches the operator how to connect, but it does **not** complete the installation.
+
+Installation completes only after the connection has been established and verified end-to-end.
 
 After runtime installation and policy activation, it must present:
 
@@ -291,16 +293,17 @@ Next:
 Connect this MCP to ChatGPT Web
 ~~~
 
-The final installer stage must:
+The installer sequence must:
 
 1. verify the MCP HTTPS endpoint is reachable;
 2. verify authentication;
-3. run a harmless discovery/read test;
+3. run a harmless server-side discovery/read test;
 4. show the exact effective authority selected by the user;
-5. provide the current ChatGPT Web connection steps for the supported integration route;
-6. ask the user to execute a harmless test from ChatGPT;
-7. verify that test appears in Broker audit;
-8. only then mark installation complete.
+5. provide the current ChatGPT Web connection tutorial for the supported integration route;
+6. wait for the operator to connect ChatGPT Web;
+7. require a harmless tool call from ChatGPT itself;
+8. verify that the call reached the expected subject, passed policy, executed successfully, and appears in Broker audit;
+9. only then mark installation complete.
 
 Because ChatGPT product surfaces can change independently from this project, the tutorial must be versioned and revalidated against current official OpenAI documentation at release/install time.
 
@@ -313,6 +316,8 @@ one install command
  -> validate policy and security
  -> expose authenticated MCP endpoint
  -> show ChatGPT Web connection tutorial
- -> perform first end-to-end ChatGPT test
+ -> user connects ChatGPT
+ -> verify real end-to-end ChatGPT tool call
+ -> verify Broker audit
  -> installation complete
 ~~~
