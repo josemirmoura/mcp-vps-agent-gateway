@@ -18,7 +18,7 @@ jobs:
 
       - name: Prepare explicit scoped root
         run: |
-          sudo rm -rf /opt/my-app /opt/vps-agent-lifecycle-scope /opt/vps-agent-lifecycle-scope
+          sudo rm -rf /opt/my-app /opt/vps-agent-lifecycle-scope
           sudo install -d -o "$USER" -g "$USER" -m 0750 /opt/vps-agent-lifecycle-scope
 
       - name: Missing default scope fails before Docker
@@ -133,4 +133,4 @@ jobs:
         if: always()
         run: |
           docker compose down -v --remove-orphans || true
-          sudo rm -rf /opt/my-app
+          sudo rm -rf /opt/my-app /opt/vps-agent-lifecycle-scope
