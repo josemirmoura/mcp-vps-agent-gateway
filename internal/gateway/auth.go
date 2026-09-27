@@ -10,15 +10,31 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
+	"github.com/modelcontextprotocol/go-sdk/oauthex"
 )
 
 type AuthConfig struct {
-	Mode                string
-	StaticToken         string
-	StaticSubject       string
-	Verifier            mcpauth.TokenVerifier
-	RequiredScopes      []string
-	ResourceMetadataURL string
+	Mode                 string
+	StaticToken          string
+	StaticSubject        string
+	Verifier             mcpauth.TokenVerifier
+	RequiredScopes       []string
+	ResourceMetadataURL  string
+	ResourceIdentifier   string
+	AuthorizationServers []string
+}
+
+func (a AuthConfig) ProtectedResourceMetadataHandler() http.Handler {
+	if a.ResourceIdentifier == "" || len(a.AuthorizationServers) == 0 {
+		return nil
+	}
+	return mcpauth.ProtectedResourceMetadataHandler(&oauthex.ProtectedResourceMetadata{
+		Resource:               a.ResourceIdentifier,
+		AuthorizationServers:   a.AuthorizationServers,
+		ScopesSupported:        a.RequiredScopes,
+		BearerMethodsSupported: []string{"header"},
+		ResourceName:           "MCP VPS Agent Gateway",
+	})
 }
 
 func (a AuthConfig) Wrap(next http.Handler) http.Handler {
