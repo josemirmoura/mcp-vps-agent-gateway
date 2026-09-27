@@ -860,6 +860,9 @@ func Handler(exec Executor, auth AuthConfig) http.Handler {
 	})
 
 	mux := http.NewServeMux()
+	if metadataHandler := auth.ProtectedResourceMetadataHandler(); metadataHandler != nil {
+		mux.Handle("/.well-known/oauth-protected-resource", metadataHandler)
+	}
 	mux.Handle("/mcp", auth.Wrap(mcpHandler))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
