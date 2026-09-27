@@ -85,7 +85,17 @@ type GrantPolicy struct {
 }
 
 func Load(filename string) (*Config, error) {
-	f, err := os.Open(filename)
+	abs, err := filepath.Abs(filename)
+	if err != nil {
+		return nil, err
+	}
+	root, err := os.OpenRoot(string(filepath.Separator))
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	rel := strings.TrimPrefix(filepath.Clean(abs), string(filepath.Separator))
+	f, err := root.Open(rel)
 	if err != nil {
 		return nil, err
 	}
