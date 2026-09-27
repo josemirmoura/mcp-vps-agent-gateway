@@ -74,6 +74,20 @@ func (w *statusWriter) Flush() {
 	if f, ok := w.ResponseWriter.(http.Flusher); ok { f.Flush() }
 }
 
+func limitConcurrent(max int, next http.Handler) http.Handler {
+	if max <= 0 { max = 64 }
+	sem := make(chan struct{}, max)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case sem <- struct{}{}:
+			defer func() { <-sem }()
+			next.ServeHTTP(w, r)
+		default:
+			http.Error(w, "too many concurrent requests", http.StatusTooManyRequests)
+		}
+	})
+}
+
 func (m *runtimeMetrics) wrapHTTP(instanceID, instanceName string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
