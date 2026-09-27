@@ -118,9 +118,9 @@ Run:
 
 Do not continue on security-critical failure.
 
-## Phase 7 — Connect ChatGPT Web
+## Phase 7 — Show ChatGPT Web connection tutorial
 
-This is a mandatory installation stage.
+This is a mandatory installation stage, but it is **not** the completion stage.
 
 Display:
 
@@ -131,23 +131,34 @@ Display:
 
 Then guide the operator step by step through connecting the MCP in ChatGPT Web.
 
+At the end of this phase, the installer must report something equivalent to:
+
+~~~text
+Tutorial completed.
+Waiting for ChatGPT connection verification...
+Installation is NOT complete yet.
+~~~
+
 The tutorial must use current official OpenAI instructions appropriate to the user's ChatGPT surface at install/release time.
 
-## Phase 8 — First ChatGPT proof
+## Phase 8 — Verify the real ChatGPT connection
 
-Ask the user to send a harmless command from ChatGPT, such as:
+After the operator has followed the tutorial and connected ChatGPT Web, ask the user to send a harmless command from ChatGPT itself, such as:
 
 ~~~text
 Read a test file from the authorized directory and tell me its contents.
 ~~~
 
-Then verify on the server:
+Then verify on the server, automatically when possible:
 
 - the MCP request arrived
 - the expected subject was authenticated
 - policy allowed the intended resource only
 - the Broker executed it
 - audit recorded it
+- the returned result matches the expected test result
+
+If any of these checks fail, installation remains incomplete and the installer should provide diagnostics/retry guidance.
 
 Optionally run a negative proof against an unauthorized resource.
 
@@ -164,4 +175,6 @@ runtime healthy
 + audit valid
 ~~~
 
-Until then, the installer should report the deployment as incomplete.
+Until every item above is verified, the installer must report the deployment as **incomplete**.
+
+The final success message belongs **after Phase 8**, never after merely displaying the tutorial.
