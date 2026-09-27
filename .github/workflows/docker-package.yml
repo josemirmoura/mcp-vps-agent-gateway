@@ -328,9 +328,61 @@ jobs:
           print("DOCKER PACKAGE ACCEPTANCE: PASS")
           PY
 
-      - name: Capture logs
-        if: always()
-        run: docker compose logs --no-color > evidence/docker-compose.log || true
+      - name: Operational diagnostics and redacted bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -a; . ./.env; set +a
+          bash scripts/diagnose.sh status | tee evidence/diagnose-status.txt
+          bash scripts/diagnose.sh audit 30 | tee evidence/diagnose-audit.txt
+          bash scripts/diagnose.sh logs 80 > evidence/diagnose-logs.txt
+          bash scripts/diagnose.sh bundle evidence/diagnostic-bundle.tar.gz
+          rm -rf /tmp/vps-agent-diagnostic-check
+          mkdir -p /tmp/vps-agent-diagnostic-check
+          tar -xzf evidence/diagnostic-bundle.tar.gz -C /tmp/vps-agent-diagnostic-check
+          ! grep -R -F "$VPS_AGENT_ADMIN_TOKEN" /tmp/vps-agent-diagnostic-check
+          ! grep -R -F "$VPS_AGENT_STATIC_TOKEN" /tmp/vps-agent-diagnostic-check
+          echo "DIAGNOSTIC REDACTION: PASS" | tee evidence/diagnostic-redaction.txt
+
+      - name: Capture logs before lifecycle removal
+        run: docker compose logs --no-color > evidence/docker-compose.log
+
+      - name: Safe remove preserves delegated resources and operator state
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -a; . ./.env; set +a
+          OLD_ADMIN="$VPS_AGENT_ADMIN_TOKEN"
+          OLD_STATIC="$VPS_AGENT_STATIC_TOKEN"
+          POLICY_HASH="$(sha256sum config/policy.yaml | awk '{print $1}')"
+          test -f state/state.db
+          bash scripts/remove.sh safe | tee evidence/remove-safe.txt
+          test -f .env
+          test -f config/policy.yaml
+          test -f state/state.db
+          test "$(sha256sum config/policy.yaml | awk '{print $1}')" = "$POLICY_HASH"
+          ! grep -F "$OLD_ADMIN" .env
+          ! grep -F "$OLD_STATIC" .env
+          test -z "$(docker ps -aq --filter label=com.docker.compose.project=mcp-vps-agent)"
+          test "$(docker inspect -f '{{.State.Running}}' vps-agent-docker-target)" = "true"
+          systemctl is-active --quiet vps-agent-docker-proof.service
+          echo "SAFE REMOVE ACCEPTANCE: PASS" | tee evidence/remove-safe-result.txt
+
+      - name: Full purge removes only MCP-owned artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge | tee evidence/remove-purge.txt
+          test ! -e .env
+          test ! -e config/policy.yaml
+          test ! -e state
+          test "$(docker inspect -f '{{.State.Running}}' vps-agent-docker-target)" = "true"
+          systemctl is-active --quiet vps-agent-docker-proof.service
+          echo "FULL PURGE ACCEPTANCE: PASS" | tee evidence/remove-purge-result.txt
+
+      - name: Capture failure logs
+        if: failure()
+        run: docker compose logs --no-color >> evidence/docker-compose.log 2>/dev/null || true
 
       - uses: actions/upload-artifact@v4
         if: always()
