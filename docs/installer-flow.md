@@ -4,12 +4,14 @@
 
 Installation is declarative and terminal-first.
 
-The operator edits two human/AI-readable files:
+The operator controls two human/AI-readable local files:
 
 ~~~text
 .env
 config/policy.yaml
 ~~~
+
+Both are local operator state. config/policy.yaml is created from the versioned config/policy.example.yaml template and is intentionally kept out of Git.
 
 Then Docker Compose starts the package. No separate wizard or native installer owns the configuration.
 
@@ -21,7 +23,7 @@ cd mcp-vps-agent-gateway
 bash scripts/init.sh
 ~~~
 
-The bootstrap checks Docker Compose, creates .env with random local secrets when needed, creates the local state directory, and validates Compose syntax. It does not decide the scope.
+The bootstrap checks Docker Compose, creates .env with random local secrets and a stable instance ID when needed, creates config/policy.yaml from the versioned template, creates the local state directory, and validates Compose syntax. It does not decide the scope.
 
 ## Phase 2 — The user chooses MCP authority
 
@@ -60,13 +62,13 @@ A local verification success means the runtime is ready. It does **not** mean in
 
 ChatGPT needs a reachable remote HTTPS MCP endpoint.
 
-Use the operator's existing reverse proxy/tunnel, or the optional Caddy override:
+Use the operator's existing reverse proxy/tunnel, or the optional Caddy override. The public write-capable ChatGPT route requires OAuth/OIDC and HTTPS:
 
 ~~~bash
 docker compose -f compose.yaml -f compose.https.yaml up -d --build
 ~~~
 
-Set the final HTTPS /mcp URL in VPS_AGENT_PUBLIC_URL.
+Set the final HTTPS /mcp URL in VPS_AGENT_PUBLIC_URL, configure the OAuth issuer/audience and expected token subject, then run bash scripts/verify-public.sh before connecting ChatGPT.
 
 ## Phase 6 — Show the current ChatGPT Web tutorial
 
@@ -112,17 +114,21 @@ If the call does not arrive or fails authorization, installation remains incompl
 ## Updates
 
 ~~~bash
-git pull --ff-only
-docker compose up -d --build
-bash scripts/verify.sh
+bash scripts/update.sh
 ~~~
 
-The policy and .env remain operator-controlled configuration.
+The update helper backs up .env, policy and Broker state, applies a fast-forward Git update, rebuilds, verifies, and rolls code/state back if verification fails. The policy and .env remain operator-controlled configuration.
 
 ## Removal
 
 ~~~bash
-docker compose down -v
+bash scripts/remove.sh safe
 ~~~
 
-Deleting the repository/state/configuration is a separate explicit operator action. The package never automatically deletes the VPS resources it was authorized to manage.
+Safe removal stops the package while preserving configuration/audit state. Full purge is a separate explicit action:
+
+~~~bash
+VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge
+~~~
+
+The package never deletes applications, services, containers, databases or files merely because it was authorized to manage them.
