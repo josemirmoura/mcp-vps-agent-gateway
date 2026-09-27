@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -61,7 +62,8 @@ func (s *Server) Serve(ctx context.Context) error {
 			defer s.wg.Done()
 			defer conn.Close()
 			var req wire.Request
-			if err := json.NewDecoder(conn).Decode(&req); err != nil {
+			const maxRequestBytes = 2 << 20
+			if err := json.NewDecoder(io.LimitReader(conn, maxRequestBytes+1)).Decode(&req); err != nil {
 				_ = json.NewEncoder(conn).Encode(wire.ErrorResponse("", "bad_request", err.Error()))
 				return
 			}
