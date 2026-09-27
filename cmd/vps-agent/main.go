@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/ipc"
@@ -19,8 +18,12 @@ func main() {
 		os.Exit(2)
 	}
 	switch os.Args[1] {
-	case "grant":
-		grant(os.Args[2:])
+	case "approvals":
+		listApprovals(os.Args[2:])
+	case "approve":
+		decideApproval(os.Args[2:], true)
+	case "deny":
+		decideApproval(os.Args[2:], false)
 	case "revoke-all":
 		revokeAll(os.Args[2:])
 	default:
@@ -35,24 +38,33 @@ func common(fs *flag.FlagSet) (*string, *string) {
 	return socket, token
 }
 
-func grant(args []string) {
-	fs := flag.NewFlagSet("grant", flag.ExitOnError)
+func listApprovals(args []string) {
+	fs := flag.NewFlagSet("approvals", flag.ExitOnError)
 	socket, token := common(fs)
-	subject := fs.String("subject", "", "grant subject")
-	caps := fs.String("cap", "", "comma-separated capabilities")
-	ttl := fs.Duration("ttl", 30*time.Minute, "grant TTL")
 	_ = fs.Parse(args)
-	if *subject == "" || *caps == "" || *token == "" {
-		fmt.Fprintln(os.Stderr, "subject, cap and admin token are required")
+	requireToken(*token)
+	call(*socket, wire.Request{ID: "operator-approval-list", Tool: "admin.approval.list", AdminToken: *token})
+}
+
+func decideApproval(args []string, approve bool) {
+	name := "approve"
+	tool := "admin.approval.approve"
+	if !approve {
+		name = "deny"
+		tool = "admin.approval.deny"
+	}
+	fs := flag.NewFlagSet(name, flag.ExitOnError)
+	socket, token := common(fs)
+	requestID := fs.String("request", "", "approval request id")
+	_ = fs.Parse(args)
+	requireToken(*token)
+	if *requestID == "" {
+		fmt.Fprintln(os.Stderr, "request id is required")
 		os.Exit(2)
 	}
-	payload, _ := json.Marshal(map[string]any{
-		"subject":      *subject,
-		"capabilities": strings.Split(*caps, ","),
-		"ttl_seconds":  int64(ttl.Seconds()),
-	})
+	payload, _ := json.Marshal(map[string]any{"request_id": *requestID})
 	call(*socket, wire.Request{
-		ID: "operator-grant", Tool: "admin.grant.issue", AdminToken: *token, Args: payload,
+		ID: "operator-" + name, Tool: tool, AdminToken: *token, Args: payload,
 	})
 }
 
@@ -60,11 +72,15 @@ func revokeAll(args []string) {
 	fs := flag.NewFlagSet("revoke-all", flag.ExitOnError)
 	socket, token := common(fs)
 	_ = fs.Parse(args)
-	if *token == "" {
+	requireToken(*token)
+	call(*socket, wire.Request{ID: "operator-revoke-all", Tool: "admin.revoke_all", AdminToken: *token})
+}
+
+func requireToken(token string) {
+	if token == "" {
 		fmt.Fprintln(os.Stderr, "admin token is required")
 		os.Exit(2)
 	}
-	call(*socket, wire.Request{ID: "operator-revoke-all", Tool: "admin.revoke_all", AdminToken: *token})
 }
 
 func call(socket string, req wire.Request) {
@@ -81,7 +97,7 @@ func call(socket string, req wire.Request) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: vps-agent <grant|revoke-all> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: vps-agent <approvals|approve|deny|revoke-all> [flags]")
 }
 
 func getenv(name, fallback string) string {
