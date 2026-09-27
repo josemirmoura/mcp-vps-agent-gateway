@@ -1,0 +1,36 @@
+name: architecture-simulation
+
+on:
+  push:
+    paths:
+      - "sim/**"
+      - "docs/architecture.md"
+      - "docs/security-hardening-v2.md"
+      - "docs/runtime-semantics-and-recovery.md"
+      - ".github/workflows/architecture-simulation.yml"
+  pull_request:
+    paths:
+      - "sim/**"
+      - "docs/architecture.md"
+      - "docs/security-hardening-v2.md"
+      - "docs/runtime-semantics-and-recovery.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run adversarial architecture simulation
+        run: |
+          python3 sim/architecture_sim.py \
+            --fuzz 100000 \
+            --lock-fuzz 50000 \
+            --seed 26092026
