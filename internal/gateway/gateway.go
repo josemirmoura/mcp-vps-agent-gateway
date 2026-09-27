@@ -245,6 +245,30 @@ type jobTailInput struct {
 	Lines int    `json:"lines,omitempty" jsonschema:"number of log lines, maximum 1000"`
 }
 
+type packageActionInput struct {
+	Name        string `json:"name,omitempty"`
+	OperationID string `json:"operation_id,omitempty"`
+}
+
+type userActionInput struct {
+	Name        string `json:"name"`
+	CreateHome  bool   `json:"create_home,omitempty"`
+	OperationID string `json:"operation_id,omitempty"`
+}
+
+type groupActionInput struct {
+	Name        string `json:"name"`
+	OperationID string `json:"operation_id,omitempty"`
+}
+
+type firewallActionInput struct {
+	Action      string `json:"action" jsonschema:"allow, deny, delete_allow, or delete_deny"`
+	Port        string `json:"port"`
+	Protocol    string `json:"protocol,omitempty" jsonschema:"tcp or udp"`
+	Source      string `json:"source,omitempty" jsonschema:"optional source IP/CIDR"`
+	OperationID string `json:"operation_id,omitempty"`
+}
+
 type elevationInput struct {
 	Capabilities []string `json:"capabilities" jsonschema:"explicit capabilities requested for temporary elevation"`
 	TTLSeconds   int64    `json:"ttl_seconds" jsonschema:"requested grant lifetime in seconds"`
@@ -615,6 +639,117 @@ func NewMCPServer(exec Executor) *mcp.Server {
 		func(ctx context.Context, _ *mcp.CallToolRequest, in jobInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "job.cancel", in.JobID, "cancel", nil, &out, true, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "package.list", Description: "List only installed packages visible through server-side package policy."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in limitInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{"limit": in.Limit})
+			if err := s.call(ctx, "package.list", "", "list", args, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "package.update", Description: "Run the host package index update only when explicitly enabled by policy."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in packageActionInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "package.update", "", "update", nil, &out, true, in.OperationID); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	for _, action := range []string{"install", "remove"} {
+		action := action
+		mcp.AddTool(server, &mcp.Tool{Name: "package." + action, Description: "Perform typed APT " + action + " only for packages permitted by policy."},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in packageActionInput) (*mcp.CallToolResult, map[string]any, error) {
+				var out map[string]any
+				if err := s.call(ctx, "package."+action, in.Name, action, nil, &out, true, in.OperationID); err != nil {
+					return nil, out, err
+				}
+				return nil, out, nil
+			})
+	}
+
+	mcp.AddTool(server, &mcp.Tool{Name: "user.list", Description: "List only users visible through identity policy."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "user.list", "", "list", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "user.inspect", Description: "Inspect one policy-authorized local user."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in userActionInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "user.inspect", in.Name, "inspect", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	for _, action := range []string{"add", "delete", "lock", "unlock"} {
+		action := action
+		mcp.AddTool(server, &mcp.Tool{Name: "user." + action, Description: "Perform typed local-user " + action + " only when policy permits it."},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in userActionInput) (*mcp.CallToolResult, map[string]any, error) {
+				var out map[string]any
+				args, _ := json.Marshal(map[string]any{"create_home": in.CreateHome})
+				if err := s.call(ctx, "user."+action, in.Name, action, args, &out, true, in.OperationID); err != nil {
+					return nil, out, err
+				}
+				return nil, out, nil
+			})
+	}
+
+	mcp.AddTool(server, &mcp.Tool{Name: "group.list", Description: "List only groups visible through identity policy."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "group.list", "", "list", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "group.inspect", Description: "Inspect one policy-authorized local group."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in groupActionInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "group.inspect", in.Name, "inspect", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	for _, action := range []string{"add", "delete"} {
+		action := action
+		mcp.AddTool(server, &mcp.Tool{Name: "group." + action, Description: "Perform typed local-group " + action + " only when policy permits it."},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in groupActionInput) (*mcp.CallToolResult, map[string]any, error) {
+				var out map[string]any
+				if err := s.call(ctx, "group."+action, in.Name, action, nil, &out, true, in.OperationID); err != nil {
+					return nil, out, err
+				}
+				return nil, out, nil
+			})
+	}
+
+	mcp.AddTool(server, &mcp.Tool{Name: "firewall.status", Description: "Return UFW status only when firewall inspection is enabled by policy."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "firewall.status", "", "status", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "firewall.action", Description: "Apply a structured UFW allow/deny/delete rule only when policy permits it."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in firewallActionInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{"action": in.Action, "port": in.Port, "protocol": in.Protocol, "source": in.Source})
+			if err := s.call(ctx, "firewall.action", in.Port, in.Action, args, &out, true, in.OperationID); err != nil {
 				return nil, out, err
 			}
 			return nil, out, nil
