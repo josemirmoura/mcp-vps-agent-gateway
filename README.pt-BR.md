@@ -49,16 +49,25 @@ git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
 cd mcp-vps-agent-gateway
 
 bash scripts/init.sh
-$EDITOR config/policy.yaml
+$EDITOR .env config/policy.yaml
 
 docker compose up -d --build
 bash scripts/verify.sh
 ~~~
 
-O bootstrap cria segredos locais aleatórios, ID estável da instância, estado e uma policy do operador **fora do Git**, a partir de config/policy.example.yaml. Ele nunca escolhe a autoridade da VPS.
+O bootstrap cria segredos locais aleatórios, ID estável da instância, estado e uma policy do operador **fora do Git**, a partir de config/policy.example.yaml. Defina `VPS_AGENT_SCOPE_ROOT` no `.env` como um diretório existente da VPS que será o teto físico do filesystem e mantenha filesystem, shell e Compose da policy dentro desse teto. O bootstrap não escolhe a autoridade da VPS.
 
 A verificação local prova health, negação de token inválido, chamada MCP real de system.info e integridade do audit chain. **A instalação ainda não terminou.**
 
+### Autoridade de filesystem sobre o host inteiro
+
+Scoped é o padrão. Para expor deliberadamente o filesystem inteiro ao Broker, use o override explícito:
+
+~~~bash
+docker compose -f compose.yaml -f compose.host.yaml up -d --build
+~~~
+
+`compose.host.yaml` é a chave deliberada de whole-host. A policy server-side continua controlando quais operações MCP são permitidas.
 ### HTTPS público + ChatGPT
 
 Para uma conexão do ChatGPT com escrita, use um Authorization Server OAuth/OIDC aderente ao padrão MCP e configure endpoint público, issuer, audience/resource e subject esperado no .env. Bearer estático fica restrito a laboratório/acceptance local.
