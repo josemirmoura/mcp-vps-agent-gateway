@@ -43,7 +43,7 @@ func diskInfo(ctx context.Context) ([]map[string]any, error) {
 }
 
 func memoryInfo() (map[string]any, error) {
-	f, err := os.Open(hostexec.Path("/proc/meminfo"))
+	f, err := os.Open("/proc/meminfo")
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func processInspect(pid int) (map[string]any, error) {
 	if pid <= 0 {
 		return nil, errors.New("pid must be positive")
 	}
-	f, err := os.Open(hostexec.Path(fmt.Sprintf("/proc/%d/status", pid)))
+	f, err := os.Open(fmt.Sprintf("/proc/%d/status", pid))
 	if err != nil {
 		return nil, err
 	}
