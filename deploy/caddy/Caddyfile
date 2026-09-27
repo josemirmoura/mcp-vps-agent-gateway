@@ -1,7 +1,0 @@
-{
-  auto_https on
-}
-
-{$VPS_AGENT_DOMAIN} {
-  reverse_proxy gateway:8080
-}
