@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
@@ -49,5 +50,32 @@ func TestConfiguredVerifierSubject(t *testing.T) {
 	// Native middleware requires expiration unless explicitly relaxed.
 	if w.Code == http.StatusNoContent {
 		t.Fatalf("expected missing expiration rejection; subject=%q", got)
+	}
+}
+
+func TestProtectedResourceMetadata(t *testing.T) {
+	h := AuthConfig{
+		ResourceIdentifier:   "https://mcp.example.com/mcp",
+		AuthorizationServers: []string{"https://auth.example.com"},
+		RequiredScopes:       []string{"vps.read", "vps.write"},
+	}.ProtectedResourceMetadataHandler()
+	if h == nil {
+		t.Fatal("expected protected resource metadata handler")
+	}
+	req := httptest.NewRequest(http.MethodGet, "/.well-known/oauth-protected-resource", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	for _, want := range []string{
+		`"resource":"https://mcp.example.com/mcp"`,
+		`"authorization_servers":["https://auth.example.com"]`,
+		`"bearer_methods_supported":["header"]`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("metadata missing %s: %s", want, body)
+		}
 	}
 }
