@@ -146,6 +146,7 @@ A remoção segura preserva configuração e auditoria. O purge exige confirmaç
 - [Fluxo Docker e primeira execução](docs/installer-flow.md)
 - [Arquitetura](docs/architecture.md)
 - [Autenticação](docs/authentication.md)
+- [Múltiplas instâncias](docs/multi-instance.md)
 - [Integração ChatGPT](docs/chatgpt-integration.md)
 - [Threat model](docs/threat-model.md)
 - [Hardening](docs/security-hardening-v2.md)
