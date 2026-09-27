@@ -24,7 +24,7 @@ if [ "${VPS_AGENT_AUTH_MODE:-static}" != "oidc" ]; then
   exit 1
 fi
 
-./scripts/verify-public.sh
+bash ./scripts/verify-public.sh
 
 cat <<EOF
 
