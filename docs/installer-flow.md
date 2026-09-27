@@ -4,11 +4,11 @@
 
 Installation is declarative and terminal-first.
 
-The operator controls two human/AI-readable local files:
+The operator controls two human/AI-readable local files plus one physical scope variable:
 
 ~~~text
-.env
-config/policy.yaml
+.env                    # includes VPS_AGENT_SCOPE_ROOT
+config/policy.yaml     # logical capability/resource policy
 ~~~
 
 Both are local operator state. config/policy.yaml is created from the versioned config/policy.example.yaml template and is intentionally kept out of Git.
@@ -25,6 +25,11 @@ bash scripts/init.sh
 
 The bootstrap checks Docker Compose, creates .env with random local secrets and a stable instance ID when needed, creates config/policy.yaml from the versioned template, creates the local state directory, and validates Compose syntax. It does not decide the scope.
 
+## Physical filesystem ceiling
+
+The default `compose.yaml` bind-mounts only `VPS_AGENT_SCOPE_ROOT` into the Broker under `/host`. The Broker validates that filesystem, shell cwd and Compose paths in policy remain inside that physical root. A policy escape makes the Broker fail closed.
+
+For deliberate whole-host filesystem authority, add `compose.host.yaml`. This is an explicit override and is not part of the default command.
 ## Phase 2 — The user chooses MCP authority
 
 The operator edits config/policy.yaml. The user decides exactly which VPS resources are delegated.
