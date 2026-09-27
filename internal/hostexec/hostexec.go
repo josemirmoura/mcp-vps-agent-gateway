@@ -45,6 +45,18 @@ func Path(canonical string) string {
 	return filepath.Join(root, strings.TrimPrefix(clean, string(filepath.Separator)))
 }
 
+func SystemPath(canonical string) string {
+	clean := filepath.Clean(canonical)
+	if !filepath.IsAbs(clean) {
+		return ""
+	}
+	if Root() != "" && (strings.EqualFold(strings.TrimSpace(os.Getenv("VPS_AGENT_HOST_NSENTER")), "1") ||
+		strings.EqualFold(strings.TrimSpace(os.Getenv("VPS_AGENT_HOST_NSENTER")), "true")) {
+		return filepath.Join("/proc/1/root", strings.TrimPrefix(clean, string(filepath.Separator)))
+	}
+	return Path(clean)
+}
+
 func commandArgs(name string, args ...string) (string, []string) {
 	if !commandAllowed(name) {
 		return "", nil
