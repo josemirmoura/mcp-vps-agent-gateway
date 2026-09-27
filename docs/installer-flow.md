@@ -1,180 +1,128 @@
-# Installer and first-run flow
+# Docker first-run flow
 
 ## Product objective
 
-Installation should feel like one command even though the runtime preserves separate privilege boundaries.
+Installation is declarative and terminal-first.
 
-The installer is responsible for turning operator intent into a validated server-side policy and a working ChatGPT connection.
-
-## Phase 1 — Preflight
-
-Check:
-
-- supported Linux/systemd environment
-- architecture
-- required ports/HTTPS route
-- existing Docker/systemd availability
-- current user has installation authority
-- conflicting installations
-- backup/rollback location
-
-## Phase 2 — Choose MCP authority
-
-The user explicitly chooses the resources delegated to MCP.
-
-The installer can offer presets, but every preset expands into an editable policy preview.
-
-Examples:
+The operator edits two human/AI-readable files:
 
 ~~~text
-Filesystem:
-[x] /opt/app
-[x] /var/www/site
-[ ] /
-
-systemd:
-[x] app.service
-[x] nginx.service
-
-Docker:
-[x] app-stack
-
-Shell:
-[x] enabled inside selected roots
-
-Network:
-[x] api.github.com:443
-[ ] unrestricted
-
-Administration:
-[ ] apt
-[ ] users/groups
-[ ] firewall
-[ ] admin shell
+.env
+config/policy.yaml
 ~~~
 
-The user owns this choice.
+Then Docker Compose starts the package. No separate wizard or native installer owns the configuration.
 
-## Phase 3 — Capability selection
+## Phase 1 — Bootstrap
 
-Expose the complete supported capability catalog and let policy enable only what the operator wants.
+~~~bash
+git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
+cd mcp-vps-agent-gateway
+bash scripts/init.sh
+~~~
 
-High-risk capabilities must be visually distinguished, especially:
+The bootstrap checks Docker Compose, creates .env with random local secrets when needed, creates the local state directory, and validates Compose syntax. It does not decide the scope.
 
-- recursive delete
-- chmod/chown
-- package management
-- firewall
-- user management
-- unrestricted network
-- administrative shell
+## Phase 2 — The user chooses MCP authority
 
-## Phase 4 — Policy preview and confirmation
+The operator edits config/policy.yaml. The user decides exactly which VPS resources are delegated.
 
-Render a human-readable summary before activation.
+One root, several roots, or / are all valid explicit choices.
 
-Example:
+systemd, Docker/Compose, shell, network, packages, users/groups, firewall, and temporary elevation are scoped separately.
+
+## Phase 3 — Start
+
+~~~bash
+docker compose up -d --build
+~~~
+
+Runtime separation:
 
 ~~~text
-MCP WILL BE ABLE TO:
-- read/write/delete under /opt/app
-- run sandboxed commands with cwd under /opt/app
-- restart app.service
-- inspect/restart containers in app-stack
-
-MCP WILL NOT BE ABLE TO:
-- access /etc
-- manage ssh.service
-- administer users
-- change firewall
-- use unrestricted network
+Gateway: non-root, no host root
+Broker: privileged, host mounted at /host, no remote control port
 ~~~
 
-Require explicit confirmation.
+Docker packages the privileged Broker. Docker is not the Broker's authorization boundary. Policy is.
 
-## Phase 5 — Install runtime
+## Phase 4 — Local verification
 
-Install:
+~~~bash
+bash scripts/verify.sh
+~~~
 
-- vps-agent-broker as native privileged systemd service
-- vps-agent-gateway as non-root service or supported container deployment
-- Unix socket permissions
-- state directories
-- policy
-- authentication configuration
-- TLS/reverse-proxy integration when required
+This verifies Compose configuration, Broker health, Gateway health, audit integrity, authentication, and a harmless system.info call.
 
-## Phase 6 — Validate locally
+A local verification success means the runtime is ready. It does **not** mean installation is complete.
 
-Run:
+## Phase 5 — HTTPS/public endpoint
 
-- policy validation
-- filesystem confinement checks
-- Broker/Gateway connectivity
-- privilege-boundary checks
-- health/readiness
-- audit verification
-- harmless MCP tool call
+ChatGPT needs a reachable remote HTTPS MCP endpoint.
 
-Do not continue on security-critical failure.
+Use the operator's existing reverse proxy/tunnel, or the optional Caddy override:
 
-## Phase 7 — Show ChatGPT Web connection tutorial
+~~~bash
+docker compose -f compose.yaml -f compose.https.yaml up -d --build
+~~~
 
-This is a mandatory installation stage, but it is **not** the completion stage.
+Set the final HTTPS /mcp URL in VPS_AGENT_PUBLIC_URL.
 
-Display:
+## Phase 6 — Show the current ChatGPT Web tutorial
 
-- final MCP HTTPS endpoint
-- configured authentication method
-- exact effective scope
-- current supported ChatGPT Web connection route
+~~~bash
+bash scripts/connect-chatgpt.sh
+~~~
 
-Then guide the operator step by step through connecting the MCP in ChatGPT Web.
+The script displays endpoint, authentication mode, expected subject, and the current connection steps.
 
-At the end of this phase, the installer must report something equivalent to:
+At this point:
 
 ~~~text
-Tutorial completed.
-Waiting for ChatGPT connection verification...
-Installation is NOT complete yet.
+Tutorial shown.
+Installation is NOT complete.
 ~~~
 
-The tutorial must use current official OpenAI instructions appropriate to the user's ChatGPT surface at install/release time.
+## Phase 7 — Verify the real ChatGPT connection
 
-## Phase 8 — Verify the real ChatGPT connection
+The connection script waits for an audited call from the configured subject.
 
-After the operator has followed the tutorial and connected ChatGPT Web, ask the user to send a harmless command from ChatGPT itself, such as:
+The user asks ChatGPT to call system.info.
+
+Success requires:
 
 ~~~text
-Read a test file from the authorized directory and tell me its contents.
+real ChatGPT MCP call
++ expected authenticated subject
++ policy allow
++ successful execution
++ Broker audit record
++ valid audit chain
 ~~~
 
-Then verify on the server, automatically when possible:
-
-- the MCP request arrived
-- the expected subject was authenticated
-- policy allowed the intended resource only
-- the Broker executed it
-- audit recorded it
-- the returned result matches the expected test result
-
-If any of these checks fail, installation remains incomplete and the installer should provide diagnostics/retry guidance.
-
-Optionally run a negative proof against an unauthorized resource.
-
-## Completion criterion
-
-Installation finishes only after:
+Only then:
 
 ~~~text
-runtime healthy
-+ policy active
-+ MCP endpoint reachable
-+ ChatGPT connected
-+ first end-to-end tool call verified
-+ audit valid
+CHATGPT WEB CONNECTION VERIFIED
+INSTALLATION COMPLETE
 ~~~
 
-Until every item above is verified, the installer must report the deployment as **incomplete**.
+If the call does not arrive or fails authorization, installation remains incomplete.
 
-The final success message belongs **after Phase 8**, never after merely displaying the tutorial.
+## Updates
+
+~~~bash
+git pull --ff-only
+docker compose up -d --build
+bash scripts/verify.sh
+~~~
+
+The policy and .env remain operator-controlled configuration.
+
+## Removal
+
+~~~bash
+docker compose down -v
+~~~
+
+Deleting the repository/state/configuration is a separate explicit operator action. The package never automatically deletes the VPS resources it was authorized to manage.
