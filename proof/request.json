@@ -1,6 +1,6 @@
 {
-  "id": "negative-shadow-proof",
+  "id": "systemd-restart-proof",
   "subject": "josemir-proof",
-  "type": "file_read_denied",
-  "path": "/etc/shadow"
+  "type": "service_restart",
+  "service": "vps-agent-test.service"
 }
