@@ -43,3 +43,21 @@ func TestInvalidRelativeRootFailsClosedToNative(t *testing.T) {
 	}
 	_ = os.Getenv(envHostRoot)
 }
+
+
+func TestCommandUsesNsenterWhenConfigured(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv(envHostRoot, root)
+	t.Setenv("VPS_AGENT_HOST_NSENTER", "1")
+	name, args := commandArgs("systemd-run", "--unit=x", "--", "/bin/true")
+	if name != "nsenter" {
+		t.Fatalf("name=%q", name)
+	}
+	wantPrefix := []string{
+		"--target", "1", "--mount", "--uts", "--ipc", "--net", "--pid", "--cgroup",
+		"--root=/proc/1/root", "--wd=/", "--", "systemd-run",
+	}
+	if len(args) < len(wantPrefix) || !reflect.DeepEqual(args[:len(wantPrefix)], wantPrefix) {
+		t.Fatalf("args=%v want prefix=%v", args, wantPrefix)
+	}
+}
