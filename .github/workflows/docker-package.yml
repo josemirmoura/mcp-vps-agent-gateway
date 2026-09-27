@@ -195,8 +195,15 @@ jobs:
         run: |
           set -euo pipefail
           /tmp/mcp-call shell.exec '{"command":"printf shell-ok > shell.txt","cwd":"/tmp/vps-agent-docker-proof","runtime_seconds":20}' | tee evidence/shell-start.json
-          for _ in $(seq 1 30); do test -f /tmp/vps-agent-docker-proof/shell.txt && break; sleep 1; done
-          test "$(cat /tmp/vps-agent-docker-proof/shell.txt)" = "shell-ok"
+          SHELL_JOB="$(python3 -c 'import json; print(json.load(open("evidence/shell-start.json"))["structured_content"]["ID"])')"
+          for _ in $(seq 1 20); do
+            test -f /tmp/vps-agent-docker-proof/shell.txt && break
+            sleep 0.5
+          done
+          /tmp/mcp-call job.status "{\"job_id\":\"$SHELL_JOB\"}" | tee evidence/shell-status.json || true
+          /tmp/mcp-call job.tail "{\"job_id\":\"$SHELL_JOB\",\"lines\":100}" | tee evidence/shell-tail.json || true
+          sudo journalctl -u "$SHELL_JOB" --no-pager -n 100 | tee evidence/shell-host-journal.txt || true
+          test "$(sudo cat /tmp/vps-agent-docker-proof/shell.txt)" = "shell-ok"
           /tmp/mcp-call shell.exec '{"command":"if cat /etc/shadow > shadow-copy 2>/dev/null; then echo LEAKED > shadow-result; else echo DENIED > shadow-result; fi","cwd":"/tmp/vps-agent-docker-proof","runtime_seconds":20}' | tee evidence/shell-deny-start.json
           for _ in $(seq 1 30); do test -f /tmp/vps-agent-docker-proof/shadow-result && break; sleep 1; done
           test "$(cat /tmp/vps-agent-docker-proof/shadow-result)" = "DENIED"
