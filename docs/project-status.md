@@ -2,17 +2,19 @@
 
 ## Current stage
 
-**PRE-ALPHA / DOCS-FIRST**
+**PRE-ALPHA / EXECUTABLE REFERENCE IMPLEMENTATION**
 
-There is currently:
+There is now executable Go reference code with repeatable GitHub-runner validation.
 
-- no supported production binary
-- no Docker image
-- no stable release
-- no compatibility promise
-- no long-running production validation of this repository's implementation
+There is still:
 
-The architecture and gates are the product today.
+- no stable production release
+- no production compatibility promise
+- no long-running real-VPS deployment history
+- no completed ChatGPT Web product-surface Gate 0A
+- no production-enabled Full/admin shell
+
+Laboratory evidence has reached the Gate 0B and Gate 1 behaviors. Formal maturity remains pre-R1 until the actual target client/distribution path is proven.
 
 ## Maturity ladder
 
@@ -94,4 +96,6 @@ Prefer:
 
 ## Current next milestone
 
-The next milestone is **Gate 0A + Gate 0B**, not another architecture subsystem.
+The implementation has clean-room evidence for Gate 0B and the typed Gate 1 systemd action.
+
+The next product milestone is **Gate 0A on the actual ChatGPT surface**, followed by a real-VPS Scoped pilot. See [implementation-validation.md](implementation-validation.md).
