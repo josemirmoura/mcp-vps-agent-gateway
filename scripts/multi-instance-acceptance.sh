@@ -103,7 +103,7 @@ docker compose exec -T gateway /usr/local/bin/vps-agent-mcp-call \
   --tool file.patch \
   --args "$PATCH_ARGS" >"$EVIDENCE_DIR/patch-replay-${INSTANCE_KEY}.json"
 
-test "$(cat "$SCOPE_ROOT/shared.txt")" = "after"
+test "$(sudo cat "$SCOPE_ROOT/shared.txt")" = "after"
 
 docker compose exec -T broker /usr/local/bin/vps-agent audit-status \
   >"$EVIDENCE_DIR/audit-status-${INSTANCE_KEY}.json"
