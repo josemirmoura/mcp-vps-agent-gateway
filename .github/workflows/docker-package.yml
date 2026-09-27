@@ -217,7 +217,12 @@ jobs:
             exit 1
           fi
           cat evidence/unauthorized-peer.txt
-          grep -q 'unauthorized_peer' evidence/unauthorized-peer.txt
+          # The Broker authenticates the peer immediately after accept(). It
+          # may close before the client finishes writing, so either a
+          # structured unauthorized_peer response or EPIPE is an expected
+          # fail-closed result. In both cases the Broker itself must stay healthy.
+          grep -Eq 'unauthorized_peer|broken pipe|permission denied' evidence/unauthorized-peer.txt
+          test "$(docker inspect -f '{{.State.Health.Status}}' mcp-vps-agent-broker-1)" = "healthy"
           echo "SO_PEERCRED UNAUTHORIZED UID DENIAL: PASS"
 
       - name: Create MCP helper
