@@ -45,7 +45,7 @@ func testBroker(t *testing.T) (*Broker, *fakeServices, *state.Store, string) {
 		Filesystem: policy.FilesystemPolicy{Read: []string{root}, Write: []string{root}},
 		Services: policy.ResourcePolicy{
 			Inspect: []string{"vps-agent-test.service"},
-			Manage: []string{"vps-agent-test.service"},
+			Manage:  []string{"vps-agent-test.service"},
 			Actions: []string{"status", "restart"},
 		},
 		Replay: policy.ReplayPolicy{RequireIdempotencyForSafeWrites: true},

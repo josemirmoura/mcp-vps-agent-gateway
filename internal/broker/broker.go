@@ -52,7 +52,7 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		})
 	case "permissions.status":
 		return ok(req.ID, map[string]any{
-			"mode": b.Policy.Mode,
+			"mode":         b.Policy.Mode,
 			"full_enabled": b.Policy.Features.FullModeEnabled && b.Policy.Enabled,
 		})
 	case "file.read", "file.read_test":

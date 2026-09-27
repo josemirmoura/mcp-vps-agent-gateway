@@ -47,9 +47,9 @@ func grant(args []string) {
 		os.Exit(2)
 	}
 	payload, _ := json.Marshal(map[string]any{
-		"subject": *subject,
+		"subject":      *subject,
 		"capabilities": strings.Split(*caps, ","),
-		"ttl_seconds": int64(ttl.Seconds()),
+		"ttl_seconds":  int64(ttl.Seconds()),
 	})
 	call(*socket, wire.Request{
 		ID: "operator-grant", Tool: "admin.grant.issue", AdminToken: *token, Args: payload,

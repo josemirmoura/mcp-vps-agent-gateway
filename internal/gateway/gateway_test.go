@@ -30,7 +30,7 @@ func TestMCPGate0RoundTrip(t *testing.T) {
 
 	target := filepath.Join(root, "hello.txt")
 	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-		Name: "file.write_test",
+		Name:      "file.write_test",
 		Arguments: map[string]any{"path": target, "content": "hello"},
 	})
 	if err != nil {
@@ -45,7 +45,7 @@ func TestMCPGate0RoundTrip(t *testing.T) {
 	}
 
 	res, err = session.CallTool(context.Background(), &mcp.CallToolParams{
-		Name: "file.read_test",
+		Name:      "file.read_test",
 		Arguments: map[string]any{"path": target},
 	})
 	if err != nil || res.IsError {
@@ -53,7 +53,7 @@ func TestMCPGate0RoundTrip(t *testing.T) {
 	}
 
 	res, err = session.CallTool(context.Background(), &mcp.CallToolParams{
-		Name: "file.read_test",
+		Name:      "file.read_test",
 		Arguments: map[string]any{"path": "/etc/passwd"},
 	})
 	if err != nil {

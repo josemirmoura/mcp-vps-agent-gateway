@@ -27,7 +27,7 @@ func TestServicePolicy(t *testing.T) {
 		Version: 1, Mode: "scoped",
 		Services: ResourcePolicy{
 			Inspect: []string{"app-*"},
-			Manage: []string{"vps-agent-test.service"},
+			Manage:  []string{"vps-agent-test.service"},
 			Actions: []string{"status", "restart"},
 		},
 	}
