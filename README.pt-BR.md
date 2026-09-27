@@ -64,11 +64,10 @@ A verificação local prova health, negação de token inválido, chamada MCP re
 Scoped é o padrão. Para expor deliberadamente o filesystem inteiro ao Broker, use o override explícito:
 
 ~~~bash
-sed -i 's/^VPS_AGENT_WHOLE_HOST=.*/VPS_AGENT_WHOLE_HOST=1/' .env
 docker compose -f compose.yaml -f compose.host.yaml up -d --build
 ~~~
 
-`compose.host.yaml` é a chave deliberada de whole-host. A policy server-side continua controlando quais operações MCP são permitidas.
+`compose.host.yaml` é a chave deliberada de whole-host e define `/` como teto físico do Broker. A policy server-side continua controlando quais operações MCP são permitidas.
 ### HTTPS público + ChatGPT
 
 Para uma conexão do ChatGPT com escrita, use um Authorization Server OAuth/OIDC aderente ao padrão MCP e configure endpoint público, issuer, audience/resource e subject esperado no .env. Bearer estático fica restrito a laboratório/acceptance local.
@@ -121,6 +120,7 @@ Delete recursivo, chmod/chown, pacotes, usuários, firewall, rede irrestrita e s
 ## Segurança
 
 - Gateway roda sem root e não recebe /host.
+- No modo Scoped, o pacote monta fisicamente apenas `VPS_AGENT_SCOPE_ROOT`; acesso ao filesystem inteiro exige o override explícito `compose.host.yaml`.
 - Broker não expõe API TCP; o Gateway usa Unix socket.
 - Broker reautoriza cada chamada privilegiada pela policy.
 - Gateway não recebe Docker socket.
