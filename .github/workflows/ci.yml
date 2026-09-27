@@ -139,13 +139,27 @@ jobs:
       - name: Secret scan
         run: |
           go install github.com/zricethezav/gitleaks/v8@v8.24.3
-          gitleaks dir . --redact --exit-code=2 --report-format=sarif --report-path=results.sarif
+          set +e
+          gitleaks dir . --redact --exit-code=2 --report-format=json --report-path=results.json
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            python3 - <<'PY'
+          import json
+          data=json.load(open("results.json"))
+          for x in data:
+              print(f"{x.get('RuleID','unknown')} {x.get('File','?')}:{x.get('StartLine','?')}")
+          PY
+            exit "$status"
+          fi
       - name: Upload security report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: source-security
-          path: gosec.json
+          path: |
+            gosec.json
+            results.json
           if-no-files-found: ignore
 
   systemd-job-smoke:
