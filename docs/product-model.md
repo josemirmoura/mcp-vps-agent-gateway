@@ -21,7 +21,7 @@ The LLM never decides the scope.
 
 The operator decides exactly how much of the VPS is delegated to MCP.
 
-The installer may offer presets for convenience, but presets never define authority by themselves.
+The package may provide policy examples for convenience, but examples never define authority by themselves.
 
 The authoritative configuration is always the explicit policy selected and confirmed by the user.
 
@@ -225,9 +225,9 @@ Similarly:
 
 The product supports the operation; policy decides whether the current installation may use it.
 
-## Installer UX
+## Configuration UX
 
-The installer should ask the operator:
+The operator or assisting AI edits the declarative policy to choose:
 
 1. Which exact filesystem roots/resources are delegated to MCP.
 2. Optional convenience preset: Project, Custom, or Whole host.
@@ -241,7 +241,7 @@ The installer should ask the operator:
 10. Approval/elevation behavior.
 11. Authentication and public/private MCP exposure.
 
-It then renders a policy file, displays a human-readable summary, asks for explicit confirmation, validates the policy, and only then activates it.
+`config/policy.yaml` is the authoritative, human/AI-readable configuration. `docker compose config -q` and runtime validation reject invalid package configuration before use.
 
 The policy remains editable later without reinstalling the binaries.
 
@@ -311,7 +311,7 @@ Next:
 Connect this MCP to ChatGPT Web
 ~~~
 
-The installer sequence must:
+The first-run sequence must:
 
 1. verify the MCP HTTPS endpoint is reachable;
 2. verify authentication;
@@ -328,9 +328,9 @@ Because ChatGPT product surfaces can change independently from this project, the
 The desired final experience is:
 
 ~~~text
-one install command
+clone / release bundle
  -> choose exactly what MCP may control
- -> install Gateway + Broker
+ -> start Gateway + Broker with Docker Compose
  -> validate policy and security
  -> expose authenticated MCP endpoint
  -> show ChatGPT Web connection tutorial
