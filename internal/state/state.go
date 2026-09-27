@@ -83,7 +83,31 @@ func (s *Store) migrate() error {
 			token INTEGER NOT NULL,
 			expires_at INTEGER NOT NULL
 		)`,
-		`CREATE TABLE IF NOT EXISTS approvals (\n			request_id TEXT PRIMARY KEY,\n			subject TEXT NOT NULL,\n			capabilities TEXT NOT NULL,\n			ttl_ns INTEGER NOT NULL,\n			status TEXT NOT NULL,\n			created_at INTEGER NOT NULL,\n			expires_at INTEGER NOT NULL,\n			decided_at INTEGER\n		)`,\n\t\t`CREATE TABLE IF NOT EXISTS jobs (\n			job_id TEXT PRIMARY KEY,\n			subject TEXT NOT NULL,\n			tool TEXT NOT NULL,\n			resource TEXT,\n			unit_name TEXT,\n			grant_id TEXT,\n			state TEXT NOT NULL,\n			deadline INTEGER NOT NULL,\n			created_at INTEGER NOT NULL,\n			updated_at INTEGER NOT NULL,\n			exit_code INTEGER,\n			detail TEXT\n		)`,\n		`CREATE TABLE IF NOT EXISTS audit_events (
+		`CREATE TABLE IF NOT EXISTS approvals (
+			request_id TEXT PRIMARY KEY,
+			subject TEXT NOT NULL,
+			capabilities TEXT NOT NULL,
+			ttl_ns INTEGER NOT NULL,
+			status TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			expires_at INTEGER NOT NULL,
+			decided_at INTEGER
+		)`,
+		`CREATE TABLE IF NOT EXISTS jobs (
+			job_id TEXT PRIMARY KEY,
+			subject TEXT NOT NULL,
+			tool TEXT NOT NULL,
+			resource TEXT,
+			unit_name TEXT,
+			grant_id TEXT,
+			state TEXT NOT NULL,
+			deadline INTEGER NOT NULL,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL,
+			exit_code INTEGER,
+			detail TEXT
+		)`,
+		`CREATE TABLE IF NOT EXISTS audit_events (
 			seq INTEGER PRIMARY KEY,
 			event_json TEXT NOT NULL,
 			prev_hash TEXT NOT NULL,
