@@ -32,7 +32,7 @@ services:
       start_period: 15s
 
   zitadel-api:
-    image: ghcr.io/zitadel/zitadel:${ZITADEL_VERSION:-v4.19.1}
+    image: ghcr.io/zitadel/zitadel:${ZITADEL_VERSION:-v4.16.0}
     restart: unless-stopped
     user: "0"
     command: ["start-from-init", "--masterkey", "${ZITADEL_MASTERKEY:?set ZITADEL_MASTERKEY}"]
@@ -46,6 +46,11 @@ services:
 
       ZITADEL_FIRSTINSTANCE_INSTANCENAME: VPS Agent Identity
       ZITADEL_FIRSTINSTANCE_ORG_NAME: VPS Agent
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: bootstrap-admin
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_FIRSTNAME: Bootstrap
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_LASTNAME: Admin
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${ZITADEL_BOOTSTRAP_ADMIN_PASSWORD:?set ZITADEL_BOOTSTRAP_ADMIN_PASSWORD}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
       ZITADEL_FIRSTINSTANCE_PATPATH: /zitadel/bootstrap/bootstrap-admin.pat
       ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: vps-agent-bootstrap
       ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: VPS Agent Bootstrap
@@ -90,6 +95,15 @@ services:
       - traefik.http.routers.vps-agent-auth-http.middlewares=vps-agent-https-redirect
       - traefik.http.routers.vps-agent-auth-http.service=vps-agent-zitadel-api
       - traefik.http.routers.vps-agent-auth-http.priority=100
+      - traefik.http.middlewares.vps-agent-auth-ratelimit.ratelimit.average=30
+      - traefik.http.middlewares.vps-agent-auth-ratelimit.ratelimit.burst=60
+      - traefik.http.routers.vps-agent-dcr.rule=Host(`${VPS_AGENT_DOMAIN}`) && PathPrefix(`/oauth/v2/register`)
+      - traefik.http.routers.vps-agent-dcr.entrypoints=websecure
+      - traefik.http.routers.vps-agent-dcr.tls=true
+      - traefik.http.routers.vps-agent-dcr.tls.certresolver=${VPS_AGENT_TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.vps-agent-dcr.middlewares=vps-agent-auth-ratelimit
+      - traefik.http.routers.vps-agent-dcr.service=vps-agent-zitadel-api
+      - traefik.http.routers.vps-agent-dcr.priority=700
       - traefik.http.routers.vps-agent-auth.rule=Host(`${VPS_AGENT_DOMAIN}`)
       - traefik.http.routers.vps-agent-auth.entrypoints=websecure
       - traefik.http.routers.vps-agent-auth.tls=true
@@ -98,7 +112,7 @@ services:
       - traefik.http.routers.vps-agent-auth.priority=100
 
   zitadel-login:
-    image: ghcr.io/zitadel/zitadel-login:${ZITADEL_VERSION:-v4.19.1}
+    image: ghcr.io/zitadel/zitadel-login:${ZITADEL_VERSION:-v4.16.0}
     restart: unless-stopped
     user: "0"
     environment:
