@@ -1,5 +1,11 @@
 name: mcp-vps-agent
 
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "${VPS_AGENT_LOG_MAX_SIZE:-10m}"
+    max-file: "${VPS_AGENT_LOG_MAX_FILES:-5}"
+
 services:
   broker:
     build:
@@ -7,6 +13,7 @@ services:
       target: broker
     image: ${VPS_AGENT_BROKER_IMAGE:-mcp-vps-agent-broker:local}
     restart: unless-stopped
+    logging: *default-logging
     user: "0:65532"
     privileged: true
     pid: host
@@ -21,6 +28,7 @@ services:
       VPS_AGENT_HOST_NSENTER: "1"
       VPS_AGENT_INSTANCE_ID: ${VPS_AGENT_INSTANCE_ID:-}
       VPS_AGENT_INSTANCE_NAME: ${VPS_AGENT_INSTANCE_NAME:-vps-agent}
+      VPS_AGENT_MAX_CONCURRENT_REQUESTS: ${VPS_AGENT_MAX_CONCURRENT_REQUESTS:-64}
     volumes:
       - type: bind
         source: /
@@ -50,6 +58,7 @@ services:
       target: gateway
     image: ${VPS_AGENT_GATEWAY_IMAGE:-mcp-vps-agent-gateway:local}
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       broker:
         condition: service_healthy
