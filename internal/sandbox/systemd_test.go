@@ -33,7 +33,7 @@ func TestBuildSystemdRunArgsBlockedNetwork(t *testing.T) {
 		}
 	}
 	got := strings.Join(args[len(args)-4:], " ")
-	if got != "-- /bin/sh -c echo ok" {
+	if got != "-- /usr/bin/sh -c echo ok" {
 		t.Fatalf("unexpected command tail %q", got)
 	}
 }
@@ -44,5 +44,37 @@ func TestBuildSystemdRunArgsAllowlistFailsClosed(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("network allowlist must fail closed until implemented")
+	}
+}
+
+
+func TestBuildSystemdRunArgsFilesystemWhitelist(t *testing.T) {
+	args, err := BuildSystemdRunArgs(Spec{
+		Unit: "job-whitelist", User: "root", Command: "printf ok", CWD: "/opt/app",
+		ReadOnlyPaths: []string{"/opt/app", "/srv/read"},
+		ReadWritePaths: []string{"/opt/app"},
+		IsolateFilesystem: true,
+		Runtime: time.Minute, NetworkMode: "blocked",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"--property=TemporaryFileSystem=/:ro",
+		"--property=CapabilityBoundingSet=",
+		"--property=BindReadOnlyPaths=/usr",
+		"--property=BindPaths=/opt/app",
+		"--property=BindReadOnlyPaths=/srv/read",
+	}
+	for _, w := range want {
+		if !slices.Contains(args, w) {
+			t.Errorf("missing %q in %v", w, args)
+		}
+	}
+	if slices.Contains(args, "--property=BindReadOnlyPaths=/opt/app") {
+		t.Fatal("writable path was also bound read-only")
+	}
+	if slices.Contains(args, "--property=PrivateTmp=yes") {
+		t.Fatal("PrivateTmp would hide authorized /tmp roots in whitelist mode")
 	}
 }
