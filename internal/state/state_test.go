@@ -2,6 +2,9 @@ package state
 
 import (
 	"context"
+	"database/sql"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -124,4 +127,26 @@ func TestAbortPendingOperationAllowsSafeRetry(t *testing.T) {
 	if err != nil || d != OperationExecute {
 		t.Fatalf("safe retry did not execute: decision=%s err=%v", d, err)
 	}
+}
+
+
+func TestSchemaVersionAndFutureVersionRejection(t *testing.T) {
+	ctx := context.Background()
+	s := openTestStore(t)
+	v, err := s.SchemaVersion(ctx)
+	if err != nil || v != CurrentSchemaVersion {
+		t.Fatalf("schema version=%d err=%v", v, err)
+	}
+
+	dir := t.TempDir()
+	file := filepath.Join(dir, "future.db")
+	db, err := sql.Open("sqlite", file)
+	if err != nil { t.Fatal(err) }
+	if _, err := db.Exec(`CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value INTEGER NOT NULL)`); err != nil { t.Fatal(err) }
+	if _, err := db.Exec(`INSERT INTO schema_meta(key,value) VALUES('schema_version', ?)`, CurrentSchemaVersion+1); err != nil { t.Fatal(err) }
+	if err := db.Close(); err != nil { t.Fatal(err) }
+	if _, err := Open(file); err == nil {
+		t.Fatal("future schema version should fail closed")
+	}
+	_ = os.Remove(file)
 }
