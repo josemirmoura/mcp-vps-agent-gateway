@@ -169,6 +169,7 @@ func install(args []string) error {
 	groupActions := fs.String("group-actions", "", "group actions")
 	firewallActions := fs.String("firewall-actions", "", "firewall actions")
 	shellEnabled := fs.Bool("shell", false, "enable scoped shell/jobs")
+	shellUser := fs.String("shell-user", "vps-agent-exec", "Linux user for scoped shell/jobs")
 	shellHostRead := fs.Bool("shell-host-read", false, "allow scoped shell to read entire host")
 	networkMode := fs.String("network-mode", "blocked", "blocked, allowlist, unrestricted")
 	listen := fs.String("listen", "127.0.0.1:8080", "Gateway listen address")
@@ -246,7 +247,7 @@ func install(args []string) error {
 		Firewall: policy.ResourcePolicy{Actions: csv(*firewallActions)},
 		Diagnostics: csv(*diagnostics),
 		Shell: policy.ShellPolicy{
-			Enabled: *shellEnabled, CWDRoots: readRoots, MaxRuntimeSeconds: 900,
+			Enabled: *shellEnabled, RunAs: *shellUser, CWDRoots: readRoots, MaxRuntimeSeconds: 900,
 			MaxOutputBytes: 1 << 20, MaxMemoryBytes: 1 << 30, MaxTasks: 256,
 			AllowHostRead: *shellHostRead,
 		},
