@@ -2,7 +2,7 @@
 
 Security-first MCP control plane for letting ChatGPT or another MCP client work on a Linux VPS with authority explicitly chosen by the VPS owner.
 
-> **Status: Docker-first release candidate for automated acceptance.** Clean Ubuntu 24.04 workflows validate the package end to end. A stable release still requires the external ChatGPT Web OAuth gate and a real audited call against the target deployment.
+> **Status: Docker-first release candidate for automated acceptance.** Clean Ubuntu 24.04 workflows validate the package end to end. The remaining release gate is the integrated self-hosted OAuth path plus a real audited ChatGPT call against the target deployment.
 
 ## The idea
 
@@ -69,32 +69,42 @@ docker compose -f compose.yaml -f compose.host.yaml up -d --build
 ~~~
 
 `compose.host.yaml` is the deliberate whole-host switch and sets the Broker's physical ceiling to `/`. Server-side policy still controls which MCP operations are allowed.
-### Public HTTPS + ChatGPT
+### Finish installation: integrated OAuth + ChatGPT
 
-For a write-capable ChatGPT connection, use a standards-based OAuth/OIDC authorization server and set the public endpoint, issuer, audience/resource and expected token subject in .env. Static bearer auth is intentionally local/lab only.
+The supported public path is self-hosted OAuth/OIDC inside this package. No Auth0/Okta/Entra account and no OpenAI tunnel are required.
 
-~~~dotenv
-VPS_AGENT_DOMAIN=mcp.example.com
-VPS_AGENT_PUBLIC_URL=https://mcp.example.com/mcp
-VPS_AGENT_AUTH_MODE=oidc
-VPS_AGENT_OIDC_ISSUER=https://auth.example.com
-VPS_AGENT_OIDC_AUDIENCE=https://mcp.example.com/mcp
-VPS_AGENT_SUBJECT=<expected-token-subject>
+Before running the next command, create a DNS A/AAAA record for a hostname you control and point it at the VPS. Then run:
+
+~~~bash
+bash scripts/setup-integrated-auth.sh --domain mcp.example.com
 ~~~
+
+The script:
+
+- reuses a single running Traefik when one is already the VPS edge;
+- otherwise starts the package Traefik automatically when ports 80/443 are free;
+- starts a pinned ZITADEL + PostgreSQL identity stack;
+- creates a dedicated non-admin VPS operator identity;
+- enables MCP-compatible Dynamic Client Registration (DCR) and PKCE discovery;
+- configures the Gateway as the OAuth protected resource;
+- binds the Broker to that exact operator subject;
+- verifies HTTPS, OAuth discovery and fail-closed unauthenticated MCP access.
+
+The script asks for the operator email and password interactively. The password is sent only to the local ZITADEL bootstrap API and is not stored by the installer.
 
 Then:
 
 ~~~bash
-docker compose -f compose.yaml -f compose.https.yaml up -d --build
-bash scripts/verify-public.sh
 bash scripts/connect-chatgpt.sh
 ~~~
 
-The public verifier requires HTTPS, OAuth discovery and fail-closed unauthenticated access. The connection script then shows the current ChatGPT Web flow and waits for a **new audited system.info call from ChatGPT**.
+That script shows the ChatGPT connection flow and waits for a **new audited system.info call from ChatGPT**.
 
 ~~~text
-tutorial shown
- -> OAuth app connected in ChatGPT
+integrated OAuth ready
+ -> ChatGPT discovers the MCP resource + authorization server
+ -> ChatGPT dynamically registers its OAuth client
+ -> operator signs in
  -> ChatGPT calls the MCP
  -> Gateway authenticates
  -> Broker verifies subject + policy
@@ -105,11 +115,8 @@ tutorial shown
 
 If the real ChatGPT call never arrives, setup remains incomplete.
 
-Current OpenAI guidance checked on 2026-09-27 documents full MCP write/modify support on ChatGPT Web for Business, Enterprise and Edu workspaces. Pro is limited to read/fetch MCP access. Authenticated write-capable MCP servers are expected to use OAuth 2.1; ChatGPT does not present custom API keys.
+Current OpenAI product/UI behavior is version-sensitive and must be rechecked at release/setup time. The MCP server itself remains standards-based; the package does not require an external identity provider for the supported installation path.
 
-Official references:
-- https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
-- https://developers.openai.com/plugins/build/auth
 ## Toolbox
 
 The current reference implementation includes complete scoped filesystem CRUD, durable sandboxed shell/jobs, typed systemd, Docker/Compose, diagnostics, packages, users/groups, UFW, out-of-band elevation, Broker-owned SQLite, operation journaling, fencing locks, and tamper-evident audit.
