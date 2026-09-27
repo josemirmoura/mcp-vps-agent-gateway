@@ -204,6 +204,25 @@ type composeInput struct {
 	OperationID string `json:"operation_id,omitempty"`
 }
 
+type shellExecInput struct {
+	Command        string `json:"command" jsonschema:"shell command to execute in the server-enforced sandbox"`
+	CWD            string `json:"cwd" jsonschema:"absolute working directory inside authorized shell roots"`
+	RuntimeSeconds int    `json:"runtime_seconds,omitempty"`
+	MemoryBytes    int64  `json:"memory_bytes,omitempty"`
+	TasksMax       int    `json:"tasks_max,omitempty"`
+	OperationID    string `json:"operation_id,omitempty"`
+}
+
+type adminShellExecInput struct {
+	Command        string `json:"command"`
+	CWD            string `json:"cwd"`
+	RuntimeSeconds int    `json:"runtime_seconds,omitempty"`
+	MemoryBytes    int64  `json:"memory_bytes,omitempty"`
+	TasksMax       int    `json:"tasks_max,omitempty"`
+	OperationID    string `json:"operation_id,omitempty"`
+	GrantID        string `json:"grant_id" jsonschema:"human-approved temporary grant containing shell.admin"`
+}
+
 type jobInput struct {
 	JobID string `json:"job_id" jsonschema:"durable job identifier"`
 }
@@ -474,6 +493,35 @@ func NewMCPServer(exec Executor) *mcp.Server {
 			})
 	}
 
+	for _, toolName := range []string{"shell.exec", "job.start"} {
+		toolName := toolName
+		mcp.AddTool(server, &mcp.Tool{Name: toolName, Description: "Start a durable sandboxed command job inside server-authorized shell and filesystem scope."},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in shellExecInput) (*mcp.CallToolResult, map[string]any, error) {
+				var out map[string]any
+				args, _ := json.Marshal(map[string]any{
+					"command": in.Command, "cwd": in.CWD, "runtime_seconds": in.RuntimeSeconds,
+					"memory_bytes": in.MemoryBytes, "tasks_max": in.TasksMax,
+				})
+				if err := s.call(ctx, toolName, in.CWD, "start", args, &out, true, in.OperationID); err != nil {
+					return nil, out, err
+				}
+				return nil, out, nil
+			})
+	}
+
+	mcp.AddTool(server, &mcp.Tool{Name: "shell.exec_admin", Description: "Start a temporary human-approved administrative shell job. Full mode and a valid shell.admin grant are required."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in adminShellExecInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{
+				"command": in.Command, "cwd": in.CWD, "runtime_seconds": in.RuntimeSeconds,
+				"memory_bytes": in.MemoryBytes, "tasks_max": in.TasksMax,
+			})
+			if err := s.callWithGrant(ctx, "shell.exec_admin", in.CWD, "start", args, &out, in.OperationID, in.GrantID); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
 	mcp.AddTool(server, &mcp.Tool{Name: "job.status", Description: "Return durable job state for the authenticated subject."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in jobInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
@@ -521,6 +569,37 @@ func NewMCPServer(exec Executor) *mcp.Server {
 			return nil, out, nil
 		})
 	return server
+}
+
+
+func (s *Server) callWithGrant(ctx context.Context, tool, resource, action string, args []byte, out any, operationID, grantID string) error {
+	id, err := randomID()
+	if err != nil {
+		return err
+	}
+	if operationID == "" {
+		operationID = id
+	}
+	req := wire.Request{
+		ID: id, Subject: SubjectFromContext(ctx), Tool: tool, Resource: resource,
+		Action: action, Args: args, InvocationID: operationID, GrantID: grantID,
+	}
+	resp, err := s.Executor.Call(ctx, req)
+	if err != nil {
+		return err
+	}
+	if !resp.OK {
+		if resp.Error == nil {
+			return errors.New("broker denied request")
+		}
+		return fmt.Errorf("%s: %s", resp.Error.Code, resp.Error.Message)
+	}
+	if out != nil && len(resp.Result) != 0 {
+		if err := json.Unmarshal(resp.Result, out); err != nil {
+			return fmt.Errorf("decode broker response: %w", err)
+		}
+	}
+	return nil
 }
 
 func (s *Server) call(ctx context.Context, tool, resource, action string, args []byte, out any, write bool, operationID string) error {
