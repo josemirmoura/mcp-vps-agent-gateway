@@ -55,7 +55,7 @@ func TestCommandUsesNsenterWhenConfigured(t *testing.T) {
 	}
 	wantPrefix := []string{
 		"--target", "1", "--mount", "--uts", "--ipc", "--net", "--pid", "--cgroup",
-		"--root=/proc/1/root", "--wd=/", "--", "systemd-run",
+		"--root=/proc/1/root", "--wdns=/", "--", "systemd-run",
 	}
 	if len(args) < len(wantPrefix) || !reflect.DeepEqual(args[:len(wantPrefix)], wantPrefix) {
 		t.Fatalf("args=%v want prefix=%v", args, wantPrefix)
