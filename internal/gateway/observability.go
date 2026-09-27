@@ -21,6 +21,8 @@ type toolMetric struct {
 type runtimeMetrics struct {
 	mu           sync.Mutex
 	started      time.Time
+	instanceID   string
+	instanceName string
 	httpRequests uint64
 	httpFailures uint64
 	authFailures uint64
@@ -28,8 +30,11 @@ type runtimeMetrics struct {
 	tools        map[string]toolMetric
 }
 
-func newRuntimeMetrics() *runtimeMetrics {
-	return &runtimeMetrics{started: time.Now().UTC(), tools: make(map[string]toolMetric)}
+func newRuntimeMetrics(instanceID, instanceName string) *runtimeMetrics {
+	return &runtimeMetrics{
+		started: time.Now().UTC(), instanceID: instanceID, instanceName: instanceName,
+		tools: make(map[string]toolMetric),
+	}
 }
 
 func (m *runtimeMetrics) observeIPCFailure() {
@@ -53,7 +58,9 @@ func (m *runtimeMetrics) observeTool(tool string, started time.Time, err error) 
 	m.mu.Unlock()
 	level := slog.LevelInfo
 	if err != nil { level = slog.LevelWarn }
-	slog.Log(context.Background(), level, "mcp_tool", "tool", tool, "duration_ms", time.Since(started).Milliseconds(), "ok", err == nil)
+	slog.Log(context.Background(), level, "mcp_tool",
+		"instance_id", m.instanceID, "instance_name", m.instanceName,
+		"tool", tool, "duration_ms", time.Since(started).Milliseconds(), "ok", err == nil)
 }
 
 func isPolicyDeny(err error) bool {
