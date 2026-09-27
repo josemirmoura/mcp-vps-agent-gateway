@@ -60,7 +60,18 @@ func NewWithHostRoot(readRoots, writeRoots []string, maxBytes int64, hostRoot st
 			hostRoot = ""
 		}
 	}
-	return &Manager{readRoots: rr, writeRoots: wr, maxBytes: maxBytes, hostRoot: hostRoot}, nil
+	m := &Manager{readRoots: rr, writeRoots: wr, maxBytes: maxBytes, hostRoot: hostRoot}
+	seen := make(map[string]struct{}, len(rr)+len(wr))
+	for _, configuredRoot := range append(append([]string(nil), rr...), wr...) {
+		if _, ok := seen[configuredRoot]; ok {
+			continue
+		}
+		seen[configuredRoot] = struct{}{}
+		if _, err := nearestExistingDir(m.physical(configuredRoot)); err != nil {
+			return nil, fmt.Errorf("unsafe authorized root %q: %w", configuredRoot, err)
+		}
+	}
+	return m, nil
 }
 
 func (m *Manager) physical(canonical string) string {
