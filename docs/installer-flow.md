@@ -64,17 +64,25 @@ This verifies Compose configuration, Broker health, Gateway health, audit integr
 
 A local verification success means the runtime is ready. It does **not** mean installation is complete.
 
-## Phase 5 — HTTPS/public endpoint
+## Phase 5 — Integrated OAuth + public endpoint
 
-ChatGPT needs a reachable remote HTTPS MCP endpoint.
+ChatGPT needs a reachable remote HTTPS MCP endpoint, but the operator should not have to assemble an identity provider by hand.
 
-Use the operator's existing reverse proxy/tunnel, or the optional Caddy override. The public write-capable ChatGPT route requires OAuth/OIDC and HTTPS:
+Create a DNS A/AAAA record pointing a hostname at the VPS, then run:
 
 ~~~bash
-docker compose -f compose.yaml -f compose.https.yaml up -d --build
+bash scripts/setup-integrated-auth.sh --domain mcp.example.com
 ~~~
 
-Set the final HTTPS /mcp URL in VPS_AGENT_PUBLIC_URL, configure the OAuth issuer/audience and expected token subject, then run bash scripts/verify-public.sh before connecting ChatGPT.
+The script reuses a single existing Traefik when one is present. If none is present and ports 80/443 are free, it starts the bundled Traefik. It then starts ZITADEL + PostgreSQL, creates the dedicated non-admin operator identity, enables MCP-compatible Dynamic Client Registration, configures the Gateway/Broker identity binding and runs the public verification.
+
+A successful phase ends with:
+
+~~~text
+INTEGRATED AUTH: READY
+~~~
+
+The script refuses to replace an unknown service already occupying 80/443.
 
 ## Phase 6 — Show the current ChatGPT Web tutorial
 
