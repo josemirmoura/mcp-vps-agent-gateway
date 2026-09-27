@@ -75,7 +75,7 @@ func main() {
 		if resource == "" || issuer == "" {
 			slog.Error("oidc_config_invalid", "reason", "OAuth resource/public URL and issuer required"); os.Exit(1)
 		}
-		var verifier gatewayVerifier
+		var verifier mcpauth.TokenVerifier
 		var err error
 		if authCfg.Mode == "integrated" {
 			verifier, err = gateway.NewIntegratedOIDCVerifier(context.Background(), issuer)
@@ -105,7 +105,6 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil { slog.Error("gateway_exit", "error", err); os.Exit(1) }
 }
 
-type gatewayVerifier = func(context.Context, string, *http.Request) (*mcpauth.TokenInfo, error)
 
 func metadataURLForResource(raw string) string {
 	u, err := url.Parse(raw)
