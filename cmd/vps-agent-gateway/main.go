@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/gateway"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/ipc"
@@ -68,8 +69,7 @@ func main() {
 
 func splitScopes(raw string) []string {
 	return strings.FieldsFunc(raw, func(r rune) bool {
-		return r == ',' || r == ' ' || r == '	' || r == '
-'
+		return r == ',' || unicode.IsSpace(r)
 	})
 }
 
