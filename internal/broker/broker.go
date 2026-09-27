@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"runtime"
 	"time"
 
@@ -23,7 +24,8 @@ type Broker struct {
 	Services   ServiceManager
 	Docker     DockerManager
 	Jobs       *jobs.Manager
-	AdminToken string
+	AdminToken      string
+	ExpectedSubject string
 }
 
 func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
@@ -45,6 +47,9 @@ func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
 }
 
 func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
+	if !strings.HasPrefix(req.Tool, "admin.") && b.ExpectedSubject != "" && req.Subject != b.ExpectedSubject {
+		return deny(req.ID, "identity_mismatch", "subject is not authorized for this Broker")
+	}
 	switch req.Tool {
 	case "system.info":
 		host, _ := os.Hostname()
