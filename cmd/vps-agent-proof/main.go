@@ -53,7 +53,7 @@ func main() {
 	flag.StringVar(&output, "output", "proof/evidence.json", "evidence output JSON")
 	flag.Parse()
 
-	raw, err := os.ReadFile(requestFile)
+	// #nosec G304 -- requestFile is an explicit operator-supplied proof-harness input, not an MCP-controlled path.\n\traw, err := os.ReadFile(requestFile)
 	must(err)
 	var req Request
 	must(json.Unmarshal(raw, &req))
@@ -144,7 +144,7 @@ func main() {
 	}
 	ev.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
 
-	must(os.MkdirAll(dir(output), 0o755))
+	must(os.MkdirAll(dir(output), 0o750))
 	encoded, err := json.MarshalIndent(ev, "", "  ")
 	must(err)
 	must(os.WriteFile(output, encoded, 0o600))
