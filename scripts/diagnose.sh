@@ -18,7 +18,7 @@ case "$cmd" in
     for service in broker gateway; do
       cid="$(docker compose ps -q "$service" 2>/dev/null || true)"
       if [ -n "$cid" ]; then
-        printf '%s health: ' "$service"
+        printf "%s health: " "$service"
         docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid"
       fi
     done
@@ -59,11 +59,11 @@ PY
     git rev-parse HEAD >"$tmp/git-head.txt" 2>&1 || true
 
     {
-      printf 'instance_id=%s\n' "${VPS_AGENT_INSTANCE_ID:-}"
-      printf 'instance_name=%s\n' "${VPS_AGENT_INSTANCE_NAME:-}"
-      printf 'auth_mode=%s\n' "${VPS_AGENT_AUTH_MODE:-}"
-      printf 'public_url=%s\n' "${VPS_AGENT_PUBLIC_URL:-}"
-      printf 'oidc_issuer=%s\n' "${VPS_AGENT_OIDC_ISSUER:-}"
+      printf "instance_id=%s\n" "${VPS_AGENT_INSTANCE_ID:-}"
+      printf "instance_name=%s\n" "${VPS_AGENT_INSTANCE_NAME:-}"
+      printf "auth_mode=%s\n" "${VPS_AGENT_AUTH_MODE:-}"
+      printf "public_url=%s\n" "${VPS_AGENT_PUBLIC_URL:-}"
+      printf "oidc_issuer=%s\n" "${VPS_AGENT_OIDC_ISSUER:-}"
     } >"$tmp/runtime.txt"
 
     docker compose exec -T broker /usr/local/bin/vps-agent audit-status >"$tmp/audit-status.json" 2>&1 || true
@@ -82,14 +82,13 @@ for name in ("logs.raw","audit-tail.json","audit-status.json"):
     for secret in secrets:
         text=text.replace(secret,"[REDACTED]")
     text=re.sub(r'(?i)(authorization|token|secret|password)(["=: ]+)[^\s",}]+', r'\1\2[REDACTED]', text)
-    (root/name.replace(".raw",".txt")).write_text(text)
+    target=root/(name.replace(".raw",".txt"))
+    target.write_text(text)
 
 policy=pathlib.Path("config/policy.yaml")
 if policy.exists():
     text=policy.read_text(errors="replace")
-    text=re.sub(r'(?im)^(\s*[^#\n]*(?:token|secret|password)[^:]*:\s*).+
-esac
-, r'\1[REDACTED]', text)
+    text=re.sub(r'(?im)^(\s*[^#\n]*(?:token|secret|password)[^:]*:\s*).+$', r'\1[REDACTED]', text)
     (root/"policy.redacted.yaml").write_text(text)
 PY
     rm -f "$tmp/logs.raw"
