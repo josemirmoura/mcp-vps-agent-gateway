@@ -88,7 +88,7 @@ jobs:
           echo "::add-mask::$PAT"
 
           curl_ci() {
-            docker run --rm --network ci-edge curlimages/curl:8.16.0               -fsS               -H 'Host: mcp.example.invalid'               -H 'X-Forwarded-Proto: https'               "$@"
+            docker run --rm -i --network ci-edge curlimages/curl:8.16.0               -fsS               -H 'Host: mcp.example.invalid'               -H 'X-Forwarded-Proto: https'               "$@"
           }
 
           curl_ci http://zitadel-api:8080/.well-known/openid-configuration > /tmp/oidc-before.json
@@ -112,7 +112,7 @@ jobs:
           }))
           PY
 
-          curl_ci             -X POST http://zitadel-api:8080/v2/users/human             -H "Authorization: Bearer $PAT"             -H 'Content-Type: application/json'             --data-binary @/tmp/operator.json             > /tmp/operator-response.json
+          curl_ci             -X POST http://zitadel-api:8080/v2/users/human             -H "Authorization: Bearer $PAT"             -H 'Content-Type: application/json'             --data-binary @-             < /tmp/operator.json             > /tmp/operator-response.json
           python3 - <<'PY'
           import json
           x=json.load(open('/tmp/operator-response.json'))
