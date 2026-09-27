@@ -1,0 +1,284 @@
+name: docker-package-acceptance
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Prepare host proof resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence state /tmp/vps-agent-docker-proof/compose
+          chmod 700 state
+
+          ADMIN_TOKEN="$(openssl rand -hex 32)"
+          MCP_TOKEN="$(openssl rand -hex 32)"
+          {
+            echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN"
+            echo "VPS_AGENT_STATIC_TOKEN=$MCP_TOKEN"
+            echo "VPS_AGENT_SUBJECT=docker-proof"
+            echo "VPS_AGENT_BIND_ADDRESS=127.0.0.1"
+            echo "VPS_AGENT_PORT=18080"
+            echo "VPS_AGENT_AUTH_MODE=static"
+            echo "VPS_AGENT_GATEWAY_IMAGE=mcp-vps-agent-gateway:ci"
+            echo "VPS_AGENT_BROKER_IMAGE=mcp-vps-agent-broker:ci"
+            echo "VPS_AGENT_PUBLIC_URL=https://example.invalid/mcp"
+          } > .env
+          chmod 600 .env
+          echo "::add-mask::$ADMIN_TOKEN"
+          echo "::add-mask::$MCP_TOKEN"
+
+          cat > config/policy.yaml <<'YAML'
+          version: 1
+          mode: scoped
+          features:
+            full_mode_enabled: false
+          filesystem:
+            read: [/tmp/vps-agent-docker-proof]
+            write: [/tmp/vps-agent-docker-proof]
+            actions: [list, stat, read, mkdir, write, patch, copy, move, remove, remove_recursive, hash, chmod, chown]
+          shell:
+            enabled: true
+            run_as: root
+            cwd_roots: [/tmp/vps-agent-docker-proof]
+            max_runtime_seconds: 60
+            max_output_bytes: 1048576
+            max_memory_bytes: 268435456
+            max_tasks: 64
+            allow_host_read: false
+          services:
+            inspect: [vps-agent-docker-proof.service]
+            manage: [vps-agent-docker-proof.service]
+            actions: [status, logs, restart]
+          docker:
+            inspect: [vps-agent-docker-target]
+            manage: [vps-agent-docker-target]
+            actions: [list, inspect, logs, restart]
+          compose:
+            inspect: [/tmp/vps-agent-docker-proof/compose]
+            manage: [/tmp/vps-agent-docker-proof/compose]
+            actions: [validate, up, down]
+          network:
+            mode: blocked
+            destinations: []
+          diagnostics: [system.disk, system.memory, process.list, process.inspect, network.listen]
+          packages:
+            inspect: ["*"]
+            manage: []
+            actions: [list]
+          users:
+            inspect: ["*"]
+            manage: []
+            actions: [list, inspect]
+          groups:
+            inspect: ["*"]
+            manage: []
+            actions: [list, inspect]
+          firewall:
+            inspect: []
+            manage: []
+            actions: []
+          privilege:
+            admin: broker-only
+          replay:
+            require_idempotency_for_safe_writes: true
+            blind_retry_non_replay_safe: false
+          grant:
+            required: true
+            max_ttl_minutes: 60
+            out_of_band_approval: true
+            step_up_auth: true
+          YAML
+
+          cat > /tmp/vps-agent-docker-proof.service <<'UNIT'
+          [Unit]
+          Description=VPS Agent Docker package proof service
+          [Service]
+          Type=simple
+          ExecStart=/usr/bin/sleep infinity
+          UNIT
+          sudo install -m 0644 /tmp/vps-agent-docker-proof.service /etc/systemd/system/vps-agent-docker-proof.service
+          sudo systemctl daemon-reload
+          sudo systemctl start vps-agent-docker-proof.service
+
+          docker rm -f vps-agent-docker-target >/dev/null 2>&1 || true
+          docker run -d --name vps-agent-docker-target alpine:3.22 sh -c 'echo docker-proof; sleep 1200'
+
+          cat > /tmp/vps-agent-docker-proof/compose/compose.yaml <<'YAML'
+          services:
+            proof:
+              image: alpine:3.22
+              container_name: vps-agent-compose-proof
+              command: ["sh", "-c", "sleep 1200"]
+          YAML
+
+      - name: Validate Compose package
+        run: docker compose config -q
+
+      - name: Build Docker package
+        run: docker compose build
+
+      - name: Start Docker package
+        run: docker compose up -d
+
+      - name: Wait for package health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 90); do
+            b="$(docker inspect -f '{{.State.Health.Status}}' mcp-vps-agent-broker-1 2>/dev/null || true)"
+            g="$(docker inspect -f '{{.State.Health.Status}}' mcp-vps-agent-gateway-1 2>/dev/null || true)"
+            if [ "$b" = healthy ] && [ "$g" = healthy ]; then
+              docker compose ps | tee evidence/compose-ps.txt
+              exit 0
+            fi
+            sleep 1
+          done
+          docker compose ps
+          docker compose logs --no-color > evidence/compose-failure.log || true
+          exit 1
+
+      - name: Create MCP helper
+        shell: bash
+        run: |
+          cat > /tmp/mcp-call <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          tool="$1"; shift
+          args="${1:-{}}"
+          set -a; . ./.env; set +a
+          docker compose exec -T gateway /usr/local/bin/vps-agent-mcp-call             --endpoint http://127.0.0.1:8080/mcp             --token "$VPS_AGENT_STATIC_TOKEN"             --tool "$tool"             --args "$args"
+          SH
+          chmod +x /tmp/mcp-call
+
+      - name: Filesystem CRUD through MCP
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/mcp-call file.mkdir '{"path":"/tmp/vps-agent-docker-proof/work"}' | tee evidence/fs-mkdir.json
+          /tmp/mcp-call file.write '{"path":"/tmp/vps-agent-docker-proof/work/a.txt","content":"alpha beta"}' | tee evidence/fs-write.json
+          /tmp/mcp-call file.read '{"path":"/tmp/vps-agent-docker-proof/work/a.txt"}' | tee evidence/fs-read.json
+          /tmp/mcp-call file.hash '{"path":"/tmp/vps-agent-docker-proof/work/a.txt"}' | tee evidence/fs-hash.json
+          /tmp/mcp-call file.patch '{"path":"/tmp/vps-agent-docker-proof/work/a.txt","old_text":"beta","new_text":"BETA"}' | tee evidence/fs-patch.json
+          /tmp/mcp-call file.copy '{"path":"/tmp/vps-agent-docker-proof/work/a.txt","destination":"/tmp/vps-agent-docker-proof/work/copy.txt"}' | tee evidence/fs-copy.json
+          /tmp/mcp-call file.move '{"path":"/tmp/vps-agent-docker-proof/work/copy.txt","destination":"/tmp/vps-agent-docker-proof/work/moved.txt"}' | tee evidence/fs-move.json
+          /tmp/mcp-call file.chmod '{"path":"/tmp/vps-agent-docker-proof/work/moved.txt","mode":511}' | tee evidence/fs-chmod.json
+          /tmp/mcp-call file.stat '{"path":"/tmp/vps-agent-docker-proof/work/moved.txt"}' | tee evidence/fs-stat.json
+          /tmp/mcp-call file.list '{"path":"/tmp/vps-agent-docker-proof/work","limit":50}' | tee evidence/fs-list.json
+          test "$(cat /tmp/vps-agent-docker-proof/work/a.txt)" = "alpha BETA"
+          test "$(stat -c '%a' /tmp/vps-agent-docker-proof/work/moved.txt)" = "777"
+          /tmp/mcp-call file.remove '{"path":"/tmp/vps-agent-docker-proof/work/moved.txt"}' | tee evidence/fs-remove.json
+          mkdir -p /tmp/vps-agent-docker-proof/work/tree/sub
+          echo x > /tmp/vps-agent-docker-proof/work/tree/sub/x
+          /tmp/mcp-call file.remove '{"path":"/tmp/vps-agent-docker-proof/work/tree","recursive":true}' | tee evidence/fs-remove-recursive.json
+          test ! -e /tmp/vps-agent-docker-proof/work/tree
+
+      - name: Filesystem escape must be denied
+        shell: bash
+        run: |
+          set -a; . ./.env; set +a
+          docker compose exec -T gateway /usr/local/bin/vps-agent-mcp-call             --endpoint http://127.0.0.1:8080/mcp             --token "$VPS_AGENT_STATIC_TOKEN"             --tool file.read             --args '{"path":"/etc/shadow"}'             --expect-error | tee evidence/shadow-denied.json
+
+      - name: Scoped shell work and read-denial
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/mcp-call shell.exec '{"command":"printf shell-ok > shell.txt","cwd":"/tmp/vps-agent-docker-proof","runtime_seconds":20}' | tee evidence/shell-start.json
+          for _ in $(seq 1 30); do test -f /tmp/vps-agent-docker-proof/shell.txt && break; sleep 1; done
+          test "$(cat /tmp/vps-agent-docker-proof/shell.txt)" = "shell-ok"
+          /tmp/mcp-call shell.exec '{"command":"if cat /etc/shadow > shadow-copy 2>/dev/null; then echo LEAKED > shadow-result; else echo DENIED > shadow-result; fi","cwd":"/tmp/vps-agent-docker-proof","runtime_seconds":20}' | tee evidence/shell-deny-start.json
+          for _ in $(seq 1 30); do test -f /tmp/vps-agent-docker-proof/shadow-result && break; sleep 1; done
+          test "$(cat /tmp/vps-agent-docker-proof/shadow-result)" = "DENIED"
+          test ! -s /tmp/vps-agent-docker-proof/shadow-copy
+
+      - name: Host systemd through container Broker
+        shell: bash
+        run: |
+          set -euo pipefail
+          BEFORE="$(systemctl show vps-agent-docker-proof.service -p MainPID --value)"
+          /tmp/mcp-call service.status '{"name":"vps-agent-docker-proof.service"}' | tee evidence/service-status.json
+          /tmp/mcp-call service.restart '{"name":"vps-agent-docker-proof.service"}' | tee evidence/service-restart.json
+          AFTER="$(systemctl show vps-agent-docker-proof.service -p MainPID --value)"
+          test "$BEFORE" -gt 0
+          test "$AFTER" -gt 0
+          test "$BEFORE" != "$AFTER"
+          printf 'before=%s\nafter=%s\n' "$BEFORE" "$AFTER" | tee evidence/service-pids.txt
+
+      - name: Host Docker through container Broker
+        shell: bash
+        run: |
+          set -euo pipefail
+          BEFORE="$(docker inspect -f '{{.State.Pid}}' vps-agent-docker-target)"
+          /tmp/mcp-call docker.inspect '{"name":"vps-agent-docker-target"}' | tee evidence/docker-inspect.json
+          /tmp/mcp-call docker.action '{"name":"vps-agent-docker-target","action":"restart"}' | tee evidence/docker-restart.json
+          AFTER="$(docker inspect -f '{{.State.Pid}}' vps-agent-docker-target)"
+          test "$BEFORE" -gt 0
+          test "$AFTER" -gt 0
+          test "$BEFORE" != "$AFTER"
+          printf 'before=%s\nafter=%s\n' "$BEFORE" "$AFTER" | tee evidence/docker-pids.txt
+
+      - name: Host Compose through container Broker
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/mcp-call compose.validate '{"project_dir":"/tmp/vps-agent-docker-proof/compose"}' | tee evidence/compose-validate.json
+          /tmp/mcp-call compose.up '{"project_dir":"/tmp/vps-agent-docker-proof/compose"}' | tee evidence/compose-up.json
+          test "$(docker inspect -f '{{.State.Running}}' vps-agent-compose-proof)" = "true"
+          /tmp/mcp-call compose.down '{"project_dir":"/tmp/vps-agent-docker-proof/compose"}' | tee evidence/compose-down.json
+          ! docker inspect vps-agent-compose-proof >/dev/null 2>&1
+
+      - name: Diagnostics and inventory
+        shell: bash
+        run: |
+          /tmp/mcp-call system.disk '{}' | tee evidence/system-disk.json
+          /tmp/mcp-call system.memory '{}' | tee evidence/system-memory.json
+          /tmp/mcp-call process.list '{"limit":10}' | tee evidence/process-list.json
+          /tmp/mcp-call network.listen '{"limit":30}' | tee evidence/network-listen.json
+          /tmp/mcp-call package.list '{"limit":20}' | tee evidence/package-list.json
+          /tmp/mcp-call user.list '{}' | tee evidence/user-list.json
+          /tmp/mcp-call group.list '{}' | tee evidence/group-list.json
+
+      - name: Audit integrity
+        shell: bash
+        run: |
+          docker compose exec -T broker /usr/local/bin/vps-agent audit-status | tee evidence/audit-status.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open("evidence/audit-status.json"))
+          assert x["ok"] is True, x
+          assert x["result"]["valid"] is True, x
+          assert x["result"]["events"] >= 20, x
+          print("DOCKER PACKAGE ACCEPTANCE: PASS")
+          PY
+
+      - name: Capture logs
+        if: always()
+        run: docker compose logs --no-color > evidence/docker-compose.log || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docker-package-evidence-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v --remove-orphans || true
+          docker rm -f vps-agent-docker-target vps-agent-compose-proof >/dev/null 2>&1 || true
+          sudo systemctl disable --now vps-agent-docker-proof.service >/dev/null 2>&1 || true
+          sudo rm -f /etc/systemd/system/vps-agent-docker-proof.service
+          sudo systemctl daemon-reload || true
+          sudo rm -rf /tmp/vps-agent-docker-proof
