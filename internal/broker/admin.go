@@ -1,5 +1,7 @@
 package broker
 
+// Typed host administration intentionally avoids generic shell construction.
+
 import (
 	"bufio"
 	"context"
