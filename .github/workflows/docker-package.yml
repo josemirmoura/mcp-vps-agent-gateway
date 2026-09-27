@@ -176,11 +176,11 @@ jobs:
           /tmp/mcp-call file.chmod '{"path":"/tmp/vps-agent-docker-proof/work/moved.txt","mode":511}' | tee evidence/fs-chmod.json
           /tmp/mcp-call file.stat '{"path":"/tmp/vps-agent-docker-proof/work/moved.txt"}' | tee evidence/fs-stat.json
           /tmp/mcp-call file.list '{"path":"/tmp/vps-agent-docker-proof/work","limit":50}' | tee evidence/fs-list.json
-          test "$(cat /tmp/vps-agent-docker-proof/work/a.txt)" = "alpha BETA"
-          test "$(stat -c '%a' /tmp/vps-agent-docker-proof/work/moved.txt)" = "777"
+          test "$(sudo cat /tmp/vps-agent-docker-proof/work/a.txt)" = "alpha BETA"
+          test "$(sudo stat -c '%a' /tmp/vps-agent-docker-proof/work/moved.txt)" = "777"
           /tmp/mcp-call file.remove '{"path":"/tmp/vps-agent-docker-proof/work/moved.txt"}' | tee evidence/fs-remove.json
-          mkdir -p /tmp/vps-agent-docker-proof/work/tree/sub
-          echo x > /tmp/vps-agent-docker-proof/work/tree/sub/x
+          sudo mkdir -p /tmp/vps-agent-docker-proof/work/tree/sub
+          echo x | sudo tee /tmp/vps-agent-docker-proof/work/tree/sub/x >/dev/null
           /tmp/mcp-call file.remove '{"path":"/tmp/vps-agent-docker-proof/work/tree","recursive":true}' | tee evidence/fs-remove-recursive.json
           test ! -e /tmp/vps-agent-docker-proof/work/tree
 
