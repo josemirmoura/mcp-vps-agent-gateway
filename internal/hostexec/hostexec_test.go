@@ -77,3 +77,19 @@ func TestHostInspectionCommandsAreExplicitlyAllowed(t *testing.T) {
 		}
 	}
 }
+
+func TestSystemPathWithNamespaceHostRoot(t *testing.T) {
+	t.Setenv("VPS_AGENT_HOST_ROOT", "/host")
+	t.Setenv("VPS_AGENT_HOST_NSENTER", "1")
+	if got, want := SystemPath("/etc/passwd"), "/proc/1/root/etc/passwd"; got != want {
+		t.Fatalf("SystemPath()=%q want %q", got, want)
+	}
+}
+
+func TestSystemPathWithoutNamespaceUsesConfiguredRoot(t *testing.T) {
+	t.Setenv("VPS_AGENT_HOST_ROOT", "/host")
+	t.Setenv("VPS_AGENT_HOST_NSENTER", "0")
+	if got, want := SystemPath("/etc/passwd"), "/host/etc/passwd"; got != want {
+		t.Fatalf("SystemPath()=%q want %q", got, want)
+	}
+}
