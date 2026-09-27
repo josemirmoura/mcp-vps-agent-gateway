@@ -19,6 +19,8 @@ services:
       VPS_AGENT_EXPECTED_SUBJECT: ${VPS_AGENT_SUBJECT:-operator}
       VPS_AGENT_HOST_ROOT: /host
       VPS_AGENT_HOST_NSENTER: "1"
+      VPS_AGENT_INSTANCE_ID: ${VPS_AGENT_INSTANCE_ID:-}
+      VPS_AGENT_INSTANCE_NAME: ${VPS_AGENT_INSTANCE_NAME:-vps-agent}
     volumes:
       - type: bind
         source: /
@@ -63,6 +65,8 @@ services:
       VPS_AGENT_PUBLIC_URL: ${VPS_AGENT_PUBLIC_URL:-}
       VPS_AGENT_OAUTH_RESOURCE: ${VPS_AGENT_OAUTH_RESOURCE:-}
       VPS_AGENT_RESOURCE_METADATA_URL: ${VPS_AGENT_RESOURCE_METADATA_URL:-}
+      VPS_AGENT_INSTANCE_ID: ${VPS_AGENT_INSTANCE_ID:-}
+      VPS_AGENT_INSTANCE_NAME: ${VPS_AGENT_INSTANCE_NAME:-vps-agent}
     volumes:
       - broker-run:/run/vps-agent
     ports:
