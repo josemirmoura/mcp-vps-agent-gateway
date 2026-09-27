@@ -29,8 +29,7 @@ func BuildSystemdRunArgs(s Spec) ([]string, error) {
 	if !filepath.IsAbs(s.CWD) {
 		return nil, errors.New("cwd must be absolute")
 	}
-	if strings.ContainsAny(s.Unit, "/ 	
-") {
+	if strings.ContainsAny(s.Unit, "/ \\t\\n") {
 		return nil, errors.New("invalid unit name")
 	}
 	if s.Runtime <= 0 {
