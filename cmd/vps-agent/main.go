@@ -28,6 +28,8 @@ func main() {
 		revokeAll(os.Args[2:])
 	case "audit-status":
 		auditStatus(os.Args[2:])
+	case "audit-tail":
+		auditTail(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -81,6 +83,18 @@ func auditStatus(args []string) {
 	call(*socket, wire.Request{ID: "operator-audit-status", Tool: "admin.audit.status", AdminToken: *token})
 }
 
+
+func auditTail(args []string) {
+	fs := flag.NewFlagSet("audit-tail", flag.ExitOnError)
+	socket, token := common(fs)
+	after := fs.Int64("after", 0, "return audit records with sequence greater than this value")
+	limit := fs.Int("limit", 100, "maximum records")
+	_ = fs.Parse(args)
+	requireToken(*token)
+	payload, _ := json.Marshal(map[string]any{"after_seq": *after, "limit": *limit})
+	call(*socket, wire.Request{ID: "operator-audit-tail", Tool: "admin.audit.tail", AdminToken: *token, Args: payload})
+}
+
 func revokeAll(args []string) {
 	fs := flag.NewFlagSet("revoke-all", flag.ExitOnError)
 	socket, token := common(fs)
@@ -110,7 +124,7 @@ func call(socket string, req wire.Request) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: vps-agent <approvals|approve|deny|revoke-all> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: vps-agent <approvals|approve|deny|revoke-all|audit-status|audit-tail> [flags]")
 }
 
 func getenv(name, fallback string) string {
