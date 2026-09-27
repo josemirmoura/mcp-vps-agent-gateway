@@ -158,12 +158,16 @@ jobs:
       - name: Generate image SBOMs
         shell: bash
         run: |
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:0.74.0 image --format cyclonedx --output /tmp/gateway.cdx.json mcp-vps-agent-gateway:ci
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:0.74.0 image --format cyclonedx --output /tmp/broker.cdx.json mcp-vps-agent-broker:ci
-          cp /tmp/gateway.cdx.json evidence/sbom-gateway.cdx.json
-          cp /tmp/broker.cdx.json evidence/sbom-broker.cdx.json
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/evidence:/evidence" \
+            aquasec/trivy:0.74.0 image --format cyclonedx --output /evidence/sbom-gateway.cdx.json mcp-vps-agent-gateway:ci
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/evidence:/evidence" \
+            aquasec/trivy:0.74.0 image --format cyclonedx --output /evidence/sbom-broker.cdx.json mcp-vps-agent-broker:ci
+          test -s evidence/sbom-gateway.cdx.json
+          test -s evidence/sbom-broker.cdx.json
 
       - name: Start Docker package
         run: docker compose up -d
