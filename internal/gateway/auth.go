@@ -95,36 +95,6 @@ func staticVerifier(token, subject string) mcpauth.TokenVerifier {
 	}
 }
 
-func NewOIDCVerifier(ctx context.Context, issuer, audience string) (mcpauth.TokenVerifier, error) {
-	if issuer == "" || audience == "" {
-		return nil, errors.New("issuer and audience are required")
-	}
-	provider, err := oidc.NewProvider(ctx, issuer)
-	if err != nil {
-		return nil, err
-	}
-	verifier := provider.Verifier(&oidc.Config{ClientID: audience})
-	return func(ctx context.Context, raw string, _ *http.Request) (*mcpauth.TokenInfo, error) {
-		tok, err := verifier.Verify(ctx, raw)
-		if err != nil {
-			return nil, mcpauth.ErrInvalidToken
-		}
-		var claims struct {
-			Subject     string   `json:"sub"`
-			Scope       string   `json:"scope"`
-			Permissions []string `json:"permissions"`
-		}
-		if err := tok.Claims(&claims); err != nil || claims.Subject == "" {
-			return nil, mcpauth.ErrInvalidToken
-		}
-		scopes := append([]string{}, claims.Permissions...)
-		scopes = append(scopes, strings.Fields(claims.Scope)...)
-		return &mcpauth.TokenInfo{
-			UserID: claims.Subject, Scopes: scopes, Expiration: tok.Expiry,
-		}, nil
-	}, nil
-}
-
 // NewIntegratedOIDCVerifier is deliberately specific to the bundled ZITADEL
 // deployment. ZITADEL DCR currently issues opaque bearer access tokens and
 // accepts RFC 8707 resource values without narrowing the token audience. The
