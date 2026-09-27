@@ -32,7 +32,7 @@ Register them as separate ChatGPT apps with matching visible names. Select or @m
 
 ## Verification
 
-For each app, call system.info and compare instance_id, instance_name and hostname with the expected VPS. Then inspect the Broker audit on that VPS:
+For each app, call system.info and compare instance_id and instance_name with the expected VPS. Treat hostname as supporting information only: infrastructure providers can legitimately reuse the same hostname across separate disposable machines. Then inspect the Broker audit on that VPS:
 
 ~~~bash
 bash scripts/diagnose.sh audit 20
