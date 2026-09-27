@@ -65,13 +65,14 @@ func aptAction(ctx context.Context, action, name string) (string, error) {
 	return text, nil
 }
 
-func userList(ctx context.Context) ([]map[string]any, error) {
-	out, err := hostexec.CommandContext(ctx, "cat", "/etc/passwd").Output()
+func userList(_ context.Context) ([]map[string]any, error) {
+	f, err := os.Open(hostexec.SystemPath("/etc/passwd"))
 	if err != nil {
 		return nil, fmt.Errorf("read host /etc/passwd: %w", err)
 	}
+	defer f.Close()
 	var result []map[string]any
-	s := bufio.NewScanner(strings.NewReader(string(out)))
+	s := bufio.NewScanner(f)
 	for s.Scan() {
 		p := strings.Split(s.Text(), ":")
 		if len(p) < 7 {
@@ -123,13 +124,14 @@ func userAction(ctx context.Context, action, name string, createHome bool) (stri
 	}
 }
 
-func groupList(ctx context.Context) ([]map[string]any, error) {
-	out, err := hostexec.CommandContext(ctx, "cat", "/etc/group").Output()
+func groupList(_ context.Context) ([]map[string]any, error) {
+	f, err := os.Open(hostexec.SystemPath("/etc/group"))
 	if err != nil {
 		return nil, fmt.Errorf("read host /etc/group: %w", err)
 	}
+	defer f.Close()
 	var result []map[string]any
-	s := bufio.NewScanner(strings.NewReader(string(out)))
+	s := bufio.NewScanner(f)
 	for s.Scan() {
 		p := strings.Split(s.Text(), ":")
 		if len(p) < 4 {
