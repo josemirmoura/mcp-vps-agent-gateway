@@ -328,6 +328,55 @@ jobs:
           print("DOCKER PACKAGE ACCEPTANCE: PASS")
           PY
 
+      - name: Update and rollback lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/vps-agent-update-origin.git /tmp/vps-agent-update-work
+          git init --bare /tmp/vps-agent-update-origin.git
+          git push /tmp/vps-agent-update-origin.git HEAD:refs/heads/base
+          git --git-dir=/tmp/vps-agent-update-origin.git symbolic-ref HEAD refs/heads/base
+
+          git clone /tmp/vps-agent-update-origin.git /tmp/vps-agent-update-work
+          git -C /tmp/vps-agent-update-work config user.email "acceptance@example.invalid"
+          git -C /tmp/vps-agent-update-work config user.name "VPS Agent Acceptance"
+          git -C /tmp/vps-agent-update-work checkout -b update-target
+          printf 'update acceptance\n' > /tmp/vps-agent-update-work/.update-acceptance-marker
+          git -C /tmp/vps-agent-update-work add .update-acceptance-marker
+          git -C /tmp/vps-agent-update-work commit -m "test: benign update target"
+          git -C /tmp/vps-agent-update-work push origin update-target
+
+          git -C /tmp/vps-agent-update-work checkout -b update-fail
+          cat > /tmp/vps-agent-update-work/scripts/verify.sh <<'SH'
+          #!/usr/bin/env bash
+          echo "intentional acceptance failure" >&2
+          exit 99
+          SH
+          git -C /tmp/vps-agent-update-work add scripts/verify.sh
+          git -C /tmp/vps-agent-update-work commit -m "test: failing update target"
+          git -C /tmp/vps-agent-update-work push origin update-fail
+
+          ORIGINAL_ORIGIN="$(git remote get-url origin)"
+          git remote set-url origin /tmp/vps-agent-update-origin.git
+          trap 'git remote set-url origin "$ORIGINAL_ORIGIN"' EXIT
+
+          VPS_AGENT_UPDATE_REF=origin/update-target bash scripts/update.sh | tee evidence/update-success.txt
+          test -f .update-acceptance-marker
+          SUCCESS_HEAD="$(git rev-parse HEAD)"
+          grep -q '"result":"success"' state/update.log
+
+          if VPS_AGENT_UPDATE_REF=origin/update-fail bash scripts/update.sh >evidence/update-rollback.txt 2>&1; then
+            echo "failing update unexpectedly succeeded" >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$SUCCESS_HEAD"
+          grep -q '"result":"rolled_back"' state/update.log
+          bash scripts/verify.sh | tee evidence/update-post-rollback-verify.txt
+          echo "UPDATE + ROLLBACK ACCEPTANCE: PASS" | tee evidence/update-lifecycle-result.txt
+
+          git remote set-url origin "$ORIGINAL_ORIGIN"
+          trap - EXIT
+
       - name: Operational diagnostics and redacted bundle
         shell: bash
         run: |
