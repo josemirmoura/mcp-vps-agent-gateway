@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
 )
@@ -77,5 +78,56 @@ func TestProtectedResourceMetadata(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("metadata missing %s: %s", want, body)
 		}
+	}
+}
+
+
+func TestIntegratedOIDCVerifierUsesIssuerUserInfo(t *testing.T) {
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/.well-known/openid-configuration":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"issuer": "` + server.URL + `",
+				"authorization_endpoint": "` + server.URL + `/authorize",
+				"token_endpoint": "` + server.URL + `/token",
+				"userinfo_endpoint": "` + server.URL + `/userinfo",
+				"jwks_uri": "` + server.URL + `/keys",
+				"response_types_supported": ["code"],
+				"subject_types_supported": ["public"],
+				"id_token_signing_alg_values_supported": ["RS256"]
+			}`))
+		case "/userinfo":
+			if r.Header.Get("Authorization") != "Bearer good-token" {
+				http.Error(w, "bad token", http.StatusUnauthorized)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"sub":"operator-123"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	verifier, err := NewIntegratedOIDCVerifier(context.Background(), server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := verifier(context.Background(), "good-token", httptest.NewRequest(http.MethodPost, "/mcp", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.UserID != "operator-123" {
+		t.Fatalf("subject=%q", info.UserID)
+	}
+	if time.Until(info.Expiration) <= 0 {
+		t.Fatalf("expected future expiration, got %v", info.Expiration)
+	}
+
+	if _, err := verifier(context.Background(), "bad-token", httptest.NewRequest(http.MethodPost, "/mcp", nil)); err == nil {
+		t.Fatal("expected invalid token rejection")
 	}
 }
