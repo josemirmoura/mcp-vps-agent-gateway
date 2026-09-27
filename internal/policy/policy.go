@@ -25,6 +25,7 @@ type Config struct {
 	Compose      ResourcePolicy   `yaml:"compose,omitempty"`
 	Packages     ResourcePolicy   `yaml:"packages,omitempty"`
 	Users        ResourcePolicy   `yaml:"users,omitempty"`
+	Groups       ResourcePolicy   `yaml:"groups,omitempty"`
 	Firewall     ResourcePolicy   `yaml:"firewall,omitempty"`
 	Diagnostics  []string         `yaml:"diagnostics,omitempty"`
 	Shell        ShellPolicy      `yaml:"shell"`
@@ -198,6 +199,17 @@ func (c *Config) CanUser(name, action string) bool {
 		return matchAny(c.Users.Inspect, name) || matchAny(c.Users.Manage, name)
 	}
 	return matchAny(c.Users.Manage, name)
+}
+
+
+func (c *Config) CanGroup(name, action string) bool {
+	if !matchAny(c.Groups.Actions, action) {
+		return false
+	}
+	if action == "list" || action == "inspect" {
+		return matchAny(c.Groups.Inspect, name) || matchAny(c.Groups.Manage, name)
+	}
+	return matchAny(c.Groups.Manage, name)
 }
 
 func (c *Config) CanFirewall(action string) bool {
