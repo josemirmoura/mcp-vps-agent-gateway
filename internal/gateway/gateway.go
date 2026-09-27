@@ -179,6 +179,19 @@ type serviceActionInput struct {
 	OperationID string `json:"operation_id,omitempty"`
 }
 
+type limitInput struct {
+	Limit int `json:"limit,omitempty"`
+}
+
+type processInspectInput struct {
+	PID int `json:"pid"`
+}
+
+type networkCheckInput struct {
+	Destination    string `json:"destination" jsonschema:"allowed host:port destination"`
+	TimeoutSeconds int    `json:"timeout_seconds,omitempty"`
+}
+
 type permissionsOutput struct {
 	Mode        string `json:"mode"`
 	FullEnabled bool   `json:"full_enabled"`
@@ -429,6 +442,63 @@ func NewMCPServer(exec Executor) *mcp.Server {
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "system.health", "", "", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "system.disk", Description: "Return bounded filesystem capacity diagnostics when policy permits."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "system.disk", "", "inspect", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "system.memory", Description: "Return bounded non-secret memory diagnostics when policy permits."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "system.memory", "", "inspect", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "process.list", Description: "List bounded process metadata without command-line arguments or environment."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in limitInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{"limit": in.Limit})
+			if err := s.call(ctx, "process.list", "", "inspect", args, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "process.inspect", Description: "Inspect a process using a safe subset of /proc status fields."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in processInspectInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "process.inspect", fmt.Sprint(in.PID), "inspect", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "network.listen", Description: "Return bounded listening socket diagnostics when explicitly enabled."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in limitInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{"limit": in.Limit})
+			if err := s.call(ctx, "network.listen", "", "inspect", args, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "network.check", Description: "Test TCP reachability only to a destination allowed by network policy."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in networkCheckInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{"timeout_seconds": in.TimeoutSeconds})
+			if err := s.call(ctx, "network.check", in.Destination, "check", args, &out, false, ""); err != nil {
 				return nil, out, err
 			}
 			return nil, out, nil
