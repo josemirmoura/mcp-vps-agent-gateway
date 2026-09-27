@@ -12,6 +12,7 @@ import (
 	"strings"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/hostexec"
@@ -34,6 +35,7 @@ type Broker struct {
 	ExpectedSubject string
 	InstanceID      string
 	InstanceName    string
+	elevationMu     sync.Mutex
 }
 
 func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
@@ -46,11 +48,17 @@ func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
 		decision = "deny"
 	}
 	if b.State != nil {
-		_, _ = b.State.AppendAudit(ctx, state.AuditEvent{
+		if _, err := b.State.AppendAudit(ctx, state.AuditEvent{
 			InstanceID: b.InstanceID, InstanceName: b.InstanceName,
 			Subject: req.Subject, Tool: req.Tool, Resource: req.Resource,
 			Decision: decision, ActionID: req.InvocationID,
-		})
+		}); err != nil {
+			slog.ErrorContext(ctx, "audit_append_failed",
+				"instance_id", b.InstanceID, "instance_name", b.InstanceName,
+				"request_id", req.ID, "invocation_id", req.InvocationID,
+				"subject", req.Subject, "tool", req.Tool, "resource", req.Resource,
+				"error", err)
+		}
 	}
 	slog.InfoContext(ctx, "broker_request",
 		"instance_id", b.InstanceID, "instance_name", b.InstanceName,
@@ -739,11 +747,15 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if !b.adminOK(req.AdminToken) {
 			return deny(req.ID, "permission_denied", "operator authentication failed")
 		}
+		b.elevationMu.Lock()
+		defer b.elevationMu.Unlock()
 		return b.decideApproval(ctx, req, "approved")
 	case "admin.approval.deny":
 		if !b.adminOK(req.AdminToken) {
 			return deny(req.ID, "permission_denied", "operator authentication failed")
 		}
+		b.elevationMu.Lock()
+		defer b.elevationMu.Unlock()
 		return b.decideApproval(ctx, req, "denied")
 	case "admin.audit.tail":
 		if !b.adminOK(req.AdminToken) {
@@ -776,10 +788,13 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if !b.adminOK(req.AdminToken) {
 			return deny(req.ID, "permission_denied", "operator authentication failed")
 		}
-		if err := b.State.RevokeAll(ctx); err != nil {
-			return deny(req.ID, "state_error", err.Error())
+		b.elevationMu.Lock()
+		defer b.elevationMu.Unlock()
+		cancelled, err := b.revokeAllElevatedAccess(ctx)
+		if err != nil {
+			return deny(req.ID, "revoke_incomplete", err.Error())
 		}
-		return ok(req.ID, map[string]any{"revoked": true})
+		return ok(req.ID, map[string]any{"revoked": true, "cancelled_elevated_jobs": cancelled})
 	case "shell.exec_admin":
 		if !b.Policy.Features.FullModeEnabled || !b.Policy.Enabled {
 			return deny(req.ID, "full_disabled", "full mode is disabled")
@@ -787,6 +802,8 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if req.InvocationID == "" {
 			return deny(req.ID, "invocation_required", "admin shell requires invocation id")
 		}
+		b.elevationMu.Lock()
+		defer b.elevationMu.Unlock()
 		valid, err := b.State.ValidateGrant(ctx, req.GrantID, req.Subject, "shell.admin")
 		if err != nil {
 			return deny(req.ID, "state_error", err.Error())
@@ -1029,6 +1046,48 @@ func (b *Broker) decideApproval(ctx context.Context, req wire.Request, decision 
 		"request_id": a.ID, "status": "approved", "grant_id": g.ID,
 		"subject": g.Subject, "capabilities": g.Capabilities, "expires_at": g.ExpiresAt,
 	})
+}
+
+func (b *Broker) revokeAllElevatedAccess(ctx context.Context) (int, error) {
+	if b.State == nil {
+		return 0, errors.New("durable state is required")
+	}
+	if err := b.State.RevokeAll(ctx); err != nil {
+		return 0, err
+	}
+
+	active, err := b.State.ListActiveJobs(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("grants revoked but active jobs could not be listed: %w", err)
+	}
+	if len(active) == 0 {
+		return 0, nil
+	}
+	if b.Jobs == nil {
+		for _, rec := range active {
+			if rec.GrantID != "" {
+				return 0, errors.New("grants revoked but elevated jobs cannot be cancelled because the job manager is unavailable")
+			}
+		}
+		return 0, nil
+	}
+
+	cancelled := 0
+	failed := make([]string, 0)
+	for _, rec := range active {
+		if rec.GrantID == "" {
+			continue
+		}
+		if err := b.Jobs.Cancel(ctx, rec.Subject, rec.ID); err != nil {
+			failed = append(failed, rec.ID+": "+err.Error())
+			continue
+		}
+		cancelled++
+	}
+	if len(failed) > 0 {
+		return cancelled, fmt.Errorf("grants revoked, but %d elevated job(s) could not be cancelled: %s", len(failed), strings.Join(failed, "; "))
+	}
+	return cancelled, nil
 }
 
 func (b *Broker) adminOK(token string) bool {
