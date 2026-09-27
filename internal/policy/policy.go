@@ -61,6 +61,8 @@ type ShellPolicy struct {
 	CWDRoots          []string `yaml:"cwd_roots"`
 	MaxRuntimeSeconds int      `yaml:"max_runtime_seconds"`
 	MaxOutputBytes    int      `yaml:"max_output_bytes"`
+	MaxMemoryBytes    int64    `yaml:"max_memory_bytes,omitempty"`
+	MaxTasks          int      `yaml:"max_tasks,omitempty"`
 	AllowHostRead     bool     `yaml:"allow_host_read,omitempty"`
 }
 
@@ -273,6 +275,41 @@ func (c *Config) CanGrant(capability string) bool {
 	capability = NormalizeCapability(capability)
 	for _, allowed := range c.Capabilities {
 		if NormalizeCapability(allowed) == capability {
+			return true
+		}
+	}
+	return false
+}
+
+
+func (c *Config) ShellRuntimeLimit() time.Duration {
+	seconds := c.Shell.MaxRuntimeSeconds
+	if seconds <= 0 {
+		seconds = 300
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func (c *Config) ShellMemoryLimit() int64 {
+	if c.Shell.MaxMemoryBytes <= 0 {
+		return 512 << 20
+	}
+	return c.Shell.MaxMemoryBytes
+}
+
+func (c *Config) ShellTasksLimit() int {
+	if c.Shell.MaxTasks <= 0 {
+		return 100
+	}
+	return c.Shell.MaxTasks
+}
+
+func (c *Config) ShellMayReadHost() bool {
+	if c.Shell.AllowHostRead {
+		return true
+	}
+	for _, root := range c.Filesystem.Read {
+		if filepath.Clean(root) == string(filepath.Separator) {
 			return true
 		}
 	}
