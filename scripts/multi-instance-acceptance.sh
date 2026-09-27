@@ -112,12 +112,13 @@ docker compose exec -T broker /usr/local/bin/vps-agent audit-tail --limit 100 \
 
 END_EPOCH="$(date +%s)"
 HOSTNAME="$(hostname)"
+BOOT_ID="$(cat /proc/sys/kernel/random/boot_id)"
 STATIC_FP="$(printf '%s' "$VPS_AGENT_STATIC_TOKEN" | sha256sum | awk '{print $1}')"
 ADMIN_FP="$(printf '%s' "$VPS_AGENT_ADMIN_TOKEN" | sha256sum | awk '{print $1}')"
 
-python3 - "$INSTANCE_KEY" "$INSTANCE_NAME" "$VPS_AGENT_INSTANCE_ID" "$SUBJECT" "$OPERATION_ID" "$HOSTNAME" "$START_EPOCH" "$END_EPOCH" "$STATIC_FP" "$ADMIN_FP" <<'PY'
+python3 - "$INSTANCE_KEY" "$INSTANCE_NAME" "$VPS_AGENT_INSTANCE_ID" "$SUBJECT" "$OPERATION_ID" "$HOSTNAME" "$BOOT_ID" "$START_EPOCH" "$END_EPOCH" "$STATIC_FP" "$ADMIN_FP" <<'PY'
 import json, pathlib, sys
-(key, name, instance_id, subject, operation_id, hostname,
+(key, name, instance_id, subject, operation_id, hostname, boot_id,
  start_epoch, end_epoch, static_fp, admin_fp) = sys.argv[1:]
 root=pathlib.Path("multi-instance-evidence")
 
@@ -156,6 +157,7 @@ evidence={
     "instance_name": name,
     "instance_id": instance_id,
     "hostname": hostname,
+    "boot_id": boot_id,
     "subject": subject,
     "operation_id": operation_id,
     "logical_path": "/opt/vps-agent-multi/shared.txt",
