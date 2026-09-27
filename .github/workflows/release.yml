@@ -61,10 +61,8 @@ jobs:
       - name: Build Compose bundle
         run: |
           mkdir -p dist/mcp-vps-agent
-          cp compose.yaml compose.https.yaml .env.example LICENSE README.md README.pt-BR.md dist/mcp-vps-agent/
+          cp compose.yaml compose.host.yaml compose.integrated-auth.yaml compose.integrated-auth.proxy.yaml .env.example LICENSE README.md README.pt-BR.md dist/mcp-vps-agent/
           cp -r config scripts dist/mcp-vps-agent/
-          mkdir -p dist/mcp-vps-agent/deploy
-          cp -r deploy/caddy dist/mcp-vps-agent/deploy/
           tar -C dist -czf dist/mcp-vps-agent-docker-package.tar.gz mcp-vps-agent
           sha256sum dist/mcp-vps-agent-docker-package.tar.gz > dist/mcp-vps-agent-docker-package.tar.gz.sha256
       - name: Create GitHub Release
