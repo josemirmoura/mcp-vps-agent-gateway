@@ -106,8 +106,8 @@ jobs:
           echo "VPS_AGENT_PROOF_TOKEN=$PROOF_TOKEN" >> "$GITHUB_ENV"
           echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN" >> "$GITHUB_ENV"
 
-          sudo install -m 0644 deploy/systemd/vps-agent-broker.service /etc/systemd/system/vps-agent-broker.service
-          sudo install -m 0644 deploy/systemd/vps-agent-gateway.service /etc/systemd/system/vps-agent-gateway.service
+          sudo install -m 0644 tests/fixtures/systemd/vps-agent-broker.service /etc/systemd/system/vps-agent-broker.service
+          sudo install -m 0644 tests/fixtures/systemd/vps-agent-gateway.service /etc/systemd/system/vps-agent-gateway.service
 
           cat > /tmp/vps-agent-test.service <<'UNIT'
           [Unit]
@@ -299,7 +299,7 @@ jobs:
           } | sudo tee /etc/vps-agent/broker.env >/dev/null
           sudo chmod 0600 /etc/vps-agent/broker.env
 
-          sudo install -m 0644 deploy/systemd/vps-agent-broker.service /etc/systemd/system/vps-agent-broker.service
+          sudo install -m 0644 tests/fixtures/systemd/vps-agent-broker.service /etc/systemd/system/vps-agent-broker.service
           sudo systemctl daemon-reload
           sudo systemctl start vps-agent-broker.service
           for i in $(seq 1 40); do
