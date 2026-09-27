@@ -15,9 +15,10 @@ type Spec struct {
 	Command        string
 	CWD            string
 	ReadOnlyPaths  []string
-	ReadWritePaths []string
+	ReadWritePaths    []string
 	InaccessiblePaths []string
-	Runtime        time.Duration
+	IsolateFilesystem bool
+	Runtime           time.Duration
 	MemoryMaxBytes int64
 	TasksMax       int
 	NetworkMode    string
@@ -55,8 +56,6 @@ func BuildSystemdRunArgs(s Spec) ([]string, error) {
 		"--uid=" + s.User,
 		"--working-directory=" + s.CWD,
 		"--property=NoNewPrivileges=yes",
-		"--property=PrivateTmp=yes",
-		"--property=ProtectSystem=strict",
 		"--property=ProtectHome=yes",
 		"--property=ProtectProc=invisible",
 		"--property=ProcSubset=pid",
@@ -70,23 +69,68 @@ func BuildSystemdRunArgs(s Spec) ([]string, error) {
 		"--property=TasksMax=" + strconv.Itoa(s.TasksMax),
 		"--property=RuntimeMaxSec=" + strconv.FormatInt(int64(s.Runtime.Seconds()), 10),
 	}
+	if s.IsolateFilesystem {
+		// Start from an empty read-only root and bind back only the runtime
+		// toolchain plus paths explicitly delegated by policy.
+		args = append(args,
+			"--property=TemporaryFileSystem=/:ro",
+			"--property=CapabilityBoundingSet=",
+			"--property=AmbientCapabilities=",
+			"--property=BindReadOnlyPaths=/usr",
+			"--property=BindReadOnlyPaths=-/bin",
+			"--property=BindReadOnlyPaths=-/sbin",
+			"--property=BindReadOnlyPaths=-/lib",
+			"--property=BindReadOnlyPaths=-/lib64",
+			"--property=BindReadOnlyPaths=-/etc/passwd",
+			"--property=BindReadOnlyPaths=-/etc/group",
+			"--property=BindReadOnlyPaths=-/etc/nsswitch.conf",
+			"--property=BindReadOnlyPaths=-/etc/hosts",
+			"--property=BindReadOnlyPaths=-/etc/resolv.conf",
+			"--property=BindReadOnlyPaths=-/etc/ssl",
+			"--property=BindReadOnlyPaths=-/etc/ca-certificates",
+			"--property=BindReadOnlyPaths=-/etc/localtime",
+			"--property=BindReadOnlyPaths=-/etc/timezone",
+		)
+	} else {
+		args = append(args,
+			"--property=PrivateTmp=yes",
+			"--property=ProtectSystem=strict",
+		)
+	}
 	for _, p := range s.InaccessiblePaths {
 		if !filepath.IsAbs(p) {
 			return nil, fmt.Errorf("inaccessible path must be absolute: %q", p)
 		}
-		args = append(args, "--property=InaccessiblePaths="+p)
+		if !s.IsolateFilesystem {
+			args = append(args, "--property=InaccessiblePaths="+p)
+		}
+	}
+	writeSet := make(map[string]bool, len(s.ReadWritePaths))
+	for _, p := range s.ReadWritePaths {
+		if !filepath.IsAbs(p) {
+			return nil, fmt.Errorf("read-write path must be absolute: %q", p)
+		}
+		p = filepath.Clean(p)
+		writeSet[p] = true
+		if s.IsolateFilesystem {
+			args = append(args, "--property=BindPaths="+p)
+		} else {
+			args = append(args, "--property=ReadWritePaths="+p)
+		}
 	}
 	for _, p := range s.ReadOnlyPaths {
 		if !filepath.IsAbs(p) {
 			return nil, fmt.Errorf("read-only path must be absolute: %q", p)
 		}
-		args = append(args, "--property=ReadOnlyPaths="+p)
-	}
-	for _, p := range s.ReadWritePaths {
-		if !filepath.IsAbs(p) {
-			return nil, fmt.Errorf("read-write path must be absolute: %q", p)
+		p = filepath.Clean(p)
+		if writeSet[p] {
+			continue
 		}
-		args = append(args, "--property=ReadWritePaths="+p)
+		if s.IsolateFilesystem {
+			args = append(args, "--property=BindReadOnlyPaths="+p)
+		} else {
+			args = append(args, "--property=ReadOnlyPaths="+p)
+		}
 	}
 	switch s.NetworkMode {
 	case "", "blocked":
@@ -98,6 +142,6 @@ func BuildSystemdRunArgs(s Spec) ([]string, error) {
 	default:
 		return nil, fmt.Errorf("unsupported network mode %q", s.NetworkMode)
 	}
-	args = append(args, "--", "/bin/sh", "-c", s.Command)
+	args = append(args, "--", "/usr/bin/sh", "-c", s.Command)
 	return args, nil
 }
