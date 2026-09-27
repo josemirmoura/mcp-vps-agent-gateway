@@ -1,0 +1,263 @@
+name: ephemeral-vps-proof
+
+on:
+  pull_request:
+    paths:
+      - 'proof/request.json'
+      - '.github/workflows/ephemeral-proof.yml'
+      - 'cmd/**'
+      - 'internal/**'
+      - 'deploy/systemd/**'
+      - 'examples/policies/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          cache: true
+
+      - name: Build binaries
+        run: |
+          go mod tidy
+          mkdir -p dist
+          go build -o dist/vps-agent-gateway ./cmd/vps-agent-gateway
+          go build -o dist/vps-agent-broker ./cmd/vps-agent-broker
+          go build -o dist/vps-agent ./cmd/vps-agent
+          go build -o dist/vps-agent-proof ./cmd/vps-agent-proof
+
+      - name: Provision disposable VPS environment
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo groupadd --system vps-agent 2>/dev/null || true
+          if ! id vps-agent >/dev/null 2>&1; then
+            sudo useradd --system --gid vps-agent --no-create-home --shell /usr/sbin/nologin vps-agent
+          fi
+
+          sudo install -m 0755 dist/vps-agent-gateway /usr/local/bin/vps-agent-gateway
+          sudo install -m 0755 dist/vps-agent-broker /usr/local/bin/vps-agent-broker
+          sudo install -m 0755 dist/vps-agent /usr/local/bin/vps-agent
+
+          sudo install -d -o root -g vps-agent -m 0750 /etc/vps-agent
+          sudo install -d -o root -g vps-agent -m 0750 /var/lib/vps-agent
+          sudo install -d -o root -g vps-agent -m 0750 /var/lib/vps-agent/proof
+
+          cat > /tmp/policy.yaml <<'YAML'
+          version: 1
+          mode: scoped
+
+          features:
+            full_mode_enabled: false
+
+          filesystem:
+            read:
+              - /var/lib/vps-agent/proof
+            write:
+              - /var/lib/vps-agent/proof
+
+          network:
+            mode: blocked
+            destinations: []
+
+          services:
+            inspect:
+              - vps-agent-test.service
+            manage:
+              - vps-agent-test.service
+            actions:
+              - status
+              - restart
+
+          docker:
+            inspect: []
+            manage: []
+            actions: []
+
+          shell:
+            enabled: false
+            cwd_roots: []
+            max_runtime_seconds: 300
+            max_output_bytes: 1048576
+
+          privilege:
+            admin: broker-only
+
+          replay:
+            require_idempotency_for_safe_writes: true
+            blind_retry_non_replay_safe: false
+
+          grant:
+            required: true
+            max_ttl_minutes: 60
+          YAML
+          sudo install -o root -g vps-agent -m 0640 /tmp/policy.yaml /etc/vps-agent/policy.yaml
+
+          PROOF_TOKEN="$(openssl rand -hex 24)"
+          ADMIN_TOKEN="$(openssl rand -hex 24)"
+          {
+            echo "VPS_AGENT_BROKER_SOCKET=/run/vps-agent/broker.sock"
+            echo "VPS_AGENT_LISTEN=127.0.0.1:18080"
+            echo "VPS_AGENT_AUTH_MODE=static"
+            echo "VPS_AGENT_STATIC_TOKEN=$PROOF_TOKEN"
+            echo "VPS_AGENT_STATIC_SUBJECT=josemir-proof"
+          } | sudo tee /etc/vps-agent/gateway.env >/dev/null
+          {
+            echo "VPS_AGENT_POLICY=/etc/vps-agent/policy.yaml"
+            echo "VPS_AGENT_BROKER_SOCKET=/run/vps-agent/broker.sock"
+            echo "VPS_AGENT_STATE_DB=/var/lib/vps-agent/state.db"
+            echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN"
+          } | sudo tee /etc/vps-agent/broker.env >/dev/null
+          sudo chown root:vps-agent /etc/vps-agent/gateway.env /etc/vps-agent/broker.env
+          sudo chmod 0640 /etc/vps-agent/gateway.env /etc/vps-agent/broker.env
+
+          echo "VPS_AGENT_PROOF_TOKEN=$PROOF_TOKEN" >> "$GITHUB_ENV"
+          echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN" >> "$GITHUB_ENV"
+
+          sudo install -m 0644 deploy/systemd/vps-agent-broker.service /etc/systemd/system/vps-agent-broker.service
+          sudo install -m 0644 deploy/systemd/vps-agent-gateway.service /etc/systemd/system/vps-agent-gateway.service
+
+          cat > /tmp/vps-agent-test.service <<'UNIT'
+          [Unit]
+          Description=Disposable VPS Agent proof service
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/bin/sleep infinity
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+          sudo install -m 0644 /tmp/vps-agent-test.service /etc/systemd/system/vps-agent-test.service
+
+          sudo systemctl daemon-reload
+          sudo systemctl start vps-agent-test.service
+          sudo systemctl start vps-agent-broker.service
+          sudo systemctl start vps-agent-gateway.service
+
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:18080/healthz >/dev/null; then
+              break
+            fi
+            sleep 0.25
+          done
+          curl -fsS http://127.0.0.1:18080/healthz
+          test -S /run/vps-agent/broker.sock
+
+      - name: Capture before state
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p proof/runtime
+          hostname > proof/runtime/hostname.txt
+          uname -a > proof/runtime/uname.txt
+          stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent > proof/runtime/permissions-before.txt
+          systemctl show vps-agent-test.service -p ActiveState -p MainPID -p ActiveEnterTimestamp --no-pager > proof/runtime/service-before.txt
+          systemctl show vps-agent-gateway.service -p ActiveState -p MainPID --no-pager > proof/runtime/gateway.txt
+          systemctl show vps-agent-broker.service -p ActiveState -p MainPID --no-pager > proof/runtime/broker.txt
+
+      - name: Execute request through real MCP Gateway and Broker
+        id: execute
+        shell: bash
+        run: |
+          set +e
+          ./dist/vps-agent-proof \
+            -request proof/request.json \
+            -endpoint http://127.0.0.1:18080/mcp \
+            -token "$VPS_AGENT_PROOF_TOKEN" \
+            -output proof/evidence.json \
+            | tee proof/runtime/proof-client.log
+          rc=${PIPESTATUS[0]}
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Capture after state and audit
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          systemctl show vps-agent-test.service -p ActiveState -p MainPID -p ActiveEnterTimestamp --no-pager > proof/runtime/service-after.txt
+          stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent > proof/runtime/permissions-after.txt
+
+          /usr/local/bin/vps-agent audit-status \
+            --admin-token "$VPS_AGENT_ADMIN_TOKEN" \
+            --socket /run/vps-agent/broker.sock \
+            > proof/audit-status.json 2>proof/runtime/audit-status.stderr
+
+          sudo journalctl -u vps-agent-broker.service --no-pager > proof/runtime/broker-journal.txt
+          sudo journalctl -u vps-agent-gateway.service --no-pager > proof/runtime/gateway-journal.txt
+          sudo journalctl -u vps-agent-test.service --no-pager > proof/runtime/test-service-journal.txt
+
+          if [ -f /var/lib/vps-agent/proof/prova-inicial.txt ]; then
+            sudo sha256sum /var/lib/vps-agent/proof/prova-inicial.txt > proof/runtime/file-sha256.txt
+            sudo cat /var/lib/vps-agent/proof/prova-inicial.txt > proof/runtime/file-content.txt
+          fi
+
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+
+          evidence_path = pathlib.Path("proof/evidence.json")
+          if evidence_path.exists():
+              evidence = json.loads(evidence_path.read_text())
+          else:
+              evidence = {"success": False, "steps": [], "error": "proof client did not create evidence.json"}
+
+          def read(path):
+              p = pathlib.Path(path)
+              return p.read_text().strip() if p.exists() else None
+
+          evidence["github"] = {
+              "run_id": os.environ.get("GITHUB_RUN_ID"),
+              "run_number": os.environ.get("GITHUB_RUN_NUMBER"),
+              "sha": os.environ.get("GITHUB_SHA"),
+              "repository": os.environ.get("GITHUB_REPOSITORY"),
+              "runner_os": os.environ.get("RUNNER_OS"),
+              "runner_arch": os.environ.get("RUNNER_ARCH"),
+          }
+          evidence["runtime"] = {
+              "hostname": read("proof/runtime/hostname.txt"),
+              "uname": read("proof/runtime/uname.txt"),
+              "service_before": read("proof/runtime/service-before.txt"),
+              "service_after": read("proof/runtime/service-after.txt"),
+              "socket_permissions": read("proof/runtime/permissions-after.txt"),
+              "file_sha256": read("proof/runtime/file-sha256.txt"),
+              "file_content": read("proof/runtime/file-content.txt"),
+          }
+          evidence["audit"] = read("proof/audit-status.json")
+          evidence["proof_client_exit_code"] = int(os.environ.get("PROOF_RC", "0"))
+          evidence_path.write_text(json.dumps(evidence, indent=2))
+          PY
+        env:
+          PROOF_RC: ${{ steps.execute.outputs.rc }}
+
+      - name: Upload proof evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ephemeral-vps-proof-${{ github.run_id }}
+          path: proof/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enforce proof result
+        if: always()
+        shell: bash
+        run: |
+          test "${{ steps.execute.outputs.rc }}" = "0"
+          python3 - <<'PY'
+          import json
+          with open("proof/evidence.json") as f:
+              evidence=json.load(f)
+          assert evidence.get("success") is True, evidence
+          print("EPHEMERAL VPS PROOF: PASS")
+          PY
