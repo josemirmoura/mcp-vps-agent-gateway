@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
-	"strings"
+		"strings"
 	"time"
+
+	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/hostexec"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/sandbox"
 )
@@ -32,7 +33,7 @@ func (SystemdRunner) Start(ctx context.Context, spec sandbox.Spec) (Job, error) 
 	if err != nil {
 		return Job{}, err
 	}
-	out, err := exec.CommandContext(ctx, "systemd-run", args...).CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "systemd-run", args...).CombinedOutput()
 	if err != nil {
 		return Job{}, fmt.Errorf("systemd-run: %s: %w", strings.TrimSpace(string(out)), err)
 	}
@@ -43,7 +44,7 @@ func (SystemdRunner) Start(ctx context.Context, spec sandbox.Spec) (Job, error) 
 }
 
 func (SystemdRunner) Status(ctx context.Context, job Job) (string, error) {
-	out, err := exec.CommandContext(ctx, "systemctl", "show", job.Unit, "--property=ActiveState", "--value").CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "systemctl", "show", job.Unit, "--property=ActiveState", "--value").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("systemctl show: %s: %w", strings.TrimSpace(string(out)), err)
 	}
@@ -57,7 +58,7 @@ func (SystemdRunner) Tail(ctx context.Context, job Job, lines int) (string, erro
 	if lines > 1000 {
 		lines = 1000
 	}
-	out, err := exec.CommandContext(ctx, "journalctl", "-u", job.Unit, "-n", fmt.Sprint(lines), "--no-pager").CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "journalctl", "-u", job.Unit, "-n", fmt.Sprint(lines), "--no-pager").CombinedOutput()
 	if err != nil {
 		return strings.TrimSpace(string(out)), err
 	}
@@ -68,7 +69,7 @@ func (SystemdRunner) Cancel(ctx context.Context, job Job) error {
 	if job.Unit == "" {
 		return errors.New("unit is required")
 	}
-	out, err := exec.CommandContext(ctx, "systemctl", "stop", job.Unit).CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "systemctl", "stop", job.Unit).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("systemctl stop: %s: %w", strings.TrimSpace(string(out)), err)
 	}
