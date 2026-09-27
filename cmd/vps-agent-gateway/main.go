@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,7 +19,7 @@ import (
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
-	listen := getenv("VPS_AGENT_LISTEN", ":8080")
+	listen := getenv("VPS_AGENT_LISTEN", "127.0.0.1:8080")
 	socket := os.Getenv("VPS_AGENT_BROKER_SOCKET")
 	pocRoot := getenv("VPS_AGENT_POC_ROOT", "/tmp/vps-agent-poc")
 
@@ -62,6 +63,10 @@ func main() {
 	if issuer != "" {
 		authCfg.AuthorizationServers = []string{issuer}
 	}
+	if (authCfg.Mode == "" || authCfg.Mode == "none") && !listenIsLoopback(listen) {
+		slog.Error("unauthenticated_remote_bind_rejected", "listen", listen, "reason", "auth mode none is allowed only on loopback")
+		os.Exit(1)
+	}
 	if os.Getenv("VPS_AGENT_PUBLIC_URL") != "" && authCfg.Mode != "oidc" {
 		slog.Error("public_auth_rejected", "reason", "public MCP configuration requires oidc"); os.Exit(1)
 	}
@@ -103,6 +108,18 @@ func metadataURLForResource(raw string) string {
 		return ""
 	}
 	return u.Scheme + "://" + u.Host + "/.well-known/oauth-protected-resource"
+}
+
+func listenIsLoopback(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func splitScopes(raw string) []string {
