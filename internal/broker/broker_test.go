@@ -149,3 +149,56 @@ func TestExpectedSubjectCannotBeForgedByGateway(t *testing.T) {
 		t.Fatalf("forged subject was not rejected: %+v", denied)
 	}
 }
+
+
+func TestMkdirCreatesAuthorizedRootAndIsIdempotent(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "new-root")
+	store, err := state.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	fs, err := securefs.New([]string{root}, []string{root}, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := &policy.Config{
+		Version: 1, Mode: "scoped",
+		Filesystem: policy.FilesystemPolicy{Read: []string{root}, Write: []string{root}},
+		Network: policy.NetworkPolicy{Mode: "blocked"},
+		Replay: policy.ReplayPolicy{RequireIdempotencyForSafeWrites: true},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	b := &Broker{Policy: cfg, FS: fs, State: store, ExpectedSubject: "alice"}
+
+	req := wire.Request{
+		ID: "mkdir-1", Subject: "alice", Tool: "file.mkdir",
+		Resource: root, InvocationID: "mkdir-op",
+	}
+	if resp := b.Handle(context.Background(), req); !resp.OK {
+		t.Fatalf("mkdir failed: %+v", resp)
+	}
+	if info, err := os.Stat(root); err != nil || !info.IsDir() {
+		t.Fatalf("directory missing: info=%v err=%v", info, err)
+	}
+
+	req.ID = "mkdir-2"
+	if resp := b.Handle(context.Background(), req); !resp.OK {
+		t.Fatalf("cached mkdir failed: %+v", resp)
+	}
+}
+
+func TestMkdirOutsideAuthorizedRootDenied(t *testing.T) {
+	b, _, _, root := testBroker(t)
+	resp := b.Handle(context.Background(), wire.Request{
+		ID: "mkdir-deny", Subject: "alice", Tool: "file.mkdir",
+		Resource: filepath.Join(filepath.Dir(root), "outside"),
+		InvocationID: "mkdir-deny-op",
+	})
+	if resp.OK {
+		t.Fatalf("outside mkdir allowed: %+v", resp)
+	}
+}
