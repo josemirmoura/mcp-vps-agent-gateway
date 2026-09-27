@@ -34,7 +34,7 @@ jobs:
           mkdir -p dist/linux-amd64 dist/linux-arm64
           for arch in amd64 arm64; do
             for cmd in vps-agent-gateway vps-agent-broker vps-agent; do
-              CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build                 -trimpath                 -ldflags="-s -w"                 -o "dist/linux-$arch/$cmd" "./cmd/$cmd"
+              CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags="-s -w" -o "dist/linux-$arch/$cmd" "./cmd/$cmd"
             done
           done
       - uses: actions/upload-artifact@v4
@@ -61,9 +61,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Verify unit syntax and sandbox directives
+      - name: Provide placeholder executables
         run: |
-          systemd-analyze verify             deploy/systemd/vps-agent-gateway.service             deploy/systemd/vps-agent-broker.service
+          sudo install -m 0755 /usr/bin/true /usr/local/bin/vps-agent-gateway
+          sudo install -m 0755 /usr/bin/true /usr/local/bin/vps-agent-broker
+      - name: Verify unit syntax and sandbox directives
+        run: systemd-analyze verify deploy/systemd/vps-agent-gateway.service deploy/systemd/vps-agent-broker.service
 
   architecture-simulation:
     runs-on: ubuntu-latest
