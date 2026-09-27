@@ -19,7 +19,16 @@ type fakeServices struct {
 	restarts int
 }
 
+func (f *fakeServices) List(context.Context) ([]ServiceInfo, error) {
+	return []ServiceInfo{{Name: "vps-agent-test.service", Active: "active"}}, nil
+}
 func (f *fakeServices) Status(context.Context, string) (string, error) { return "active", nil }
+func (f *fakeServices) Logs(context.Context, string, int) (string, error) { return "log", nil }
+func (f *fakeServices) Start(context.Context, string) (string, error) { return "active", nil }
+func (f *fakeServices) Stop(context.Context, string) (string, error) { return "inactive", nil }
+func (f *fakeServices) Reload(context.Context, string) (string, error) { return "active", nil }
+func (f *fakeServices) Enable(context.Context, string) (string, error) { return "enabled", nil }
+func (f *fakeServices) Disable(context.Context, string) (string, error) { return "disabled", nil }
 func (f *fakeServices) Restart(context.Context, string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
