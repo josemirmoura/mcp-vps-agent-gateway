@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -21,6 +22,11 @@ type Config struct {
 	Network      NetworkPolicy    `yaml:"network"`
 	Services     ResourcePolicy   `yaml:"services"`
 	Docker       ResourcePolicy   `yaml:"docker"`
+	Compose      ResourcePolicy   `yaml:"compose,omitempty"`
+	Packages     ResourcePolicy   `yaml:"packages,omitempty"`
+	Users        ResourcePolicy   `yaml:"users,omitempty"`
+	Firewall     ResourcePolicy   `yaml:"firewall,omitempty"`
+	Diagnostics  []string         `yaml:"diagnostics,omitempty"`
 	Shell        ShellPolicy      `yaml:"shell"`
 	Privilege    PrivilegePolicy  `yaml:"privilege"`
 	Replay       ReplayPolicy     `yaml:"replay"`
@@ -33,8 +39,9 @@ type Features struct {
 }
 
 type FilesystemPolicy struct {
-	Read  []string `yaml:"read"`
-	Write []string `yaml:"write"`
+	Read    []string `yaml:"read"`
+	Write   []string `yaml:"write"`
+	Actions []string `yaml:"actions,omitempty"`
 }
 
 type NetworkPolicy struct {
@@ -54,6 +61,7 @@ type ShellPolicy struct {
 	CWDRoots          []string `yaml:"cwd_roots"`
 	MaxRuntimeSeconds int      `yaml:"max_runtime_seconds"`
 	MaxOutputBytes    int      `yaml:"max_output_bytes"`
+	AllowHostRead     bool     `yaml:"allow_host_read,omitempty"`
 }
 
 type PrivilegePolicy struct {
@@ -134,6 +142,101 @@ func matchAny(patterns []string, value string) bool {
 		}
 	}
 	return false
+}
+
+
+func containsAction(actions []string, action string) bool {
+	action = NormalizeCapability(action)
+	for _, allowed := range actions {
+		allowed = NormalizeCapability(allowed)
+		if allowed == "*" || allowed == action {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Config) CanFilesystem(action string) bool {
+	if len(c.Filesystem.Actions) == 0 {
+		switch NormalizeCapability(action) {
+		case "read", "write", "mkdir":
+			return true
+		default:
+			return false
+		}
+	}
+	return containsAction(c.Filesystem.Actions, action)
+}
+
+func (c *Config) CanCompose(resource, action string) bool {
+	if !matchAny(c.Compose.Actions, action) {
+		return false
+	}
+	if action == "inspect" || action == "validate" {
+		return matchAny(c.Compose.Inspect, resource) || matchAny(c.Compose.Manage, resource)
+	}
+	return matchAny(c.Compose.Manage, resource)
+}
+
+func (c *Config) CanPackage(name, action string) bool {
+	if !matchAny(c.Packages.Actions, action) {
+		return false
+	}
+	if action == "list" || action == "status" {
+		return matchAny(c.Packages.Inspect, name) || matchAny(c.Packages.Manage, name)
+	}
+	return matchAny(c.Packages.Manage, name) || (name == "" && matchAny(c.Packages.Manage, "*"))
+}
+
+func (c *Config) CanUser(name, action string) bool {
+	if !matchAny(c.Users.Actions, action) {
+		return false
+	}
+	if action == "list" || action == "inspect" {
+		return matchAny(c.Users.Inspect, name) || matchAny(c.Users.Manage, name)
+	}
+	return matchAny(c.Users.Manage, name)
+}
+
+func (c *Config) CanFirewall(action string) bool {
+	return matchAny(c.Firewall.Actions, action)
+}
+
+func (c *Config) CanDiagnostic(action string) bool {
+	return containsAction(c.Diagnostics, action)
+}
+
+func withinAnyRoot(roots []string, target string) bool {
+	if !filepath.IsAbs(target) {
+		return false
+	}
+	target = filepath.Clean(target)
+	for _, root := range roots {
+		root = filepath.Clean(root)
+		rel, err := filepath.Rel(root, target)
+		if err != nil {
+			continue
+		}
+		if rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Config) CanShellCWD(cwd string) bool {
+	return c.Shell.Enabled && withinAnyRoot(c.Shell.CWDRoots, cwd)
+}
+
+func (c *Config) CanNetworkDestination(destination string) bool {
+	switch c.Network.Mode {
+	case "unrestricted":
+		return true
+	case "allowlist":
+		return matchAny(c.Network.Destinations, destination)
+	default:
+		return false
+	}
 }
 
 func (c *Config) CanService(name, action string) bool {
