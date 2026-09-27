@@ -7,14 +7,15 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
-	"strconv"
+		"strconv"
 	"strings"
 	"time"
+
+	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/hostexec"
 )
 
 func diskInfo(ctx context.Context) ([]map[string]any, error) {
-	out, err := exec.CommandContext(ctx, "df", "-P", "-B1").Output()
+	out, err := hostexec.CommandContext(ctx, "df", "-P", "-B1").Output()
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +43,7 @@ func diskInfo(ctx context.Context) ([]map[string]any, error) {
 }
 
 func memoryInfo() (map[string]any, error) {
-	f, err := os.Open("/proc/meminfo")
+	f, err := os.Open(hostexec.Path("/proc/meminfo"))
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +79,7 @@ func processList(ctx context.Context, limit int) ([]map[string]any, error) {
 	if limit > 500 {
 		limit = 500
 	}
-	out, err := exec.CommandContext(ctx, "ps", "-eo", "pid=,user=,comm=,%cpu=,%mem=", "--sort=-%cpu").Output()
+	out, err := hostexec.CommandContext(ctx, "ps", "-eo", "pid=,user=,comm=,%cpu=,%mem=", "--sort=-%cpu").Output()
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +105,7 @@ func processInspect(pid int) (map[string]any, error) {
 	if pid <= 0 {
 		return nil, errors.New("pid must be positive")
 	}
-	f, err := os.Open(fmt.Sprintf("/proc/%d/status", pid))
+	f, err := os.Open(hostexec.Path(fmt.Sprintf("/proc/%d/status", pid)))
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +138,7 @@ func listenInfo(ctx context.Context, limit int) ([]string, error) {
 	if limit > 1000 {
 		limit = 1000
 	}
-	out, err := exec.CommandContext(ctx, "ss", "-lntupH").CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "ss", "-lntupH").CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("ss: %s: %w", strings.TrimSpace(string(out)), err)
 	}
