@@ -114,6 +114,36 @@ func Load(filename string) (*Config, error) {
 	return &cfg, nil
 }
 
+func (c *Config) ValidatePhysicalScope(root string, wholeHost bool) error {
+	if wholeHost {
+		return nil
+	}
+	if !filepath.IsAbs(root) {
+		return errors.New("physical scope root must be absolute")
+	}
+	root = filepath.Clean(root)
+	if root == string(filepath.Separator) {
+		return errors.New("whole-host physical scope requires explicit whole-host mode")
+	}
+	check := func(kind string, paths []string) error {
+		for _, p := range paths {
+			if p == "" {
+				continue
+			}
+			if !withinAnyRoot([]string{root}, p) {
+				return fmt.Errorf("%s path %q is outside physical scope root %q", kind, p, root)
+			}
+		}
+		return nil
+	}
+	if err := check("filesystem.read", c.Filesystem.Read); err != nil { return err }
+	if err := check("filesystem.write", c.Filesystem.Write); err != nil { return err }
+	if err := check("shell.cwd_roots", c.Shell.CWDRoots); err != nil { return err }
+	if err := check("compose.inspect", c.Compose.Inspect); err != nil { return err }
+	if err := check("compose.manage", c.Compose.Manage); err != nil { return err }
+	return nil
+}
+
 func (c *Config) Validate() error {
 	if c.Version != 1 {
 		return fmt.Errorf("unsupported policy version %d", c.Version)
