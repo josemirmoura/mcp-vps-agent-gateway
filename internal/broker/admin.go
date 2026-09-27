@@ -220,7 +220,7 @@ func firewallAction(ctx context.Context, action, port, protocol, source string) 
 		if source == "" {
 			args = append(args, rule)
 		} else {
-			args = append(args, "from", source, "to", "any", "port", port}
+			args = append(args, "from", source, "to", "any", "port", port)
 			if protocol != "" {
 				args = append(args, "proto", protocol)
 			}
