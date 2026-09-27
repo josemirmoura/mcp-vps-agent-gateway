@@ -11,16 +11,16 @@ permissions:
 
 jobs:
   go:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: '1.27.1'
+          go-version-file: go.mod
           cache: true
       - name: Resolve module graph
-        run: go mod tidy
+        run: go mod download
       - name: Format ephemeral workspace
         run: gofmt -w $(find . -name '*.go' -type f -print)
       - name: Vet
@@ -34,7 +34,7 @@ jobs:
           mkdir -p dist/linux-amd64 dist/linux-arm64
           for arch in amd64 arm64; do
             for cmd in vps-agent-gateway vps-agent-broker vps-agent vps-agent-mcp-call; do
-              CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags="-s -w" -o "dist/linux-$arch/$cmd" "./cmd/$cmd"
+              CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags='-s -w' -o "dist/linux-$arch/$cmd" "./cmd/$cmd"
             done
           done
           for arch in amd64 arm64; do
@@ -49,23 +49,23 @@ jobs:
           if-no-files-found: error
 
   docker-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: '1.27.1'
-      - run: go mod tidy
+          go-version-file: go.mod
+      - run: go mod download
       - name: Docker typed-operation smoke
         env:
-          VPS_AGENT_DOCKER_SMOKE: "1"
+          VPS_AGENT_DOCKER_SMOKE: '1'
         run: go test -count=1 -v ./internal/broker -run TestDockerCLISmoke
 
   systemd-unit-verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Provide placeholder executables
         run: |
           sudo install -m 0755 /usr/bin/true /usr/local/bin/vps-agent-gateway
@@ -74,27 +74,25 @@ jobs:
         run: systemd-analyze verify deploy/systemd/vps-agent-gateway.service deploy/systemd/vps-agent-broker.service
 
   architecture-simulation:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
       - run: python sim/architecture_sim.py
 
   vuln:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: '1.27.1'
-      - run: go mod tidy
+          go-version-file: go.mod
+      - run: go mod download
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
       - run: govulncheck ./...
-
-
 
   source-security:
     runs-on: ubuntu-24.04
@@ -107,58 +105,15 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Resolve module graph
-        run: go mod tidy
+      - run: go mod download
       - name: Gosec
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
           gosec -fmt=json -out=gosec.json ./...
       - name: Bounded fuzzing
         run: |
-          go test ./internal/securefs -run='^    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
-        with:
-          go-version: '1.27.1'
-          cache: true
-      - name: Create sandbox execution user
-        run: |
-          sudo useradd --system --no-create-home --shell /usr/sbin/nologin vps-agent-exec 2>/dev/null || true
-      - name: Resolve module graph
-        run: go mod tidy
-      - name: Run real transient systemd job
-        run: |
-          sudo --preserve-env=PATH env \
-            VPS_AGENT_SYSTEMD_JOB_SMOKE=1 \
-            GOPATH="$GOPATH" \
-            GOCACHE="$GOCACHE" \
-            GOMODCACHE="$GOMODCACHE" \
-            go test -count=1 -run TestSystemdRunnerSmoke ./internal/jobs
- -fuzz=FuzzSelectRootNeverEscapes -fuzztime=10s
-          go test ./internal/policy -run='^    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
-        with:
-          go-version: '1.27.1'
-          cache: true
-      - name: Create sandbox execution user
-        run: |
-          sudo useradd --system --no-create-home --shell /usr/sbin/nologin vps-agent-exec 2>/dev/null || true
-      - name: Resolve module graph
-        run: go mod tidy
-      - name: Run real transient systemd job
-        run: |
-          sudo --preserve-env=PATH env \
-            VPS_AGENT_SYSTEMD_JOB_SMOKE=1 \
-            GOPATH="$GOPATH" \
-            GOCACHE="$GOCACHE" \
-            GOMODCACHE="$GOMODCACHE" \
-            go test -count=1 -run TestSystemdRunnerSmoke ./internal/jobs
- -fuzz=FuzzPolicyLoadNeverPanics -fuzztime=10s
+          go test ./internal/securefs -run='^$' -fuzz=FuzzSelectRootNeverEscapes -fuzztime=10s
+          go test ./internal/policy -run='^$' -fuzz=FuzzPolicyLoadNeverPanics -fuzztime=10s
       - name: Secret scan
         uses: gitleaks/gitleaks-action@v3
         env:
@@ -171,21 +126,19 @@ jobs:
           path: gosec.json
           if-no-files-found: ignore
 
-
   systemd-job-smoke:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
-          go-version: '1.27.1'
+          go-version-file: go.mod
           cache: true
       - name: Create sandbox execution user
         run: |
           sudo useradd --system --no-create-home --shell /usr/sbin/nologin vps-agent-exec 2>/dev/null || true
-      - name: Resolve module graph
-        run: go mod tidy
+      - run: go mod download
       - name: Run real transient systemd job
         run: |
           sudo --preserve-env=PATH env \
