@@ -61,8 +61,8 @@ PY
 
 echo
 echo "Checking integrated Authorization Server discovery..."
-  curl --fail --silent --show-error "$ISSUER/.well-known/openid-configuration" >/tmp/vps-agent-oidc-discovery.json
-  python3 - "$ISSUER" <<'PY'
+curl --fail --silent --show-error "$ISSUER/.well-known/openid-configuration" >/tmp/vps-agent-oidc-discovery.json
+python3 - "$ISSUER" <<'PY'
 import json,sys
 issuer=sys.argv[1].rstrip("/")
 data=json.load(open("/tmp/vps-agent-oidc-discovery.json"))
@@ -71,7 +71,14 @@ registration=data.get("registration_endpoint","")
 assert registration.startswith("https://"), data
 methods=data.get("code_challenge_methods_supported", [])
 assert "S256" in methods, data
-print("INTEGRATED OAUTH DISCOVERY + DCR + PKCE: PASS")
+scopes=data.get("scopes_supported", [])
+assert "offline_access" in scopes, data
+grants=data.get("grant_types_supported", [])
+assert "authorization_code" in grants, data
+assert "refresh_token" in grants, data
+token_auth=data.get("token_endpoint_auth_methods_supported", [])
+assert "none" in token_auth, data
+print("INTEGRATED OAUTH DISCOVERY + DCR + PKCE + REFRESH: PASS")
 PY
 
 echo
