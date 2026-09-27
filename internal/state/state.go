@@ -18,6 +18,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const CurrentSchemaVersion = 1
+
 type Store struct {
 	db *sql.DB
 }
@@ -55,6 +57,30 @@ func Open(filename string) (*Store, error) {
 func (s *Store) Close() error { return s.db.Close() }
 
 func (s *Store) migrate() error {
+	if _, err := s.db.Exec(`CREATE TABLE IF NOT EXISTS schema_meta (
+		key TEXT PRIMARY KEY,
+		value INTEGER NOT NULL
+	)`); err != nil {
+		return err
+	}
+	var version int
+	err := s.db.QueryRow(`SELECT value FROM schema_meta WHERE key='schema_version'`).Scan(&version)
+	if errors.Is(err, sql.ErrNoRows) {
+		// Legacy databases created before schema versioning are schema v1.
+		if _, err := s.db.Exec(`INSERT INTO schema_meta(key,value) VALUES('schema_version',?)`, CurrentSchemaVersion); err != nil {
+			return err
+		}
+		version = CurrentSchemaVersion
+	} else if err != nil {
+		return err
+	}
+	if version > CurrentSchemaVersion {
+		return fmt.Errorf("state schema %d is newer than supported version %d", version, CurrentSchemaVersion)
+	}
+	if version < 1 {
+		return fmt.Errorf("unsupported state schema version %d", version)
+	}
+
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS operations (
 			invocation_id TEXT PRIMARY KEY,
@@ -119,7 +145,16 @@ func (s *Store) migrate() error {
 			return err
 		}
 	}
+	if version < CurrentSchemaVersion {
+		return fmt.Errorf("missing migration path from schema %d to %d", version, CurrentSchemaVersion)
+	}
 	return nil
+}
+
+func (s *Store) SchemaVersion(ctx context.Context) (int, error) {
+	var version int
+	err := s.db.QueryRowContext(ctx, `SELECT value FROM schema_meta WHERE key='schema_version'`).Scan(&version)
+	return version, err
 }
 
 type OperationDecision string
