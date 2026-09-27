@@ -47,7 +47,7 @@ Requisitos: VPS Linux, Docker Engine, plugin Docker Compose, Git, OpenSSL e Pyth
 ~~~bash
 git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git &&
 cd mcp-vps-agent-gateway &&
-sudo install -d -o "$USER" -g "$USER" -m 0750 /opt/vps-agent-sandbox &&
+sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 /opt/vps-agent-sandbox &&
 bash scripts/init.sh --scope /opt/vps-agent-sandbox &&
 docker compose up -d --build &&
 bash scripts/verify.sh
