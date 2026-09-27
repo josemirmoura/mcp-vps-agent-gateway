@@ -286,6 +286,21 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			err := b.FS.Chown(req.Resource, in.UID, in.GID)
 			return map[string]any{"path": req.Resource, "uid": in.UID, "gid": in.GID, "changed": err == nil}, err
 		})
+	case "service.list":
+		if b.Services == nil {
+			return deny(req.ID, "service_unavailable", "service manager is not configured")
+		}
+		all, err := b.Services.List(ctx)
+		if err != nil {
+			return deny(req.ID, "service_error", err.Error())
+		}
+		filtered := make([]ServiceInfo, 0, len(all))
+		for _, svc := range all {
+			if b.Policy.CanService(svc.Name, "status") || b.Policy.CanService(svc.Name, "inspect") {
+				filtered = append(filtered, svc)
+			}
+		}
+		return ok(req.ID, map[string]any{"services": filtered})
 	case "service.status":
 		if b.Services == nil {
 			return deny(req.ID, "service_unavailable", "service manager is not configured")
@@ -298,17 +313,38 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "service_error", err.Error())
 		}
 		return ok(req.ID, map[string]any{"service": req.Resource, "status": status})
-	case "service.restart":
+	case "service.logs":
 		if b.Services == nil {
 			return deny(req.ID, "service_unavailable", "service manager is not configured")
 		}
-		if !b.Policy.CanService(req.Resource, "restart") {
-			return deny(req.ID, "permission_denied", "service restart is outside policy")
+		if !b.Policy.CanService(req.Resource, "logs") {
+			return deny(req.ID, "permission_denied", "service logs are outside policy")
+		}
+		var in struct {
+			Lines int `json:"lines"`
+		}
+		if len(req.Args) > 0 {
+			if err := json.Unmarshal(req.Args, &in); err != nil {
+				return deny(req.ID, "invalid_args", err.Error())
+			}
+		}
+		logs, err := b.Services.Logs(ctx, req.Resource, in.Lines)
+		if err != nil {
+			return deny(req.ID, "service_error", err.Error())
+		}
+		return ok(req.ID, map[string]any{"service": req.Resource, "logs": logs})
+	case "service.start", "service.stop", "service.restart", "service.reload", "service.enable", "service.disable":
+		if b.Services == nil {
+			return deny(req.ID, "service_unavailable", "service manager is not configured")
+		}
+		action := strings.TrimPrefix(req.Tool, "service.")
+		if !b.Policy.CanService(req.Resource, action) {
+			return deny(req.ID, "permission_denied", "service action is outside policy")
 		}
 		if req.InvocationID == "" {
-			return deny(req.ID, "invocation_required", "restart requires invocation id")
+			return deny(req.ID, "invocation_required", "service mutation requires invocation id")
 		}
-		return b.restartService(ctx, req)
+		return b.serviceMutation(ctx, req, action)
 	case "docker.inspect":
 		if b.Docker == nil {
 			return deny(req.ID, "docker_unavailable", "docker manager is not configured")
@@ -622,6 +658,59 @@ func (b *Broker) writeFile(ctx context.Context, req wire.Request, data []byte) w
 		if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
 			return deny(req.ID, "state_error", "write completed but operation journal update failed: "+err.Error())
 		}
+	}
+	return wire.Response{ID: req.ID, OK: true, Result: result}
+}
+
+func (b *Broker) serviceMutation(ctx context.Context, req wire.Request, action string) wire.Response {
+	if b.State == nil {
+		return deny(req.ID, "state_required", "service mutation requires durable state")
+	}
+	requestHash, _ := state.HashRequest(map[string]any{
+		"subject": req.Subject, "tool": req.Tool, "service": req.Resource, "action": action,
+	})
+	decision, cached, err := b.State.BeginOperation(ctx, req.InvocationID, req.Subject, req.Tool, requestHash)
+	if err != nil {
+		return deny(req.ID, "state_error", err.Error())
+	}
+	switch decision {
+	case state.OperationCached:
+		return wire.Response{ID: req.ID, OK: true, Result: cached}
+	case state.OperationConflict:
+		return deny(req.ID, "idempotency_conflict", "invocation id reused with different request")
+	case state.OperationReconcile:
+		return deny(req.ID, "reconcile_required", "previous service action outcome is uncertain; inspect service before retry")
+	}
+
+	lock, err := b.State.AcquireLock(ctx, "service:"+req.Resource, req.InvocationID, 2*time.Minute)
+	if err != nil {
+		return deny(req.ID, "resource_busy", err.Error())
+	}
+	defer b.State.ReleaseLock(context.Background(), lock)
+
+	var status string
+	switch action {
+	case "start":
+		status, err = b.Services.Start(ctx, req.Resource)
+	case "stop":
+		status, err = b.Services.Stop(ctx, req.Resource)
+	case "restart":
+		status, err = b.Services.Restart(ctx, req.Resource)
+	case "reload":
+		status, err = b.Services.Reload(ctx, req.Resource)
+	case "enable":
+		status, err = b.Services.Enable(ctx, req.Resource)
+	case "disable":
+		status, err = b.Services.Disable(ctx, req.Resource)
+	default:
+		err = fmt.Errorf("unsupported service action %q", action)
+	}
+	if err != nil {
+		return deny(req.ID, "service_error", err.Error())
+	}
+	result, _ := json.Marshal(map[string]any{"service": req.Resource, "action": action, "status": status})
+	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
+		return deny(req.ID, "state_error", "service action completed but journal update failed: "+err.Error())
 	}
 	return wire.Response{ID: req.ID, OK: true, Result: result}
 }
