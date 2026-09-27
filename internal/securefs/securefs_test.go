@@ -230,3 +230,32 @@ func TestRecursiveRemoveDoesNotFollowSymlink(t *testing.T) {
 		t.Fatalf("recursive delete escaped through symlink: got=%q err=%v", got, err)
 	}
 }
+
+
+func TestHostRootMappingPreservesCanonicalPaths(t *testing.T) {
+	host := t.TempDir()
+	canonicalRoot := "/opt/project"
+	physicalRoot := filepath.Join(host, "opt", "project")
+	if err := os.MkdirAll(physicalRoot, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	m, err := NewWithHostRoot([]string{canonicalRoot}, []string{canonicalRoot}, 4096, host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := "/opt/project/hello.txt"
+	if err := m.WriteFileAtomic(target, []byte("host-root")); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(physicalRoot, "hello.txt"))
+	if err != nil || string(got) != "host-root" {
+		t.Fatalf("physical file=%q err=%v", got, err)
+	}
+	entries, err := m.List(canonicalRoot, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Path != "/opt/project/hello.txt" {
+		t.Fatalf("canonical path leaked host prefix: %+v", entries)
+	}
+}
