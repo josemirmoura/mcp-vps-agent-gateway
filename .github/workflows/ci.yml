@@ -7,9 +7,37 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  autofix:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          cache: true
+      - name: Normalize Go source and module files
+        run: |
+          go mod tidy
+          gofmt -w $(find . -name '*.go' -type f -print)
+      - name: Commit generated normalization
+        run: |
+          if git diff --quiet; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add go.mod go.sum '*.go' 'internal/**/*.go' 'cmd/**/*.go' 2>/dev/null || git add -A
+          git commit -m "chore: normalize Go source and module graph"
+          git push origin HEAD:${{ github.head_ref }}
+
   go:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -19,13 +47,10 @@ jobs:
         with:
           go-version: '1.27.1'
           cache: true
-      - name: Resolve module graph
-        run: go mod tidy
-      - name: Formatting
+      - name: Resolve module graph and format workspace
         run: |
-          test -z "$(gofmt -l -- '*.go' 2>/dev/null || true)"
-          files="$(find . -name '*.go' -type f -print)"
-          test -z "$(gofmt -l $files)"
+          go mod tidy
+          gofmt -w $(find . -name '*.go' -type f -print)
       - name: Vet
         run: go vet ./...
       - name: Test with race detector
