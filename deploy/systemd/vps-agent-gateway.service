@@ -1,0 +1,23 @@
+[Unit]
+Description=MCP VPS Agent Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vps-agent
+Group=vps-agent
+EnvironmentFile=-/etc/vps-agent/gateway.env
+ExecStart=/usr/local/bin/vps-agent-gateway
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/tmp/vps-agent-poc /run/vps-agent
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target
