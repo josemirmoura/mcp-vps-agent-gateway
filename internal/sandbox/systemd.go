@@ -14,7 +14,9 @@ type Spec struct {
 	User           string
 	Command        string
 	CWD            string
+	ReadOnlyPaths  []string
 	ReadWritePaths []string
+	InaccessiblePaths []string
 	Runtime        time.Duration
 	MemoryMaxBytes int64
 	TasksMax       int
@@ -56,11 +58,29 @@ func BuildSystemdRunArgs(s Spec) ([]string, error) {
 		"--property=PrivateTmp=yes",
 		"--property=ProtectSystem=strict",
 		"--property=ProtectHome=yes",
+		"--property=ProtectProc=invisible",
+		"--property=ProcSubset=pid",
+		"--property=PrivateDevices=yes",
+		"--property=ProtectKernelTunables=yes",
+		"--property=ProtectControlGroups=yes",
+		"--property=ProtectKernelModules=yes",
 		"--property=RestrictSUIDSGID=yes",
 		"--property=LockPersonality=yes",
 		"--property=MemoryMax=" + strconv.FormatInt(s.MemoryMaxBytes, 10),
 		"--property=TasksMax=" + strconv.Itoa(s.TasksMax),
 		"--property=RuntimeMaxSec=" + strconv.FormatInt(int64(s.Runtime.Seconds()), 10),
+	}
+	for _, p := range s.InaccessiblePaths {
+		if !filepath.IsAbs(p) {
+			return nil, fmt.Errorf("inaccessible path must be absolute: %q", p)
+		}
+		args = append(args, "--property=InaccessiblePaths="+p)
+	}
+	for _, p := range s.ReadOnlyPaths {
+		if !filepath.IsAbs(p) {
+			return nil, fmt.Errorf("read-only path must be absolute: %q", p)
+		}
+		args = append(args, "--property=ReadOnlyPaths="+p)
 	}
 	for _, p := range s.ReadWritePaths {
 		if !filepath.IsAbs(p) {
@@ -78,6 +98,6 @@ func BuildSystemdRunArgs(s Spec) ([]string, error) {
 	default:
 		return nil, fmt.Errorf("unsupported network mode %q", s.NetworkMode)
 	}
-	args = append(args, "--", "/bin/sh", "-lc", s.Command)
+	args = append(args, "--", "/bin/sh", "-c", s.Command)
 	return args, nil
 }
