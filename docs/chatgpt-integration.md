@@ -1,135 +1,84 @@
 # ChatGPT integration
 
-## Target
+Checked: 2026-09-27.
 
-Desired experience:
+## Target
 
 ~~~text
 ChatGPT Web
-   -> plugin/app/MCP
-   -> VPS Agent Gateway
+   -> custom MCP app
+   -> HTTPS /mcp endpoint
+   -> Gateway
    -> Broker
    -> VPS
 ~~~
 
-The server architecture is client-independent. The ChatGPT distribution path is a separate product constraint.
+The server architecture is MCP-client independent. ChatGPT product availability is a separate completion gate.
 
-## Current product constraint
+## Current OpenAI product constraint
 
-**Checked: 2026-09-26.**
+OpenAI currently documents full MCP support, including write/modify actions, for ChatGPT Business, Enterprise and Edu on ChatGPT web.
 
-OpenAI currently documents full private MCP support, including write/modify actions in Developer Mode, for ChatGPT Business, Enterprise and Edu:
-
+Official source:
 https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
 
-The plugin directory is available across ChatGPT plans, but availability and capabilities vary by plan, surface, region, role and the apps included in a plugin:
+The same official page states that Pro users can connect MCPs with read/fetch permissions, but Full MCP is not currently available to Pro.
 
-https://help.openai.com/en/articles/20001256-plugins-in-chatgpt-and-codex
+Do not infer write support for another plan/surface merely because the MCP server works with MCP Inspector or another client.
 
-Therefore the project must not assume that a private custom write-capable MCP can be attached directly to ChatGPT Plus Web.
+ChatGPT connects to remote MCP servers. A local/private-network MCP cannot be attached directly unless a supported secure tunnel/remote route is used.
 
-## Route A — Private development
+## Current documented connection flow
 
-Use a plan/workspace that currently supports private full MCP write in Developer Mode.
+For an eligible workspace/surface:
 
-This is the simplest private testing route.
+1. Enable Developer Mode in the workspace/user settings described by the current OpenAI documentation.
+2. Go to Apps and create a custom app.
+3. Provide the remote HTTPS MCP endpoint.
+4. Select/configure authentication.
+5. Scan tools.
+6. Create the app.
+7. In a new web chat, select or mention the app.
+8. Call a harmless tool such as system.info.
+9. Verify the matching authenticated call in Broker audit.
 
-## Route B — Plus Web
+The OpenAI UI and permissions are version-sensitive. Recheck the official page at release/setup time.
 
-If Plus Web is a hard requirement, the practical path is an eligible plugin/app whose remote MCP capabilities are available on that surface.
+## Our package completion rule
 
-This can require:
+scripts/connect-chatgpt.sh shows the tutorial and then waits for an audited system.info call from the configured subject.
 
-- stable public HTTPS MCP endpoint
-- plugin/app packaging
-- authentication
-- review/submission requirements
-- actual availability on the target Plus account
-
-Do not mark Plus Web complete until the plugin/app is visible there and a write tool executes successfully.
-
-## Route C — Protocol development
-
-Use MCP Inspector while the ChatGPT distribution path is unresolved.
-
-This lets Gateway/Broker engineering proceed without pretending the product surface is already available.
-
-## Gate 0A artifact
-
-Before privileged implementation, record:
+Showing the tutorial is not success.
 
 ~~~text
-target_surface:
-target_plan:
-integration_route:
-read_available:
-write_available:
-private_or_published:
-tested_date:
+tutorial shown
+ -> ChatGPT app connected
+ -> system.info invoked from ChatGPT
+ -> expected subject authenticated
+ -> Broker policy allows
+ -> execution succeeds
+ -> audit record observed
+ -> installation complete
 ~~~
 
-## Transport
-
-Use MCP Streamable HTTP over HTTPS, typically at /mcp.
-
-Official guidance:
-
-https://developers.openai.com/plugins/concepts/mcp-server
-https://developers.openai.com/plugins/build/mcp-server
-
-Do not create a custom WebSocket protocol.
+If the target ChatGPT plan/workspace cannot invoke the required tool, the script times out and installation remains incomplete.
 
 ## Authentication
 
-For private user data or write actions, use the authentication required by the current MCP/OpenAI integration.
+For OAuth/OIDC deployments validate issuer, audience/resource, signature, expiration, scopes, and subject.
 
-For OAuth/OIDC, validate:
+If the OpenAI integration requires refresh-token support, follow the current OpenAI guidance for offline_access/refresh-token issuance.
 
-- issuer
-- audience/resource
-- signature
-- expiration
-- scopes
-- subject
+Static bearer auth exists for laboratory/private validation. Do not assume it is the final authentication mechanism accepted by every ChatGPT app surface.
 
-Authentication identifies the caller. Broker policy still decides authorization.
+## Transport
 
-## Tool ladder
+Use MCP Streamable HTTP over remote HTTPS at /mcp.
 
-Gate 0B:
+Do not invent a custom WebSocket protocol.
 
-~~~text
-system.info
-file.read_test
-file.write_test
-~~~
+## Security
 
-Gate 1:
+ChatGPT host confirmations and app permissions are additional UX/safety controls. They never replace Broker authorization.
 
-~~~text
-system.info
-file.read_test
-service.status
-service.restart
-~~~
-
-Do not expose the full north-star tool catalog before the gates justify it.
-
-## Host confirmations
-
-Host confirmations improve UX and safety. They do not replace server-side authorization.
-
-
-## Installer handoff
-
-The product installer must treat the **verified ChatGPT Web connection** as the final completion gate.
-
-Showing the connection tutorial happens first. It does not complete installation.
-
-The installer should output the configured MCP endpoint, authentication method and effective policy summary, then guide the user through the currently supported ChatGPT Web connection path.
-
-After the user connects ChatGPT, the installer/runbook must require one harmless end-to-end tool call from ChatGPT itself and verify the corresponding authenticated subject, policy decision, execution result and Broker audit event.
-
-Only after those checks pass may the installer declare setup complete.
-
-Exact UI instructions are version-sensitive and must be checked against current official OpenAI documentation at release/install time.
+Tool definitions may be frozen/reviewed by the ChatGPT workspace. If the MCP tool schema changes, refresh/review the app actions using the current OpenAI workspace flow.
