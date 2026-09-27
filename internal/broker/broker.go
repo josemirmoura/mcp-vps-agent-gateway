@@ -622,7 +622,7 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return map[string]any{"action": action, "package": req.Resource, "output": out}, err
 		})
 	case "user.list":
-		rows, err := userList()
+		rows, err := userList(ctx)
 		if err != nil {
 			return deny(req.ID, "identity_error", err.Error())
 		}
@@ -638,7 +638,7 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if !b.Policy.CanUser(req.Resource, "inspect") {
 			return deny(req.ID, "permission_denied", "user inspection is outside policy")
 		}
-		row, err := userInspect(req.Resource)
+		row, err := userInspect(ctx, req.Resource)
 		if err != nil {
 			return deny(req.ID, "identity_error", err.Error())
 		}
@@ -662,7 +662,7 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return map[string]any{"action": action, "user": req.Resource, "output": out}, err
 		})
 	case "group.list":
-		rows, err := groupList()
+		rows, err := groupList(ctx)
 		if err != nil {
 			return deny(req.ID, "identity_error", err.Error())
 		}
@@ -678,7 +678,7 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if !b.Policy.CanGroup(req.Resource, "inspect") {
 			return deny(req.ID, "permission_denied", "group inspection is outside policy")
 		}
-		row, err := groupInspect(req.Resource)
+		row, err := groupInspect(ctx, req.Resource)
 		if err != nil {
 			return deny(req.ID, "identity_error", err.Error())
 		}
