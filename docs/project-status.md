@@ -14,7 +14,7 @@ There is still:
 - no completed ChatGPT Web product-surface Gate 0A
 - no production-enabled Full/admin shell
 
-Laboratory evidence has reached the Gate 0B and Gate 1 behaviors. Formal maturity remains pre-R1 until the actual target client/distribution path is proven.
+Laboratory evidence now covers the Docker package end-to-end on a clean Ubuntu runner: filesystem CRUD, authorization denial, sandboxed shell/jobs, host systemd, host Docker/Compose, diagnostics and audit. Formal product maturity still remains pre-R1 until the actual ChatGPT Web integration route is proven on the target account.
 
 ## Maturity ladder
 
@@ -96,6 +96,6 @@ Prefer:
 
 ## Current next milestone
 
-The implementation has clean-room evidence for Gate 0B and the typed Gate 1 systemd action.
+The implementation has clean-room evidence through the broad Scoped toolbox and the Docker packaging path.
 
-The next product milestone is **Gate 0A on the actual ChatGPT surface**, followed by a real-VPS Scoped pilot. See [implementation-validation.md](implementation-validation.md).
+The next external milestone is **Gate 0A on the actual ChatGPT Web surface**, followed by a real-VPS Scoped pilot and long-running reliability work. See [implementation-validation.md](implementation-validation.md).
