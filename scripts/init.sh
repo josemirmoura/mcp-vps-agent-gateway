@@ -38,17 +38,37 @@ if grep -q 'CHANGE_ME_' .env; then
   exit 1
 fi
 
+set -a
+. ./.env
+set +a
+
+SCOPE_ROOT="${VPS_AGENT_SCOPE_ROOT:-}"
+if [ -z "$SCOPE_ROOT" ]; then
+  echo "ERROR: set VPS_AGENT_SCOPE_ROOT in .env before starting the Scoped package." >&2
+  exit 1
+fi
+if [ "$SCOPE_ROOT" = "/" ]; then
+  echo "NOTE: whole-host authority requires the explicit compose.host.yaml override."
+elif [ ! -d "$SCOPE_ROOT" ]; then
+  echo "NOTE: VPS_AGENT_SCOPE_ROOT does not exist yet: $SCOPE_ROOT"
+  echo "Create that directory or change .env before docker compose up."
+fi
+
 docker compose config -q
 
-cat <<'EOF'
+cat <<EOF
 
 Bootstrap ready.
 
-1. Edit config/policy.yaml and define exactly what the MCP may control.
-2. Review .env.
-3. Start:
+1. Review .env and choose the physical Scoped ceiling:
+     VPS_AGENT_SCOPE_ROOT=$SCOPE_ROOT
+   The directory must exist before startup.
+2. Edit config/policy.yaml. Filesystem, shell and Compose paths must stay inside that ceiling.
+3. Start Scoped mode:
      docker compose up -d --build
+   Whole-host is a separate explicit override:
+     docker compose -f compose.yaml -f compose.host.yaml up -d --build
 4. Verify:
-     ./scripts/verify.sh
+     bash scripts/verify.sh
 
 EOF
