@@ -11,7 +11,7 @@ func TestBuildSystemdRunArgsBlockedNetwork(t *testing.T) {
 	args, err := BuildSystemdRunArgs(Spec{
 		Unit: "vps-agent-job-123", User: "vps-agent-exec",
 		Command: "echo ok", CWD: "/srv/app",
-		ReadWritePaths: []string{"/srv/app"}, Runtime: time.Minute,
+		ReadOnlyPaths: []string{"/srv/app"}, ReadWritePaths: []string{"/srv/app"}, InaccessiblePaths: []string{"/etc"}, Runtime: time.Minute,
 		NetworkMode: "blocked",
 	})
 	if err != nil {
@@ -21,7 +21,11 @@ func TestBuildSystemdRunArgsBlockedNetwork(t *testing.T) {
 		"--property=NoNewPrivileges=yes",
 		"--property=ProtectSystem=strict",
 		"--property=PrivateNetwork=yes",
+		"--property=ReadOnlyPaths=/srv/app",
 		"--property=ReadWritePaths=/srv/app",
+		"--property=InaccessiblePaths=/etc",
+		"--property=ProtectProc=invisible",
+		"--property=PrivateDevices=yes",
 	}
 	for _, w := range want {
 		if !slices.Contains(args, w) {
@@ -29,7 +33,7 @@ func TestBuildSystemdRunArgsBlockedNetwork(t *testing.T) {
 		}
 	}
 	got := strings.Join(args[len(args)-4:], " ")
-	if got != "-- /bin/sh -lc echo ok" {
+	if got != "-- /bin/sh -c echo ok" {
 		t.Fatalf("unexpected command tail %q", got)
 	}
 }
