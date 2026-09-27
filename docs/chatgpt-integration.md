@@ -35,7 +35,7 @@ For an eligible workspace/surface:
 1. Enable Developer Mode in the workspace/user settings described by the current OpenAI documentation.
 2. Go to Apps and create a custom app.
 3. Provide the remote HTTPS MCP endpoint.
-4. Select/configure authentication.
+4. Select OAuth authentication and complete the provider authorization flow.
 5. Scan tools.
 6. Create the app.
 7. In a new web chat, select or mention the app.
@@ -65,11 +65,11 @@ If the target ChatGPT plan/workspace cannot invoke the required tool, the script
 
 ## Authentication
 
-For OAuth/OIDC deployments validate issuer, audience/resource, signature, expiration, scopes, and subject.
+For the public ChatGPT route, configure VPS_AGENT_AUTH_MODE=oidc. The Gateway publishes RFC 9728 protected-resource metadata and validates issuer, audience/resource, signature, expiration, scopes and subject. The Broker then independently checks the expected subject and policy.
 
 If the OpenAI integration requires refresh-token support, follow the current OpenAI guidance for offline_access/refresh-token issuance.
 
-Static bearer auth exists for laboratory/private validation. Do not assume it is the final authentication mechanism accepted by every ChatGPT app surface.
+Static bearer auth exists only for local/laboratory acceptance. The public write-capable ChatGPT path uses OAuth/OIDC. Current OpenAI guidance states that ChatGPT does not present custom API keys to MCP servers.
 
 ## Transport
 
