@@ -19,7 +19,12 @@ type Request struct {
 	Type    string `json:"type"`
 	Path    string `json:"path,omitempty"`
 	Content string `json:"content,omitempty"`
-	Service string `json:"service,omitempty"`
+	Service       string `json:"service,omitempty"`
+	Directory     string `json:"directory,omitempty"`
+	HTMLPath      string `json:"html_path,omitempty"`
+	HTMLContent   string `json:"html_content,omitempty"`
+	SecondPath    string `json:"second_path,omitempty"`
+	SecondContent string `json:"second_content,omitempty"`
 }
 
 type Evidence struct {
@@ -91,6 +96,25 @@ func main() {
 		ev.Steps = append(ev.Steps, call(ctx, session, "file.read_test", map[string]any{
 			"path": req.Path,
 		}, true))
+	case "directory_html_and_file":
+		if req.Directory == "" || req.HTMLPath == "" || req.SecondPath == "" {
+			must(errors.New("directory, html_path and second_path are required"))
+		}
+		ev.Steps = append(ev.Steps, call(ctx, session, "file.mkdir", map[string]any{
+			"path": req.Directory,
+		}, false))
+		ev.Steps = append(ev.Steps, call(ctx, session, "file.write", map[string]any{
+			"path": req.HTMLPath, "content": req.HTMLContent,
+		}, false))
+		ev.Steps = append(ev.Steps, call(ctx, session, "file.read", map[string]any{
+			"path": req.HTMLPath,
+		}, false))
+		ev.Steps = append(ev.Steps, call(ctx, session, "file.write", map[string]any{
+			"path": req.SecondPath, "content": req.SecondContent,
+		}, false))
+		ev.Steps = append(ev.Steps, call(ctx, session, "file.read", map[string]any{
+			"path": req.SecondPath,
+		}, false))
 	case "service_restart":
 		if req.Service == "" {
 			must(errors.New("service is required"))
