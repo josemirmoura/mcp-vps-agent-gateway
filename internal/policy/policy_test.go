@@ -137,3 +137,29 @@ func FuzzPolicyLoadNeverPanics(f *testing.F) {
 		_, _ = Load(p)
 	})
 }
+
+func TestPhysicalScopeRejectsPolicyEscape(t *testing.T) {
+	cfg := &Config{
+		Version: 1, Mode: "scoped",
+		Filesystem: FilesystemPolicy{Read: []string{"/opt/app"}, Write: []string{"/opt/app/data"}},
+		Shell: ShellPolicy{Enabled: true, CWDRoots: []string{"/opt/app"}},
+		Compose: ResourcePolicy{Inspect: []string{"/opt/app"}, Manage: []string{"/opt/app"}},
+	}
+	if err := cfg.ValidatePhysicalScope("/opt", false); err != nil {
+		t.Fatalf("expected scope to fit: %v", err)
+	}
+	cfg.Filesystem.Read = append(cfg.Filesystem.Read, "/etc")
+	if err := cfg.ValidatePhysicalScope("/opt", false); err == nil {
+		t.Fatal("expected physical scope escape rejection")
+	}
+}
+
+func TestPhysicalScopeRequiresExplicitWholeHost(t *testing.T) {
+	cfg := &Config{Version: 1, Mode: "scoped", Filesystem: FilesystemPolicy{Read: []string{"/"}}}
+	if err := cfg.ValidatePhysicalScope("/", false); err == nil {
+		t.Fatal("expected explicit whole-host requirement")
+	}
+	if err := cfg.ValidatePhysicalScope("/", true); err != nil {
+		t.Fatalf("explicit whole-host should pass: %v", err)
+	}
+}
