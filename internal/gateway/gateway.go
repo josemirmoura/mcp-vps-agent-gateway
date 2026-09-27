@@ -112,6 +112,15 @@ type fileWriteOutput struct {
 	Bytes   int  `json:"bytes"`
 }
 
+type fileMkdirInput struct {
+	Path string `json:"path" jsonschema:"absolute directory path inside an authorized writable root"`
+}
+
+type fileMkdirOutput struct {
+	Path    string `json:"path"`
+	Created bool   `json:"created"`
+}
+
 type serviceInput struct {
 	Name string `json:"name" jsonschema:"canonical systemd unit name"`
 }
@@ -183,6 +192,34 @@ func NewMCPServer(exec Executor) *mcp.Server {
 			var out fileWriteOutput
 			args, _ := json.Marshal(map[string]any{"content": in.Content})
 			if err := s.call(ctx, "file.write_test", in.Path, "", args, &out, true, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "file.read", Description: "Read a bounded text file only from server-authorized filesystem roots."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in fileReadInput) (*mcp.CallToolResult, fileReadOutput, error) {
+			var out fileReadOutput
+			if err := s.call(ctx, "file.read", in.Path, "", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "file.write", Description: "Atomically write a bounded text file only inside server-authorized writable roots."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in fileWriteInput) (*mcp.CallToolResult, fileWriteOutput, error) {
+			var out fileWriteOutput
+			args, _ := json.Marshal(map[string]any{"content": in.Content})
+			if err := s.call(ctx, "file.write", in.Path, "", args, &out, true, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "file.mkdir", Description: "Create an authorized directory tree without following symlink components."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in fileMkdirInput) (*mcp.CallToolResult, fileMkdirOutput, error) {
+			var out fileMkdirOutput
+			if err := s.call(ctx, "file.mkdir", in.Path, "mkdir", nil, &out, true, ""); err != nil {
 				return nil, out, err
 			}
 			return nil, out, nil
