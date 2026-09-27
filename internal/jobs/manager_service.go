@@ -22,7 +22,24 @@ func (m *Manager) Start(ctx context.Context, subject, tool, resource, grantID st
 	if spec.Unit == "" {
 		return state.JobRecord{}, errors.New("job unit is required")
 	}
-	deadline := time.Now().Add(spec.Runtime)
+	now := time.Now()
+	deadline := now.Add(spec.Runtime)
+	if grantID != "" {
+		grant, err := m.State.GetGrant(ctx, grantID)
+		if err != nil {
+			return state.JobRecord{}, fmt.Errorf("load job grant: %w", err)
+		}
+		if grant.Subject != subject || grant.Revoked || !grant.ExpiresAt.After(now) {
+			return state.JobRecord{}, errors.New("job grant is invalid, revoked, expired, or belongs to another subject")
+		}
+		if grant.ExpiresAt.Before(deadline) {
+			deadline = grant.ExpiresAt
+		}
+		spec.Runtime = time.Until(deadline)
+		if spec.Runtime <= 0 {
+			return state.JobRecord{}, errors.New("job deadline has already expired")
+		}
+	}
 	rec := state.JobRecord{
 		ID: spec.Unit, Subject: subject, Tool: tool, Resource: resource,
 		UnitName: spec.Unit, GrantID: grantID, State: "starting", Deadline: deadline,
