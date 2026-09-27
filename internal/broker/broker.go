@@ -45,6 +45,7 @@ func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
 	}
 	if b.State != nil {
 		_, _ = b.State.AppendAudit(ctx, state.AuditEvent{
+			InstanceID: b.InstanceID, InstanceName: b.InstanceName,
 			Subject: req.Subject, Tool: req.Tool, Resource: req.Resource,
 			Decision: decision, ActionID: req.InvocationID,
 		})
