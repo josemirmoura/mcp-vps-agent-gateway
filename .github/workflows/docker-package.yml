@@ -136,15 +136,6 @@ jobs:
       - name: Start Docker package
         run: docker compose up -d
 
-      - name: Reject unauthorized Broker socket peer
-        run: |
-          docker run --rm --user 1000:1000 \
-            -v mcp-vps-agent_broker-run:/run/vps-agent:ro \
-            busybox:1.37 sh -ec '
-              test ! -r /run/vps-agent/broker.sock
-              test ! -w /run/vps-agent/broker.sock
-            '
-
       - name: Wait for package health
         shell: bash
         run: |
@@ -161,6 +152,23 @@ jobs:
           docker compose ps
           docker compose logs --no-color > evidence/compose-failure.log || true
           exit 1
+
+      - name: Healthcheck regression and Broker socket isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Historical Gateway failure was caused by the healthcheck command
+          # not existing in the runtime image. Prove both the dependency and
+          # the real endpoint, rather than weakening the healthcheck.
+          docker compose exec -T gateway sh -ec 'command -v curl >/dev/null; curl -fsS http://127.0.0.1:8080/healthz'
+          test -S /var/lib/docker/volumes/mcp-vps-agent_broker-run/_data/broker.sock
+          docker run --rm --user 1000:1000 \
+            -v mcp-vps-agent_broker-run:/run/vps-agent:ro \
+            busybox:1.37 sh -ec '
+              test -S /run/vps-agent/broker.sock
+              test ! -r /run/vps-agent/broker.sock
+              test ! -w /run/vps-agent/broker.sock
+            '
 
       - name: Create MCP helper
         shell: bash
