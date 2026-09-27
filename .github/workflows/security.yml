@@ -1,0 +1,89 @@
+name: security-gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-security:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Go vulnerability database
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+      - name: Gosec
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
+          gosec -fmt=json -out=gosec.json ./...
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload source-security report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: source-security
+          path: gosec.json
+          if-no-files-found: ignore
+
+  image-security:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build release-equivalent local images
+        run: |
+          docker build --target gateway -t mcp-vps-agent-gateway:security .
+          docker build --target broker -t mcp-vps-agent-broker:security .
+      - name: Scan Gateway image for critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: mcp-vps-agent-gateway:security
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Scan Broker image for critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: mcp-vps-agent-broker:security
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Gateway SBOM
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: mcp-vps-agent-gateway:security
+          format: cyclonedx
+          output: sbom-gateway.cdx.json
+          exit-code: '0'
+      - name: Broker SBOM
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: mcp-vps-agent-broker:security
+          format: cyclonedx
+          output: sbom-broker.cdx.json
+          exit-code: '0'
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@v6
+        with:
+          name: sbom
+          path: |
+            sbom-gateway.cdx.json
+            sbom-broker.cdx.json
