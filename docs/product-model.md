@@ -280,7 +280,7 @@ Therefore:
 The primary operator flow is intentionally terminal- and AI-friendly:
 
 ~~~bash
-sudo install -d -o "$USER" -g "$USER" -m 0750 /opt/vps-agent-sandbox
+sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 /opt/vps-agent-sandbox
 bash scripts/init.sh --scope /opt/vps-agent-sandbox
 # optionally refine config/policy.yaml and .env
 docker compose up -d --build
