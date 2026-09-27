@@ -1,0 +1,150 @@
+services:
+  gateway:
+    networks:
+      - default
+      - public-edge
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${VPS_AGENT_EDGE_NETWORK:?set VPS_AGENT_EDGE_NETWORK}
+      - traefik.http.services.vps-agent-gateway.loadbalancer.server.port=8080
+      - traefik.http.routers.vps-agent-mcp.rule=Host(`${VPS_AGENT_DOMAIN}`) && (PathPrefix(`/mcp`) || Path(`/healthz`) || Path(`/.well-known/oauth-protected-resource`))
+      - traefik.http.routers.vps-agent-mcp.entrypoints=websecure
+      - traefik.http.routers.vps-agent-mcp.tls=true
+      - traefik.http.routers.vps-agent-mcp.tls.certresolver=${VPS_AGENT_TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.vps-agent-mcp.priority=1000
+
+  zitadel-postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${ZITADEL_POSTGRES_DB:-zitadel}
+      POSTGRES_USER: ${ZITADEL_POSTGRES_USER:-zitadel}
+      POSTGRES_PASSWORD: ${ZITADEL_POSTGRES_PASSWORD:?set ZITADEL_POSTGRES_PASSWORD}
+    volumes:
+      - zitadel-postgres-data:/var/lib/postgresql/data
+    networks:
+      - integrated-auth
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d ${ZITADEL_POSTGRES_DB:-zitadel} -U ${ZITADEL_POSTGRES_USER:-zitadel}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  zitadel-api:
+    image: ghcr.io/zitadel/zitadel:${ZITADEL_VERSION:-v4.19.1}
+    restart: unless-stopped
+    user: "0"
+    command: ["start-from-init", "--masterkey", "${ZITADEL_MASTERKEY:?set ZITADEL_MASTERKEY}"]
+    environment:
+      ZITADEL_PORT: "8080"
+      ZITADEL_EXTERNALDOMAIN: ${VPS_AGENT_DOMAIN:?set VPS_AGENT_DOMAIN}
+      ZITADEL_EXTERNALPORT: "443"
+      ZITADEL_EXTERNALSECURE: "true"
+      ZITADEL_TLS_ENABLED: "false"
+      ZITADEL_DATABASE_POSTGRES_DSN: postgresql://${ZITADEL_POSTGRES_USER:-zitadel}:${ZITADEL_POSTGRES_PASSWORD}@zitadel-postgres:5432/${ZITADEL_POSTGRES_DB:-zitadel}?sslmode=disable
+
+      ZITADEL_FIRSTINSTANCE_INSTANCENAME: VPS Agent Identity
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: VPS Agent
+      ZITADEL_FIRSTINSTANCE_PATPATH: /zitadel/bootstrap/bootstrap-admin.pat
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: vps-agent-bootstrap
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: VPS Agent Bootstrap
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: ${ZITADEL_BOOTSTRAP_PAT_EXPIRATION:?set ZITADEL_BOOTSTRAP_PAT_EXPIRATION}
+
+      ZITADEL_FIRSTINSTANCE_LOGINCLIENTPATPATH: /zitadel/bootstrap/login-client.pat
+      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_USERNAME: login-client
+      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_NAME: VPS Agent Login Client
+      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_PAT_EXPIRATIONDATE: ${ZITADEL_LOGIN_PAT_EXPIRATION:?set ZITADEL_LOGIN_PAT_EXPIRATION}
+
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "true"
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_BASEURI: https://${VPS_AGENT_DOMAIN}/ui/v2/login/
+      ZITADEL_OIDC_DEFAULTLOGINURLV2: https://${VPS_AGENT_DOMAIN}/ui/v2/login/login?authRequest=
+      ZITADEL_OIDC_DEFAULTLOGOUTURLV2: https://${VPS_AGENT_DOMAIN}/ui/v2/login/logout?post_logout_redirect=
+      ZITADEL_SAML_DEFAULTLOGINURLV2: https://${VPS_AGENT_DOMAIN}/ui/v2/login/login?samlRequest=
+
+      ZITADEL_TELEMETRY_ENABLED: "false"
+      ZITADEL_LOGSTORE_ACCESS_STDOUT_ENABLED: "true"
+    volumes:
+      - zitadel-bootstrap:/zitadel/bootstrap
+    networks:
+      - integrated-auth
+      - public-edge
+    depends_on:
+      zitadel-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/zitadel", "ready"]
+      interval: 10s
+      timeout: 30s
+      retries: 18
+      start_period: 20s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${VPS_AGENT_EDGE_NETWORK}
+      - traefik.http.services.vps-agent-zitadel-api.loadbalancer.server.port=8080
+      - traefik.http.services.vps-agent-zitadel-api.loadbalancer.server.scheme=h2c
+      - traefik.http.middlewares.vps-agent-https-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.vps-agent-https-redirect.redirectscheme.permanent=true
+      - traefik.http.routers.vps-agent-auth-http.rule=Host(`${VPS_AGENT_DOMAIN}`)
+      - traefik.http.routers.vps-agent-auth-http.entrypoints=web
+      - traefik.http.routers.vps-agent-auth-http.middlewares=vps-agent-https-redirect
+      - traefik.http.routers.vps-agent-auth-http.service=vps-agent-zitadel-api
+      - traefik.http.routers.vps-agent-auth-http.priority=100
+      - traefik.http.routers.vps-agent-auth.rule=Host(`${VPS_AGENT_DOMAIN}`)
+      - traefik.http.routers.vps-agent-auth.entrypoints=websecure
+      - traefik.http.routers.vps-agent-auth.tls=true
+      - traefik.http.routers.vps-agent-auth.tls.certresolver=${VPS_AGENT_TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.vps-agent-auth.service=vps-agent-zitadel-api
+      - traefik.http.routers.vps-agent-auth.priority=100
+
+  zitadel-login:
+    image: ghcr.io/zitadel/zitadel-login:${ZITADEL_VERSION:-v4.19.1}
+    restart: unless-stopped
+    user: "0"
+    environment:
+      ZITADEL_API_URL: http://zitadel-api:8080
+      NEXT_PUBLIC_BASE_PATH: /ui/v2/login
+      ZITADEL_SERVICE_USER_TOKEN_FILE: /zitadel/bootstrap/login-client.pat
+      CUSTOM_REQUEST_HEADERS: Host:${VPS_AGENT_DOMAIN},X-Forwarded-Proto:https
+    volumes:
+      - zitadel-bootstrap:/zitadel/bootstrap:ro
+    networks:
+      - integrated-auth
+      - public-edge
+    depends_on:
+      zitadel-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "node /app/healthcheck.mjs http://localhost:3000/ui/v2/login/healthy"]
+      interval: 10s
+      timeout: 30s
+      retries: 18
+      start_period: 20s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${VPS_AGENT_EDGE_NETWORK}
+      - traefik.http.services.vps-agent-zitadel-login.loadbalancer.server.port=3000
+      - traefik.http.middlewares.vps-agent-login-root.replacepath.path=/ui/v2/login/
+      - traefik.http.routers.vps-agent-login.rule=Host(`${VPS_AGENT_DOMAIN}`) && PathPrefix(`/ui/v2/login`)
+      - traefik.http.routers.vps-agent-login.entrypoints=websecure
+      - traefik.http.routers.vps-agent-login.tls=true
+      - traefik.http.routers.vps-agent-login.tls.certresolver=${VPS_AGENT_TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.vps-agent-login.service=vps-agent-zitadel-login
+      - traefik.http.routers.vps-agent-login.priority=500
+      - traefik.http.routers.vps-agent-login-root.rule=Host(`${VPS_AGENT_DOMAIN}`) && Path(`/`)
+      - traefik.http.routers.vps-agent-login-root.entrypoints=websecure
+      - traefik.http.routers.vps-agent-login-root.tls=true
+      - traefik.http.routers.vps-agent-login-root.tls.certresolver=${VPS_AGENT_TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.vps-agent-login-root.middlewares=vps-agent-login-root
+      - traefik.http.routers.vps-agent-login-root.service=vps-agent-zitadel-login
+      - traefik.http.routers.vps-agent-login-root.priority=600
+
+networks:
+  integrated-auth:
+  public-edge:
+    external: true
+    name: ${VPS_AGENT_EDGE_NETWORK:?set VPS_AGENT_EDGE_NETWORK}
+
+volumes:
+  zitadel-postgres-data:
+  zitadel-bootstrap:
