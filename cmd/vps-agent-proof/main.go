@@ -65,7 +65,7 @@ func main() {
 	client := mcp.NewClient(&mcp.Implementation{Name: "vps-agent-proof", Version: "v1"}, nil)
 	transport := &mcp.StreamableClientTransport{Endpoint: endpoint}
 	if token != "" {
-		transport.HTTPClient = &httpClientWithBearer{token: token}
+		transport.HTTPClient = &http.Client{Transport: bearerRoundTripper{token: token}}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -162,12 +162,12 @@ func dir(p string) string {
 }
 
 // RoundTripper wrapper avoids coupling proof code to server internals.
-type httpClientWithBearer struct {
+type bearerRoundTripper struct {
 	token string
 }
 
-func (h *httpClientWithBearer) Do(req *http.Request) (*http.Response, error) {
+func (h bearerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	req = req.Clone(req.Context())
 	req.Header.Set("Authorization", "Bearer "+h.token)
-	return http.DefaultClient.Do(req)
+	return http.DefaultTransport.RoundTrip(req)
 }
