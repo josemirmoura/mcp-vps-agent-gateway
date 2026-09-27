@@ -2,6 +2,41 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+usage() {
+  cat <<'EOF'
+usage: bash scripts/init.sh [--scope /absolute/existing/path]
+
+Options:
+  --scope PATH   Set the physical Scoped filesystem ceiling in .env.
+                 If the policy still references the previous scope, those
+                 paths are migrated to the new scope.
+  -h, --help     Show this help.
+EOF
+}
+
+SCOPE_OVERRIDE=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --scope)
+      if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+        echo "ERROR: --scope requires an absolute path." >&2
+        exit 2
+      fi
+      SCOPE_OVERRIDE="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "ERROR: unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is required." >&2
   exit 1
@@ -19,7 +54,7 @@ if [ ! -f .env ]; then
   chmod 600 .env
   echo "Created .env with random tokens."
 else
-  echo ".env already exists; leaving it unchanged."
+  echo ".env already exists; preserving existing secrets and identity."
 fi
 
 mkdir -p state
@@ -30,7 +65,7 @@ if [ ! -f config/policy.yaml ]; then
   chmod 600 config/policy.yaml
   echo "Created config/policy.yaml from the versioned template."
 else
-  echo "config/policy.yaml already exists; leaving operator policy unchanged."
+  echo "config/policy.yaml already exists; preserving operator policy."
 fi
 
 if grep -q 'CHANGE_ME_' .env; then
@@ -41,10 +76,72 @@ fi
 set -a
 . ./.env
 set +a
+OLD_SCOPE_ROOT="\${VPS_AGENT_SCOPE_ROOT:-}"
 
-SCOPE_ROOT="${VPS_AGENT_SCOPE_ROOT:-}"
+if [ -n "$SCOPE_OVERRIDE" ]; then
+  if [[ "$SCOPE_OVERRIDE" != /* ]]; then
+    echo "ERROR: --scope must be an absolute path: $SCOPE_OVERRIDE" >&2
+    exit 1
+  fi
+
+  NORMALIZED_OVERRIDE="$(python3 - "$SCOPE_OVERRIDE" <<'PY'
+import os
+import sys
+print(os.path.normpath(sys.argv[1]))
+PY
+)"
+  if [ "$NORMALIZED_OVERRIDE" != "$SCOPE_OVERRIDE" ]; then
+    echo "ERROR: --scope must be canonical (no '..', '.' or trailing slash): $SCOPE_OVERRIDE" >&2
+    exit 1
+  fi
+
+  python3 - ".env" "$SCOPE_OVERRIDE" <<'PY'
+import pathlib
+import shlex
+import sys
+
+path = pathlib.Path(sys.argv[1])
+value = sys.argv[2]
+key = "VPS_AGENT_SCOPE_ROOT"
+lines = path.read_text().splitlines()
+replacement = f"{key}={shlex.quote(value)}"
+out = []
+replaced = False
+for line in lines:
+    if line.startswith(key + "="):
+        out.append(replacement)
+        replaced = True
+    else:
+        out.append(line)
+if not replaced:
+    out.append(replacement)
+path.write_text("\n".join(out) + "\n")
+PY
+
+  if [ -n "$OLD_SCOPE_ROOT" ] && [ "$OLD_SCOPE_ROOT" != "$SCOPE_OVERRIDE" ]; then
+    python3 - "config/policy.yaml" "$OLD_SCOPE_ROOT" "$SCOPE_OVERRIDE" <<'PY'
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+old = sys.argv[2]
+new = sys.argv[3]
+text = path.read_text()
+if old != "/" and old in text:
+    text = text.replace(old, new)
+    path.write_text(text)
+    print(f"Migrated policy paths from {old} to {new}.")
+else:
+    print("Policy did not contain the previous scoped root; leaving policy paths unchanged.")
+PY
+  fi
+
+  VPS_AGENT_SCOPE_ROOT="$SCOPE_OVERRIDE"
+fi
+
+SCOPE_ROOT="\${VPS_AGENT_SCOPE_ROOT:-}"
 if [ -z "$SCOPE_ROOT" ]; then
-  echo "ERROR: set VPS_AGENT_SCOPE_ROOT in .env before starting the Scoped package." >&2
+  echo "ERROR: set VPS_AGENT_SCOPE_ROOT in .env or pass --scope /absolute/path." >&2
   exit 1
 fi
 if [[ "$SCOPE_ROOT" != /* ]]; then
@@ -61,6 +158,7 @@ if [ "$NORMALIZED_SCOPE_ROOT" != "$SCOPE_ROOT" ]; then
   echo "ERROR: VPS_AGENT_SCOPE_ROOT must be canonical (no '..', '.' or trailing slash): $SCOPE_ROOT" >&2
   exit 1
 fi
+
 if [ "$SCOPE_ROOT" = "/" ]; then
   echo "NOTE: whole-host authority requires the explicit compose.host.yaml override."
 else
@@ -72,9 +170,20 @@ else
     fi
     CHECK_PATH="$(dirname "$CHECK_PATH")"
   done
+
   if [ ! -d "$SCOPE_ROOT" ]; then
-    echo "NOTE: VPS_AGENT_SCOPE_ROOT does not exist yet: $SCOPE_ROOT"
-    echo "Create that directory or change .env before docker compose up."
+    cat >&2 <<EOF
+ERROR: VPS_AGENT_SCOPE_ROOT does not exist: $SCOPE_ROOT
+
+Create it first, for example:
+  sudo install -d -o "\$USER" -g "\$USER" -m 0750 "$SCOPE_ROOT"
+
+Or choose an existing directory:
+  bash scripts/init.sh --scope /absolute/existing/path
+
+Nothing has been started.
+EOF
+    exit 1
   fi
 fi
 
@@ -84,15 +193,18 @@ cat <<EOF
 
 Bootstrap ready.
 
-1. Review .env and choose the physical Scoped ceiling:
-     VPS_AGENT_SCOPE_ROOT=$SCOPE_ROOT
-   The directory must exist before startup.
-2. Edit config/policy.yaml. Filesystem, shell and Compose paths must stay inside that ceiling.
-3. Start Scoped mode:
-     docker compose up -d --build
-   Whole-host is a separate explicit override:
-     docker compose -f compose.yaml -f compose.host.yaml up -d --build
-4. Verify:
-     bash scripts/verify.sh
+Scoped filesystem ceiling:
+  $SCOPE_ROOT
+
+Optional: review .env and config/policy.yaml before startup.
+
+Start Scoped mode:
+  docker compose up -d --build
+
+Whole-host is a separate explicit override:
+  docker compose -f compose.yaml -f compose.host.yaml up -d --build
+
+Verify:
+  bash scripts/verify.sh
 
 EOF
