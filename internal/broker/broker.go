@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"runtime"
@@ -50,6 +51,11 @@ func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
 			Decision: decision, ActionID: req.InvocationID,
 		})
 	}
+	slog.InfoContext(ctx, "broker_request",
+		"instance_id", b.InstanceID, "instance_name", b.InstanceName,
+		"request_id", req.ID, "invocation_id", req.InvocationID,
+		"subject", req.Subject, "tool", req.Tool, "resource", req.Resource,
+		"decision", decision)
 	return resp
 }
 
