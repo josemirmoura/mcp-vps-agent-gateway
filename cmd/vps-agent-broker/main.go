@@ -24,7 +24,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fs, err := securefs.New(cfg.FileRoots(false), cfg.FileRoots(true), securefs.DefaultMaxBytes)
+	fs, err := securefs.NewWithHostRoot(
+		cfg.FileRoots(false),
+		cfg.FileRoots(true),
+		securefs.DefaultMaxBytes,
+		os.Getenv("VPS_AGENT_HOST_ROOT"),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
