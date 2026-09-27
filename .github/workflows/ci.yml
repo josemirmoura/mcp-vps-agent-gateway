@@ -21,6 +21,8 @@ jobs:
           cache: true
       - name: Resolve module graph
         run: go mod download
+      - name: Validate shell scripts
+        run: bash -n scripts/*.sh
       - name: Format ephemeral workspace
         run: gofmt -w $(find . -name '*.go' -type f -print)
       - name: Vet
