@@ -2,7 +2,7 @@
 
 Security-first reference architecture for connecting ChatGPT or another MCP client to a Linux VPS without making the model a trusted security boundary.
 
-> **Status: PRE-ALPHA / DOCS-FIRST.** There is no production-ready binary or stable release yet.
+> **Status: PRE-ALPHA / EXECUTABLE REFERENCE IMPLEMENTATION.** Go code now exists and is validated on disposable GitHub-hosted Ubuntu runners. There is still no stable production release.
 
 ## What this project is
 
@@ -39,7 +39,7 @@ Today this repository is not:
 - a generic root shell for AI
 - a promise that every ChatGPT plan supports private MCP write access
 
-The complete design is a north star. Implementation is intentionally MVP-first.
+The complete design is a north star. The repository now contains an MVP-first Go reference implementation, but it is not yet production-ready.
 
 ## Modes
 
@@ -92,9 +92,16 @@ As of 2026-09-26, OpenAI documents private full MCP write/modify in Developer Mo
 
 See [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
 
-### 4. Build only Gate 0B
+### 4. Validate the executable reference implementation
 
-Expose only:
+~~~bash
+go test -race ./...
+go build ./cmd/...
+~~~
+
+The GitHub workflows additionally validate Docker, systemd, vulnerability scanning and real MCP-to-Broker Linux effects. See [docs/implementation-validation.md](docs/implementation-validation.md).
+
+The Gate 0B baseline exposes:
 
 ~~~text
 system.info
@@ -110,14 +117,12 @@ Restrict file access to:
 
 Do not add root, Docker, SQLite, Full, approval or generic shell yet.
 
-### 5. Give this to a coding agent
+### 5. Continue gate-by-gate
 
 ~~~text
-Read AGENTS.md, docs/README.md and docs/mvp-first.md.
-Implement Gate 0B only using Go and the official MCP Go SDK.
-Do not implement privileged execution, Docker access, Full mode,
-approval, SQLite or a generic shell.
-Add tests for path confinement, invalid inputs and clear errors.
+Read AGENTS.md, docs/README.md, docs/mvp-first.md and docs/implementation-validation.md.
+Inspect the current implementation and CI evidence.
+Advance only the next unproven gate; do not enable Full or generic admin shell early.
 ~~~
 
 ## The implementation ladder
