@@ -50,3 +50,46 @@ func TestJobPersistence(t *testing.T) {
 		t.Fatalf("updated=%+v", got)
 	}
 }
+
+
+func TestRevokeAllInvalidatesGrantsAndPendingApprovals(t *testing.T) {
+	s := openTestStore(t)
+	ctx := context.Background()
+
+	grant, err := s.IssueGrant(ctx, "alice", []string{"shell.admin"}, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approval, err := s.CreateApproval(ctx, "alice", []string{"shell.admin"}, time.Minute, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.RevokeAll(ctx); err != nil {
+		t.Fatal(err)
+	}
+	valid, err := s.ValidateGrant(ctx, grant.ID, "alice", "shell.admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if valid {
+		t.Fatal("revoke-all left an existing grant valid")
+	}
+	pending, err := s.ListPendingApprovals(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pending) != 0 {
+		t.Fatalf("revoke-all left pending approvals: %+v", pending)
+	}
+	got, err := s.GetApproval(ctx, approval.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "revoked" {
+		t.Fatalf("approval status=%q, want revoked", got.Status)
+	}
+	if _, err := s.DecideApproval(ctx, approval.ID, "approved"); err == nil {
+		t.Fatal("revoked approval could still be approved")
+	}
+}
