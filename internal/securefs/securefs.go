@@ -21,9 +21,14 @@ type Manager struct {
 	readRoots  []string
 	writeRoots []string
 	maxBytes   int64
+	hostRoot   string
 }
 
 func New(readRoots, writeRoots []string, maxBytes int64) (*Manager, error) {
+	return NewWithHostRoot(readRoots, writeRoots, maxBytes, "")
+}
+
+func NewWithHostRoot(readRoots, writeRoots []string, maxBytes int64, hostRoot string) (*Manager, error) {
 	if maxBytes <= 0 {
 		maxBytes = DefaultMaxBytes
 	}
@@ -46,7 +51,27 @@ func New(readRoots, writeRoots []string, maxBytes int64) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Manager{readRoots: rr, writeRoots: wr, maxBytes: maxBytes}, nil
+	if hostRoot != "" {
+		if !filepath.IsAbs(hostRoot) {
+			return nil, errors.New("host root must be absolute")
+		}
+		hostRoot = filepath.Clean(hostRoot)
+		if hostRoot == "/" {
+			hostRoot = ""
+		}
+	}
+	return &Manager{readRoots: rr, writeRoots: wr, maxBytes: maxBytes, hostRoot: hostRoot}, nil
+}
+
+func (m *Manager) physical(canonical string) string {
+	if m.hostRoot == "" {
+		return canonical
+	}
+	clean := filepath.Clean(canonical)
+	if clean == "/" {
+		return m.hostRoot
+	}
+	return filepath.Join(m.hostRoot, strings.TrimPrefix(clean, string(filepath.Separator)))
 }
 
 func rejectTraversal(p string) error {
@@ -153,11 +178,13 @@ func (m *Manager) MkdirAll(dirname string, perm os.FileMode) error {
 	}
 	target = filepath.Clean(target)
 
-	anchor, err := nearestExistingDir(allowedRoot)
+	physicalAllowedRoot := m.physical(allowedRoot)
+	physicalTarget := m.physical(target)
+	anchor, err := nearestExistingDir(physicalAllowedRoot)
 	if err != nil {
 		return err
 	}
-	rel, err := filepath.Rel(anchor, target)
+	rel, err := filepath.Rel(anchor, physicalTarget)
 	if err != nil {
 		return err
 	}
@@ -233,7 +260,7 @@ func (m *Manager) Stat(filename string, write bool) (Entry, error) {
 	if err != nil {
 		return Entry{}, err
 	}
-	root, err := os.OpenRoot(rootPath)
+	root, err := os.OpenRoot(m.physical(rootPath))
 	if err != nil {
 		return Entry{}, err
 	}
@@ -256,7 +283,7 @@ func (m *Manager) List(dirname string, limit int) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	root, err := os.OpenRoot(rootPath)
+	root, err := os.OpenRoot(m.physical(rootPath))
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +314,7 @@ func (m *Manager) Hash(filename string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	root, err := os.OpenRoot(rootPath)
+	root, err := os.OpenRoot(m.physical(rootPath))
 	if err != nil {
 		return "", err
 	}
@@ -348,7 +375,7 @@ func (m *Manager) CopyFile(src, dst string) error {
 	if dstRel == "." {
 		return errors.New("destination cannot be an authorized root directory")
 	}
-	srcRoot, err := os.OpenRoot(srcRootPath)
+	srcRoot, err := os.OpenRoot(m.physical(srcRootPath))
 	if err != nil {
 		return err
 	}
@@ -369,7 +396,7 @@ func (m *Manager) CopyFile(src, dst string) error {
 		return fmt.Errorf("file exceeds copy limit of %d bytes", MaxCopyBytes)
 	}
 
-	dstRoot, err := os.OpenRoot(dstRootPath)
+	dstRoot, err := os.OpenRoot(m.physical(dstRootPath))
 	if err != nil {
 		return err
 	}
@@ -424,7 +451,7 @@ func (m *Manager) Move(src, dst string) error {
 		return errors.New("cannot move an authorized root directory")
 	}
 	if srcRootPath == dstRootPath {
-		root, err := os.OpenRoot(srcRootPath)
+		root, err := os.OpenRoot(m.physical(srcRootPath))
 		if err != nil {
 			return err
 		}
@@ -470,7 +497,7 @@ func (m *Manager) Remove(target string, recursive bool) error {
 	if rel == "." {
 		return errors.New("refusing to delete an authorized root itself")
 	}
-	root, err := os.OpenRoot(rootPath)
+	root, err := os.OpenRoot(m.physical(rootPath))
 	if err != nil {
 		return err
 	}
@@ -496,7 +523,7 @@ func (m *Manager) Chmod(target string, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	root, err := os.OpenRoot(rootPath)
+	root, err := os.OpenRoot(m.physical(rootPath))
 	if err != nil {
 		return err
 	}
@@ -517,7 +544,7 @@ func (m *Manager) Chown(target string, uid, gid int) error {
 	if err != nil {
 		return err
 	}
-	root, err := os.OpenRoot(rootPath)
+	root, err := os.OpenRoot(m.physical(rootPath))
 	if err != nil {
 		return err
 	}
@@ -535,7 +562,7 @@ func (m *Manager) ReadFile(filename string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	root, err := os.OpenRoot(rootPath)
+	root, err := os.OpenRoot(m.physical(rootPath))
 	if err != nil {
 		return nil, err
 	}
@@ -569,7 +596,7 @@ func (m *Manager) WriteFileAtomic(filename string, data []byte) error {
 	if rel == "." {
 		return errors.New("cannot overwrite root directory")
 	}
-	root, err := os.OpenRoot(rootPath)
+	root, err := os.OpenRoot(m.physical(rootPath))
 	if err != nil {
 		return err
 	}
