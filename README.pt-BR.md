@@ -1,161 +1,124 @@
 # MCP VPS Agent Gateway
 
-Arquitetura de referência orientada a segurança para conectar ChatGPT ou outro cliente MCP a uma VPS Linux sem transformar o modelo em fronteira de segurança.
+Plano de controle MCP orientado a segurança para permitir que ChatGPT ou outro cliente MCP trabalhe numa VPS Linux com a autoridade escolhida explicitamente pelo dono da VPS.
 
-> **Status: PRE-ALPHA / IMPLEMENTAÇÃO DE REFERÊNCIA EXECUTÁVEL.** Já existe código Go validado em runners Ubuntu efêmeros do GitHub. Ainda não existe release estável de produção.
+> **Status: pre-alpha / pacote Docker de referência executável.** O pacote está sendo validado em máquinas Ubuntu limpas e efêmeras do GitHub. Ainda não é um release estável de produção.
 
-## O que é
+## A ideia
 
-O alvo é:
+Um único pacote traz a caixa de ferramentas ampla. **Quem decide a porção da VPS entregue ao MCP é o usuário.**
+
+~~~text
+um projeto:         /opt/meu-app
+várias raízes:      /opt/app + /var/www/site + /srv/dados
+filesystem inteiro: /
+~~~
+
+Filesystem é só uma dimensão. A policy controla separadamente shell, units systemd, recursos Docker/Compose, rede, pacotes, usuários/grupos, firewall e administração temporária.
+
+**O LLM nunca é a fronteira de segurança. O servidor decide.**
+
+## Runtime
 
 ~~~text
 ChatGPT Web / cliente MCP
         |
-        | Streamable HTTP
+        | HTTPS + MCP Streamable HTTP
         v
-vps-agent-gateway      sem root
+Gateway container
+sem root, sem /host
         |
-        | Unix socket
+        | Unix socket protegido
         v
-vps-agent-broker       privilegiado, somente local
+Broker container
+fronteira privilegiada
         |
+        | host montado em /host
         v
-Linux / systemd / Docker
+Linux / systemd / Docker / arquivos
 ~~~
 
-O Gateway cuida de MCP, autenticação e schemas.
+Docker é o mecanismo de empacotamento. O Broker continua sendo um componente privilegiado e deve ser tratado como equivalente a root na porção delegada. A policy server-side é autoritativa.
 
-O Broker é a fronteira real de segurança: policy, estado, jobs, filesystem, Docker/systemd, secrets e execução privilegiada.
+## Começo rápido
 
-> **O LLM nunca é a fronteira de segurança.**
-
-## O que ainda não é
-
-Hoje este repositório não é:
-
-- software plug-and-play
-- imagem Docker pronta
-- release de produção
-- shell root genérico para IA
-- garantia de que todo plano do ChatGPT aceite MCP privado com escrita
-
-A arquitetura completa é o norte. O repositório agora contém uma implementação Go MVP-first, ainda não pronta para produção.
-
-## Modos
-
-- **Controlled** — inspeção com mudanças estreitamente controladas.
-- **Scoped** — autonomia dentro de um perímetro explícito.
-- **Full** — pacote temporário de capabilities, opcional e desligado por padrão.
-
-O trabalho rotineiro deve acontecer em Scoped. Full é excepcional.
-
-## Stack de referência
-
-- **Gateway:** Go + SDK MCP oficial para Go
-- **Broker:** Go
-- **IPC:** Unix Domain Socket
-- **Transporte:** MCP Streamable HTTP
-- **Estado:** SQLite, aberto somente pelo Broker
-- **Isolamento:** systemd transient units + cgroups
-- **Segredos:** systemd credentials e/ou arquivos root-owned
-- **Sandbox adicional:** Landlock quando disponível
-- **Entrada:** reverse proxy existente ou túnel privado suportado
-
-Sem Kubernetes, Redis, service mesh ou daemon separado de policy.
-
-## Início rápido
-
-### 1. Clone
+Requisitos: VPS Linux, Docker Engine, plugin Docker Compose, Git e OpenSSL.
 
 ~~~bash
 git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
 cd mcp-vps-agent-gateway
+
+bash scripts/init.sh
 ~~~
 
-### 2. Leia primeiro
-
-~~~text
-docs/README.md
-docs/project-status.md
-docs/mvp-first.md
-docs/architecture.md
-AGENTS.md
-~~~
-
-### 3. Faça o Gate 0A antes de código privilegiado
-
-Valide qual caminho real do ChatGPT será usado.
-
-Em 2026-09-26, a OpenAI documenta MCP privado completo com write/modify em Developer Mode para Business, Enterprise e Edu. Não assuma que Plus Web aceita um MCP privado customizado com escrita.
-
-Veja [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
-
-### 4. Valide a implementação executável
+Depois edite config/policy.yaml e .env.
 
 ~~~bash
-go test -race ./...
-go build ./cmd/...
+docker compose up -d --build
+bash scripts/verify.sh
 ~~~
 
-Os workflows do GitHub também validam Docker, systemd, vulnerabilidades e efeitos reais de MCP -> Broker -> Linux. Veja [docs/implementation-validation.md](docs/implementation-validation.md).
+HTTPS automático opcional com Caddy:
 
-A base do Gate 0B expõe:
+~~~bash
+docker compose -f compose.yaml -f compose.https.yaml up -d --build
+~~~
+
+Defina VPS_AGENT_PUBLIC_URL no .env e execute:
+
+~~~bash
+bash scripts/connect-chatgpt.sh
+~~~
+
+O script mostra o tutorial do ChatGPT Web e depois espera uma **chamada real e auditada de system.info vinda do ChatGPT**. Mostrar o tutorial não conclui a instalação.
 
 ~~~text
-system.info
-file.read_test
-file.write_test
+tutorial
+ -> usuário conecta o ChatGPT
+ -> ChatGPT chama o MCP
+ -> Broker confirma subject
+ -> policy autoriza
+ -> audit registra
+ -> INSTALAÇÃO CONCLUÍDA
 ~~~
 
-Restrinja arquivos a:
+Se a chamada real não chegar, a instalação continua incompleta.
 
-~~~text
-/tmp/vps-agent-poc/
-~~~
+## Caixa de ferramentas
 
-Ainda não adicione root, Docker, SQLite, Full, approval ou shell genérico.
+A implementação atual inclui filesystem completo em escopo, shell/jobs sandboxed, systemd tipado, Docker/Compose, diagnósticos, pacotes, usuários/grupos, UFW, elevação fora do canal MCP, SQLite exclusivo do Broker, journal de operações, fencing locks e audit hash-chain.
 
-### 5. Avance gate por gate
+Uma capability existir no pacote não significa que esteja habilitada. Quem decide é config/policy.yaml.
 
-~~~text
-Leia AGENTS.md, docs/README.md, docs/mvp-first.md e docs/implementation-validation.md.
-Inspecione a implementação e as evidências atuais.
-Avance somente o próximo gate ainda não provado; não habilite Full nem shell administrativo genérico antes da hora.
-~~~
+Delete recursivo, chmod/chown, pacotes, usuários, firewall, rede irrestrita e shell administrativo são escolhas explícitas. file.chmod pode aplicar 0777 se o dono da VPS habilitar essa capability.
 
-## Escada de implementação
+## Segurança
 
-~~~text
-Gate -1   Adotar / adaptar / construir
-Gate 0A   Provar a superfície real do ChatGPT
-Gate 0B   POC MCP seguro de leitura/escrita
-Gate 1    Uma ação privilegiada tipada
-Gate 2    Um stack real em Scoped
-Gate 3    Estado/jobs/secrets duráveis
-Gate 4    Escritas validadas mais amplas
-Gate 5    Elevação temporária opcional
-~~~
+- Gateway roda sem root e não recebe /host.
+- Broker não expõe API TCP; o Gateway usa Unix socket.
+- Broker reautoriza cada chamada privilegiada pela policy.
+- Gateway não recebe Docker socket.
+- filesystem bloqueia traversal e symlink escape.
+- writes usam operation journal e idempotência.
+- mutações usam locks/fencing quando necessário.
+- resultados de tools são dados não confiáveis.
+- Full não implica rede irrestrita.
+- secrets não aparecem em tools genéricas.
 
-Cada gate precisa justificar a próxima camada.
+## Validação
 
-## Segurança central
+O GitHub Actions valida vet, race detector, govulncheck, simulação adversarial, systemd real, Docker real, acceptance Gateway -> Broker -> Linux, acceptance do pacote Docker e testes negativos.
 
-- Gateway nunca roda como root.
-- Gateway nunca recebe Docker socket.
-- Broker reautoriza toda chamada privilegiada.
-- Policy é deny-by-default e autoritativa dentro do Broker.
-- Só o Broker abre o SQLite.
-- Writes replay-safe usam idempotência gerada pela infraestrutura.
-- Writes non-replay-safe nunca recebem retry cego.
-- Filesystem resiste a traversal e symlink escape.
-- Resultados de tools são dados não confiáveis.
-- O modelo não registra MCP downstream dinamicamente.
-- Full nasce desligado e não implica rede irrestrita.
-- Secrets não são expostos por ferramenta genérica de leitura.
+Veja [validação da implementação](docs/implementation-validation.md).
 
 ## Documentação
 
-A ordem canônica e as regras de precedência estão em [docs/README.md](docs/README.md).
+- [Modelo do produto](docs/product-model.md)
+- [Fluxo Docker e primeira execução](docs/installer-flow.md)
+- [Arquitetura](docs/architecture.md)
+- [Integração ChatGPT](docs/chatgpt-integration.md)
+- [Threat model](docs/threat-model.md)
+- [Hardening](docs/security-hardening-v2.md)
 
 ## Licença
 
