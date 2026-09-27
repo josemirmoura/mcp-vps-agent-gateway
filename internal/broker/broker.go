@@ -927,7 +927,10 @@ func (b *Broker) startShellJob(ctx context.Context, req wire.Request, admin bool
 	if networkMode == "" {
 		networkMode = "blocked"
 	}
-	user := "vps-agent-exec"
+	user := b.Policy.Shell.RunAs
+	if user == "" {
+		user = "vps-agent-exec"
+	}
 	if admin {
 		user = "root"
 	}
