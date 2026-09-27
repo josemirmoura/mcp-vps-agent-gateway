@@ -108,3 +108,20 @@ func TestAuditTamperDetected(t *testing.T) {
 		t.Fatal("tampered chain was not detected")
 	}
 }
+
+
+func TestAbortPendingOperationAllowsSafeRetry(t *testing.T) {
+	ctx := context.Background()
+	s := openTestStore(t)
+	d, _, err := s.BeginOperation(ctx, "abortable", "alice", "file.write", "hash")
+	if err != nil || d != OperationExecute {
+		t.Fatalf("begin=%s err=%v", d, err)
+	}
+	if err := s.AbortOperation(ctx, "abortable"); err != nil {
+		t.Fatal(err)
+	}
+	d, _, err = s.BeginOperation(ctx, "abortable", "alice", "file.write", "hash")
+	if err != nil || d != OperationExecute {
+		t.Fatalf("safe retry did not execute: decision=%s err=%v", d, err)
+	}
+}
