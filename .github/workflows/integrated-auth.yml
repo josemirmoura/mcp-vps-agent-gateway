@@ -1,0 +1,154 @@
+name: integrated-auth-component-acceptance
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integrated-auth:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prepare isolated identity stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/vps-agent-auth-ci state
+          cp config/policy.example.yaml config/policy.yaml
+          docker network create ci-edge
+
+          cat > .env <<'EOF'
+          VPS_AGENT_ADMIN_TOKEN=ci-admin-token
+          VPS_AGENT_STATIC_TOKEN=ci-static-token
+          VPS_AGENT_SUBJECT=ci-placeholder
+          VPS_AGENT_INSTANCE_ID=ci-integrated-auth
+          VPS_AGENT_INSTANCE_NAME=ci-integrated-auth
+          VPS_AGENT_SCOPE_ROOT=/tmp/vps-agent-auth-ci
+          VPS_AGENT_WHOLE_HOST=0
+          VPS_AGENT_AUTH_MODE=integrated
+          VPS_AGENT_DOMAIN=mcp.example.invalid
+          VPS_AGENT_PUBLIC_URL=https://mcp.example.invalid/mcp
+          VPS_AGENT_OIDC_ISSUER=https://mcp.example.invalid
+          VPS_AGENT_OIDC_AUDIENCE=
+          VPS_AGENT_OAUTH_RESOURCE=https://mcp.example.invalid/mcp
+          VPS_AGENT_RESOURCE_METADATA_URL=https://mcp.example.invalid/.well-known/oauth-protected-resource
+          VPS_AGENT_REQUIRED_SCOPES=openid
+          VPS_AGENT_EDGE_NETWORK=ci-edge
+          VPS_AGENT_TRAEFIK_CERTRESOLVER=letsencrypt
+          VPS_AGENT_BUNDLED_PROXY=0
+          ZITADEL_VERSION=v4.19.1
+          ZITADEL_MASTERKEY=0123456789abcdef0123456789abcdef
+          ZITADEL_POSTGRES_DB=zitadel
+          ZITADEL_POSTGRES_USER=zitadel
+          ZITADEL_POSTGRES_PASSWORD=CiPostgresPassword123
+          ZITADEL_BOOTSTRAP_ADMIN_PASSWORD=CiBootstrapPassword123!
+          ZITADEL_BOOTSTRAP_PAT_EXPIRATION=2099-01-01T00:00:00Z
+          ZITADEL_LOGIN_PAT_EXPIRATION=2099-01-01T00:00:00Z
+          EOF
+          chmod 600 .env config/policy.yaml
+
+      - name: Start ZITADEL and PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f compose.yaml -f compose.integrated-auth.yaml up -d zitadel-postgres zitadel-api
+          for _ in $(seq 1 120); do
+            cid="$(docker compose -f compose.yaml -f compose.integrated-auth.yaml ps -q zitadel-api)"
+            status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid" 2>/dev/null || true)"
+            if [ "$status" = healthy ]; then
+              docker compose -f compose.yaml -f compose.integrated-auth.yaml ps
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f compose.yaml -f compose.integrated-auth.yaml logs --no-color zitadel-api zitadel-postgres
+          exit 1
+
+      - name: Enable DCR and create operator through real ZITADEL API
+        shell: bash
+        run: |
+          set -euo pipefail
+          COMPOSE=(docker compose -f compose.yaml -f compose.integrated-auth.yaml)
+          PAT="$("${COMPOSE[@]}" exec -T zitadel-api cat /zitadel/bootstrap/bootstrap-admin.pat)"
+          test -n "$PAT"
+          echo "::add-mask::$PAT"
+
+          curl_ci() {
+            docker run --rm --network ci-edge curlimages/curl:8.16.0               -fsS               -H 'Host: mcp.example.invalid'               -H 'X-Forwarded-Proto: https'               "$@"
+          }
+
+          curl_ci http://zitadel-api:8080/.well-known/openid-configuration > /tmp/oidc-before.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/oidc-before.json'))
+          assert x['issuer'] == 'https://mcp.example.invalid', x
+          print('OIDC DISCOVERY: PASS')
+          PY
+
+          curl_ci             -X PUT http://zitadel-api:8080/v2/settings/security             -H "Authorization: Bearer $PAT"             -H 'Content-Type: application/json'             --data '{"dynamicClientRegistration":{"enabled":true,"allowUnauthenticated":true}}'             > /tmp/security.json
+
+          cat > /tmp/operator.json <<'JSON'
+          {
+            "userId": "ci-operator-001",
+            "username": "ci-operator",
+            "profile": {
+              "givenName": "CI",
+              "familyName": "Operator",
+              "displayName": "CI Operator",
+              "preferredLanguage": "en"
+            },
+            "email": {
+              "email": "ci-operator@example.invalid",
+              "isVerified": true
+            },
+            "password": {
+              "password": "CiOperatorPassword123!",
+              "changeRequired": false
+            }
+          }
+          JSON
+
+          curl_ci             -X POST http://zitadel-api:8080/v2/users/human             -H "Authorization: Bearer $PAT"             -H 'Content-Type: application/json'             --data-binary @/tmp/operator.json             > /tmp/operator-response.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/operator-response.json'))
+          assert x.get('userId') == 'ci-operator-001', x
+          print('DEDICATED OPERATOR: PASS')
+          PY
+
+          curl_ci http://zitadel-api:8080/.well-known/openid-configuration > /tmp/oidc-after.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/oidc-after.json'))
+          endpoint=x.get('registration_endpoint','')
+          assert endpoint, x
+          assert 'S256' in x.get('code_challenge_methods_supported',[]), x
+          print('DCR + PKCE DISCOVERY: PASS')
+          PY
+
+          curl_ci             -X POST http://zitadel-api:8080/oauth/v2/register             -H 'Content-Type: application/json'             --data '{
+              "client_name":"CI MCP Client",
+              "redirect_uris":["https://example.com/callback"],
+              "grant_types":["authorization_code","refresh_token"],
+              "response_types":["code"],
+              "token_endpoint_auth_method":"none"
+            }'             > /tmp/dcr-client.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/dcr-client.json'))
+          assert x.get('client_id'), x
+          assert x.get('registration_access_token'), x
+          print('REAL DYNAMIC CLIENT REGISTRATION: PASS')
+          PY
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f compose.yaml -f compose.integrated-auth.yaml down -v --remove-orphans || true
+          docker network rm ci-edge >/dev/null 2>&1 || true
+          rm -f .env config/policy.yaml
