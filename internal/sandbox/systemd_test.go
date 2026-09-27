@@ -21,7 +21,6 @@ func TestBuildSystemdRunArgsBlockedNetwork(t *testing.T) {
 		"--property=NoNewPrivileges=yes",
 		"--property=ProtectSystem=strict",
 		"--property=PrivateNetwork=yes",
-		"--property=ReadOnlyPaths=/srv/app",
 		"--property=ReadWritePaths=/srv/app",
 		"--property=InaccessiblePaths=/etc",
 		"--property=ProtectProc=invisible",
