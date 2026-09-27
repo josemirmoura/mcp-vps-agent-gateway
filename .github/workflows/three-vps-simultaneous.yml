@@ -71,13 +71,14 @@ jobs:
           ids=[r["instance_id"] for r in rows]
           names=[r["instance_name"] for r in rows]
           hosts=[r["hostname"] for r in rows]
+          boot_ids=[r["boot_id"] for r in rows]
           static_fps=[r["static_token_sha256"] for r in rows]
           admin_fps=[r["admin_token_sha256"] for r in rows]
           audit_heads=[r["audit"]["head_hash"] for r in rows]
 
           assert len(set(ids))==3, ids
           assert len(set(names))==3, names
-          assert len(set(hosts))==3, hosts
+          assert len(set(boot_ids))==3, boot_ids
           assert len(set(static_fps))==3, static_fps
           assert len(set(admin_fps))==3, admin_fps
           assert len(set(audit_heads))==3, audit_heads
@@ -108,11 +109,14 @@ jobs:
                       "name":r["instance_name"],
                       "id":r["instance_id"],
                       "hostname":r["hostname"],
+                      "boot_id":r["boot_id"],
                       "audit_head":r["audit"]["head_hash"],
                       "audit_events":r["audit"]["events"],
                   }
                   for r in rows
               ],
+              "hostname_values":hosts,
+              "hostname_collision_observed":len(set(hosts)) < len(hosts),
               "shared_subject":"multi-operator",
               "shared_operation_id":"shared-collision-operation-001",
               "shared_logical_path":"/opt/vps-agent-multi/shared.txt",
