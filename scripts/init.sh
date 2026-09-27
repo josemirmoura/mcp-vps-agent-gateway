@@ -12,8 +12,10 @@ if [ ! -f .env ]; then
   cp .env.example .env
   ADMIN_TOKEN="$(openssl rand -hex 32)"
   MCP_TOKEN="$(openssl rand -hex 32)"
+  INSTANCE_ID="$(openssl rand -hex 16)"
   sed -i "s/CHANGE_ME_ADMIN_TOKEN/$ADMIN_TOKEN/" .env
   sed -i "s/CHANGE_ME_MCP_TOKEN/$MCP_TOKEN/" .env
+  sed -i "s/CHANGE_ME_INSTANCE_ID/$INSTANCE_ID/" .env
   chmod 600 .env
   echo "Created .env with random tokens."
 else
