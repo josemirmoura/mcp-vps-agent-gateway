@@ -120,3 +120,20 @@ func TestShellCWDAndNetworkScope(t *testing.T) {
 		t.Fatal("network destination scope is incorrect")
 	}
 }
+
+
+func FuzzPolicyLoadNeverPanics(f *testing.F) {
+	f.Add("version: 1\nmode: scoped\n")
+	f.Add("version: nope\nmode: full\n")
+	f.Add("{{{{")
+	f.Fuzz(func(t *testing.T, body string) {
+		if len(body) > 1<<20 {
+			t.Skip()
+		}
+		p := filepath.Join(t.TempDir(), "policy.yaml")
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		_, _ = Load(p)
+	})
+}
