@@ -44,7 +44,7 @@ func commandArgs(name string, args ...string) (string, []string) {
 			"--target", "1",
 			"--mount", "--uts", "--ipc", "--net", "--pid", "--cgroup",
 			"--root=/proc/1/root",
-			"--wd=/",
+			"--wdns=/",
 			"--",
 			name,
 		}
