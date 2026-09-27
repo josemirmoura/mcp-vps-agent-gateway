@@ -23,8 +23,9 @@ type Config struct {
 	Docker     ResourcePolicy   `yaml:"docker"`
 	Shell      ShellPolicy      `yaml:"shell"`
 	Privilege  PrivilegePolicy  `yaml:"privilege"`
-	Replay     ReplayPolicy     `yaml:"replay"`
-	Grant      GrantPolicy      `yaml:"grant,omitempty"`
+	Replay       ReplayPolicy     `yaml:"replay"`
+	Grant        GrantPolicy      `yaml:"grant,omitempty"`
+	Capabilities []string         `yaml:"capabilities,omitempty"`
 }
 
 type Features struct {
@@ -37,8 +38,9 @@ type FilesystemPolicy struct {
 }
 
 type NetworkPolicy struct {
-	Mode         string   `yaml:"mode"`
-	Destinations []string `yaml:"destinations"`
+	Mode                                 string   `yaml:"mode"`
+	Destinations                         []string `yaml:"destinations"`
+	UnrestrictedRequiresSeparateApproval bool     `yaml:"unrestricted_requires_separate_approval,omitempty"`
 }
 
 type ResourcePolicy struct {
@@ -64,8 +66,10 @@ type ReplayPolicy struct {
 }
 
 type GrantPolicy struct {
-	Required      bool `yaml:"required"`
-	MaxTTLMinutes int  `yaml:"max_ttl_minutes"`
+	Required          bool `yaml:"required"`
+	MaxTTLMinutes     int  `yaml:"max_ttl_minutes"`
+	OutOfBandApproval bool `yaml:"out_of_band_approval,omitempty"`
+	StepUpAuth        bool `yaml:"step_up_auth,omitempty"`
 }
 
 func Load(filename string) (*Config, error) {
@@ -157,6 +161,19 @@ func (c *Config) FileRoots(write bool) []string {
 		return append([]string(nil), c.Filesystem.Write...)
 	}
 	return append([]string(nil), c.Filesystem.Read...)
+}
+
+func (c *Config) CanGrant(capability string) bool {
+	if c.Mode != "full" || !c.Enabled || !c.Features.FullModeEnabled {
+		return false
+	}
+	capability = NormalizeCapability(capability)
+	for _, allowed := range c.Capabilities {
+		if NormalizeCapability(allowed) == capability {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Config) MaxGrantTTL() time.Duration {
