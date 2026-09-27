@@ -33,7 +33,7 @@ jobs:
         run: |
           mkdir -p dist/linux-amd64 dist/linux-arm64
           for arch in amd64 arm64; do
-            for cmd in vps-agent-gateway vps-agent-broker vps-agent vps-agent-setup; do
+            for cmd in vps-agent-gateway vps-agent-broker vps-agent vps-agent-mcp-call; do
               CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags="-s -w" -o "dist/linux-$arch/$cmd" "./cmd/$cmd"
             done
           done
