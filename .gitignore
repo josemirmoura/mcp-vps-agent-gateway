@@ -25,3 +25,4 @@ tmp/
 
 # Docker runtime state
 state/
+config/policy.yaml
