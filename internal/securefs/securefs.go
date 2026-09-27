@@ -82,6 +82,124 @@ func selectRoot(roots []string, target string) (root, rel string, err error) {
 	return "", "", errors.New("path outside authorized roots")
 }
 
+
+func selectAuthorizedRoot(roots []string, target string) (string, error) {
+	if err := rejectTraversal(target); err != nil {
+		return "", err
+	}
+	abs, err := filepath.Abs(target)
+	if err != nil {
+		return "", err
+	}
+	abs = filepath.Clean(abs)
+	for _, candidate := range roots {
+		rel, err := filepath.Rel(candidate, abs)
+		if err != nil {
+			continue
+		}
+		if rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)) {
+			return candidate, nil
+		}
+	}
+	return "", errors.New("path outside authorized roots")
+}
+
+func nearestExistingDir(p string) (string, error) {
+	cur := filepath.Clean(p)
+	for {
+		info, err := os.Lstat(cur)
+		if err == nil {
+			if info.Mode()&os.ModeSymlink != 0 {
+				return "", fmt.Errorf("authorized path ancestor is a symlink: %s", cur)
+			}
+			if !info.IsDir() {
+				return "", fmt.Errorf("authorized path ancestor is not a directory: %s", cur)
+			}
+			resolved, err := filepath.EvalSymlinks(cur)
+			if err != nil {
+				return "", err
+			}
+			if filepath.Clean(resolved) != cur {
+				return "", fmt.Errorf("authorized path ancestor resolves through symlink: %s", cur)
+			}
+			return cur, nil
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return "", fmt.Errorf("no existing directory ancestor for %s", p)
+		}
+		cur = parent
+	}
+}
+
+// MkdirAll creates an authorized directory tree while rejecting traversal and
+// symlink components. It can create the configured writable root itself when
+// that root does not yet exist.
+func (m *Manager) MkdirAll(dirname string, perm os.FileMode) error {
+	allowedRoot, err := selectAuthorizedRoot(m.writeRoots, dirname)
+	if err != nil {
+		return err
+	}
+	target, err := filepath.Abs(dirname)
+	if err != nil {
+		return err
+	}
+	target = filepath.Clean(target)
+
+	anchor, err := nearestExistingDir(allowedRoot)
+	if err != nil {
+		return err
+	}
+	rel, err := filepath.Rel(anchor, target)
+	if err != nil {
+		return err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+		return errors.New("directory creation escaped authorized anchor")
+	}
+
+	root, err := os.OpenRoot(anchor)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+
+	current := "."
+	for _, part := range strings.FieldsFunc(filepath.ToSlash(rel), func(r rune) bool { return r == '/' }) {
+		if part == "" || part == "." {
+			continue
+		}
+		if part == ".." {
+			return errors.New("path traversal is forbidden")
+		}
+		if current == "." {
+			current = part
+		} else {
+			current = filepath.Join(current, part)
+		}
+		info, err := root.Lstat(current)
+		if err == nil {
+			if info.Mode()&os.ModeSymlink != 0 {
+				return fmt.Errorf("refusing symlink component: %s", current)
+			}
+			if !info.IsDir() {
+				return fmt.Errorf("path component is not a directory: %s", current)
+			}
+			continue
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if err := root.Mkdir(current, perm.Perm()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (m *Manager) ReadFile(filename string) ([]byte, error) {
 	rootPath, rel, err := selectRoot(m.readRoots, filename)
 	if err != nil {
