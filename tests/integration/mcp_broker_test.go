@@ -27,6 +27,20 @@ func (f *fakeServiceManager) Status(context.Context, string) (string, error) {
 	return "active", nil
 }
 
+func (f *fakeServiceManager) List(context.Context) ([]broker.ServiceInfo, error) {
+	return []broker.ServiceInfo{{Name: "vps-agent-test.service", Active: "active"}}, nil
+}
+
+func (f *fakeServiceManager) Logs(context.Context, string, int) (string, error) {
+	return "fake log", nil
+}
+
+func (f *fakeServiceManager) Start(context.Context, string) (string, error) { return "active", nil }
+func (f *fakeServiceManager) Stop(context.Context, string) (string, error) { return "inactive", nil }
+func (f *fakeServiceManager) Reload(context.Context, string) (string, error) { return "active", nil }
+func (f *fakeServiceManager) Enable(context.Context, string) (string, error) { return "enabled", nil }
+func (f *fakeServiceManager) Disable(context.Context, string) (string, error) { return "disabled", nil }
+
 func (f *fakeServiceManager) Restart(context.Context, string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
