@@ -7,68 +7,68 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  autofix:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-      - uses: actions/setup-go@v6
-        with:
-          go-version: '1.27.1'
-          cache: true
-      - name: Normalize Go source and module files
-        run: |
-          go mod tidy
-          gofmt -w $(find . -name '*.go' -type f -print)
-      - name: Commit generated normalization
-        run: |
-          if git diff --quiet; then
-            echo "No generated changes"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add go.mod go.sum '*.go' 'internal/**/*.go' 'cmd/**/*.go' 2>/dev/null || git add -A
-          git commit -m "chore: normalize Go source and module graph"
-          git push origin HEAD:${{ github.head_ref }}
-
   go:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
           go-version: '1.27.1'
           cache: true
-      - name: Resolve module graph and format workspace
-        run: |
-          go mod tidy
-          gofmt -w $(find . -name '*.go' -type f -print)
+      - name: Resolve module graph
+        run: go mod tidy
+      - name: Format ephemeral workspace
+        run: gofmt -w $(find . -name '*.go' -type f -print)
       - name: Vet
         run: go vet ./...
       - name: Test with race detector
         run: go test -race -count=1 ./...
-      - name: Build all commands
+      - name: Build native commands
         run: go build ./cmd/...
-      - name: Upload resolved module files
-        uses: actions/upload-artifact@v4
+      - name: Build release artifacts
+        run: |
+          mkdir -p dist/linux-amd64 dist/linux-arm64
+          for arch in amd64 arm64; do
+            for cmd in vps-agent-gateway vps-agent-broker vps-agent; do
+              CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build                 -trimpath                 -ldflags="-s -w"                 -o "dist/linux-$arch/$cmd" "./cmd/$cmd"
+            done
+          done
+      - uses: actions/upload-artifact@v4
         with:
-          name: go-module-files
-          path: |
-            go.mod
-            go.sum
+          name: vps-agent-linux-binaries
+          path: dist/
+          if-no-files-found: error
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+      - run: go mod tidy
+      - name: Docker typed-operation smoke
+        env:
+          VPS_AGENT_DOCKER_SMOKE: "1"
+        run: go test -count=1 -v ./internal/broker -run TestDockerCLISmoke
+
+  systemd-unit-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify unit syntax and sandbox directives
+        run: |
+          systemd-analyze verify             deploy/systemd/vps-agent-gateway.service             deploy/systemd/vps-agent-broker.service
 
   architecture-simulation:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
           go-version: '1.27.1'
