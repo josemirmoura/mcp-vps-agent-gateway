@@ -39,6 +39,7 @@ func main() {
 		Services: broker.SystemdManager{}, Docker: broker.DockerCLI{},
 		Jobs:       &jobs.Manager{State: store, Runner: jobs.SystemdRunner{}},
 		AdminToken: os.Getenv("VPS_AGENT_ADMIN_TOKEN"),
+		ExpectedSubject: os.Getenv("VPS_AGENT_EXPECTED_SUBJECT"),
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
