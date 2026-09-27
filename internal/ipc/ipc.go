@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/wire"
 )
 
@@ -19,14 +21,61 @@ type Handler interface {
 }
 
 type Server struct {
-	socket  string
-	handler Handler
-	ln      net.Listener
-	wg      sync.WaitGroup
+	socket          string
+	handler         Handler
+	ln              net.Listener
+	wg              sync.WaitGroup
+	AllowedPeerUIDs map[uint32]struct{}
 }
 
 func NewServer(socket string, handler Handler) *Server {
 	return &Server{socket: socket, handler: handler}
+}
+
+func (s *Server) AllowPeerUIDs(uids ...uint32) {
+	if s.AllowedPeerUIDs == nil {
+		s.AllowedPeerUIDs = make(map[uint32]struct{}, len(uids))
+	}
+	for _, uid := range uids {
+		s.AllowedPeerUIDs[uid] = struct{}{}
+	}
+}
+
+func unixPeerUID(conn net.Conn) (uint32, error) {
+	uc, ok := conn.(*net.UnixConn)
+	if !ok {
+		return 0, errors.New("peer is not a Unix connection")
+	}
+	raw, err := uc.SyscallConn()
+	if err != nil {
+		return 0, err
+	}
+	var cred *unix.Ucred
+	var controlErr error
+	if err := raw.Control(func(fd uintptr) {
+		cred, controlErr = unix.GetsockoptUcred(int(fd), unix.SOL_SOCKET, unix.SO_PEERCRED)
+	}); err != nil {
+		return 0, err
+	}
+	if controlErr != nil {
+		return 0, controlErr
+	}
+	if cred == nil {
+		return 0, errors.New("missing Unix peer credentials")
+	}
+	return cred.Uid, nil
+}
+
+func (s *Server) peerAllowed(conn net.Conn) bool {
+	if len(s.AllowedPeerUIDs) == 0 {
+		return true
+	}
+	uid, err := unixPeerUID(conn)
+	if err != nil {
+		return false
+	}
+	_, ok := s.AllowedPeerUIDs[uid]
+	return ok
 }
 
 func (s *Server) Serve(ctx context.Context) error {
@@ -57,6 +106,11 @@ func (s *Server) Serve(ctx context.Context) error {
 				break
 			}
 			return err
+		}
+		if !s.peerAllowed(conn) {
+			_ = json.NewEncoder(conn).Encode(wire.ErrorResponse("", "unauthorized_peer", "Unix peer credential is not authorized"))
+			_ = conn.Close()
+			continue
 		}
 		s.wg.Add(1)
 		go func() {
