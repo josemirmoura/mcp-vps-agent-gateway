@@ -77,14 +77,64 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if b.FS == nil {
 			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
 		}
+		if !b.Policy.CanFilesystem("read") {
+			return deny(req.ID, "permission_denied", "file read is disabled by policy")
+		}
 		data, err := b.FS.ReadFile(req.Resource)
 		if err != nil {
 			return deny(req.ID, "permission_denied", err.Error())
 		}
 		return ok(req.ID, map[string]any{"content": string(data), "bytes": len(data)})
+	case "file.list":
+		if b.FS == nil {
+			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		}
+		if !b.Policy.CanFilesystem("list") {
+			return deny(req.ID, "permission_denied", "file list is disabled by policy")
+		}
+		var in struct {
+			Limit int `json:"limit"`
+		}
+		if len(req.Args) > 0 {
+			if err := json.Unmarshal(req.Args, &in); err != nil {
+				return deny(req.ID, "invalid_args", err.Error())
+			}
+		}
+		entries, err := b.FS.List(req.Resource, in.Limit)
+		if err != nil {
+			return deny(req.ID, "permission_denied", err.Error())
+		}
+		return ok(req.ID, map[string]any{"path": req.Resource, "entries": entries})
+	case "file.stat":
+		if b.FS == nil {
+			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		}
+		if !b.Policy.CanFilesystem("stat") {
+			return deny(req.ID, "permission_denied", "file stat is disabled by policy")
+		}
+		st, err := b.FS.Stat(req.Resource, false)
+		if err != nil {
+			return deny(req.ID, "permission_denied", err.Error())
+		}
+		return ok(req.ID, st)
+	case "file.hash":
+		if b.FS == nil {
+			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		}
+		if !b.Policy.CanFilesystem("hash") {
+			return deny(req.ID, "permission_denied", "file hash is disabled by policy")
+		}
+		sum, err := b.FS.Hash(req.Resource)
+		if err != nil {
+			return deny(req.ID, "permission_denied", err.Error())
+		}
+		return ok(req.ID, map[string]any{"path": req.Resource, "sha256": sum})
 	case "file.mkdir":
 		if b.FS == nil {
 			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		}
+		if !b.Policy.CanFilesystem("mkdir") {
+			return deny(req.ID, "permission_denied", "mkdir is disabled by policy")
 		}
 		if req.InvocationID == "" {
 			return deny(req.ID, "invocation_required", "mkdir requires invocation id")
@@ -93,6 +143,9 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 	case "file.write", "file.write_test":
 		if b.FS == nil {
 			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		}
+		if !b.Policy.CanFilesystem("write") {
+			return deny(req.ID, "permission_denied", "file write is disabled by policy")
 		}
 		var in struct {
 			Content string `json:"content"`
@@ -104,6 +157,135 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "invocation_required", "write requires invocation id")
 		}
 		return b.writeFile(ctx, req, []byte(in.Content))
+	case "file.patch":
+		if b.FS == nil {
+			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		}
+		if !b.Policy.CanFilesystem("patch") {
+			return deny(req.ID, "permission_denied", "file patch is disabled by policy")
+		}
+		if req.InvocationID == "" {
+			return deny(req.ID, "invocation_required", "patch requires invocation id")
+		}
+		var in struct {
+			OldText        string `json:"old_text"`
+			NewText        string `json:"new_text"`
+			ExpectedSHA256 string `json:"expected_sha256"`
+		}
+		if err := json.Unmarshal(req.Args, &in); err != nil {
+			return deny(req.ID, "invalid_args", err.Error())
+		}
+		return b.fileMutation(ctx, req, in, func() (any, error) {
+			sum, err := b.FS.Patch(req.Resource, in.OldText, in.NewText, in.ExpectedSHA256)
+			return map[string]any{"path": req.Resource, "sha256": sum, "patched": err == nil}, err
+		})
+	case "file.copy":
+		if b.FS == nil {
+			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		}
+		if !b.Policy.CanFilesystem("copy") {
+			return deny(req.ID, "permission_denied", "file copy is disabled by policy")
+		}
+		if req.InvocationID == "" {
+			return deny(req.ID, "invocation_required", "copy requires invocation id")
+		}
+		var in struct {
+			Destination string `json:"destination"`
+		}
+		if err := json.Unmarshal(req.Args, &in); err != nil || in.Destination == "" {
+			return deny(req.ID, "invalid_args", "destination is required")
+		}
+		return b.fileMutation(ctx, req, in, func() (any, error) {
+			err := b.FS.CopyFile(req.Resource, in.Destination)
+			return map[string]any{"source": req.Resource, "destination": in.Destination, "copied": err == nil}, err
+		})
+	case "file.move":
+		if b.FS == nil {
+			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		}
+		if !b.Policy.CanFilesystem("move") {
+			return deny(req.ID, "permission_denied", "file move is disabled by policy")
+		}
+		if req.InvocationID == "" {
+			return deny(req.ID, "invocation_required", "move requires invocation id")
+		}
+		var in struct {
+			Destination string `json:"destination"`
+		}
+		if err := json.Unmarshal(req.Args, &in); err != nil || in.Destination == "" {
+			return deny(req.ID, "invalid_args", "destination is required")
+		}
+		return b.fileMutation(ctx, req, in, func() (any, error) {
+			err := b.FS.Move(req.Resource, in.Destination)
+			return map[string]any{"source": req.Resource, "destination": in.Destination, "moved": err == nil}, err
+		})
+	case "file.remove":
+		if b.FS == nil {
+			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		}
+		if req.InvocationID == "" {
+			return deny(req.ID, "invocation_required", "remove requires invocation id")
+		}
+		var in struct {
+			Recursive bool `json:"recursive"`
+		}
+		if len(req.Args) > 0 {
+			if err := json.Unmarshal(req.Args, &in); err != nil {
+				return deny(req.ID, "invalid_args", err.Error())
+			}
+		}
+		action := "remove"
+		if in.Recursive {
+			action = "remove_recursive"
+		}
+		if !b.Policy.CanFilesystem(action) {
+			return deny(req.ID, "permission_denied", action+" is disabled by policy")
+		}
+		return b.fileMutation(ctx, req, in, func() (any, error) {
+			err := b.FS.Remove(req.Resource, in.Recursive)
+			return map[string]any{"path": req.Resource, "removed": err == nil, "recursive": in.Recursive}, err
+		})
+	case "file.chmod":
+		if b.FS == nil {
+			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		}
+		if !b.Policy.CanFilesystem("chmod") {
+			return deny(req.ID, "permission_denied", "chmod is disabled by policy")
+		}
+		if req.InvocationID == "" {
+			return deny(req.ID, "invocation_required", "chmod requires invocation id")
+		}
+		var in struct {
+			Mode uint32 `json:"mode"`
+		}
+		if err := json.Unmarshal(req.Args, &in); err != nil || in.Mode > 0o777 {
+			return deny(req.ID, "invalid_args", "mode must be an integer between 0 and 0777")
+		}
+		return b.fileMutation(ctx, req, in, func() (any, error) {
+			err := b.FS.Chmod(req.Resource, os.FileMode(in.Mode))
+			return map[string]any{"path": req.Resource, "mode": in.Mode, "changed": err == nil}, err
+		})
+	case "file.chown":
+		if b.FS == nil {
+			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		}
+		if !b.Policy.CanFilesystem("chown") {
+			return deny(req.ID, "permission_denied", "chown is disabled by policy")
+		}
+		if req.InvocationID == "" {
+			return deny(req.ID, "invocation_required", "chown requires invocation id")
+		}
+		var in struct {
+			UID int `json:"uid"`
+			GID int `json:"gid"`
+		}
+		if err := json.Unmarshal(req.Args, &in); err != nil {
+			return deny(req.ID, "invalid_args", err.Error())
+		}
+		return b.fileMutation(ctx, req, in, func() (any, error) {
+			err := b.FS.Chown(req.Resource, in.UID, in.GID)
+			return map[string]any{"path": req.Resource, "uid": in.UID, "gid": in.GID, "changed": err == nil}, err
+		})
 	case "service.status":
 		if b.Services == nil {
 			return deny(req.ID, "service_unavailable", "service manager is not configured")
@@ -331,6 +513,45 @@ func (b *Broker) adminOK(token string) bool {
 	return subtle.ConstantTimeCompare([]byte(token), []byte(b.AdminToken)) == 1
 }
 
+
+
+func (b *Broker) fileMutation(ctx context.Context, req wire.Request, fingerprint any, fn func() (any, error)) wire.Response {
+	if b.State == nil {
+		return deny(req.ID, "state_required", "filesystem mutation requires durable state")
+	}
+	requestHash, err := state.HashRequest(map[string]any{
+		"subject": req.Subject, "tool": req.Tool, "resource": req.Resource, "args": fingerprint,
+	})
+	if err != nil {
+		return deny(req.ID, "hash_error", err.Error())
+	}
+	decision, cached, err := b.State.BeginOperation(ctx, req.InvocationID, req.Subject, req.Tool, requestHash)
+	if err != nil {
+		return deny(req.ID, "state_error", err.Error())
+	}
+	switch decision {
+	case state.OperationCached:
+		return wire.Response{ID: req.ID, OK: true, Result: cached}
+	case state.OperationConflict:
+		return deny(req.ID, "idempotency_conflict", "invocation id reused with different request")
+	case state.OperationReconcile:
+		return deny(req.ID, "reconcile_required", "previous operation outcome is uncertain")
+	}
+	value, err := fn()
+	if err != nil {
+		_ = b.State.AbortOperation(context.Background(), req.InvocationID)
+		return deny(req.ID, "filesystem_error", err.Error())
+	}
+	result, err := json.Marshal(value)
+	if err != nil {
+		_ = b.State.AbortOperation(context.Background(), req.InvocationID)
+		return deny(req.ID, "encode_error", err.Error())
+	}
+	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
+		return deny(req.ID, "state_error", "filesystem operation completed but journal update failed: "+err.Error())
+	}
+	return wire.Response{ID: req.ID, OK: true, Result: result}
+}
 
 func (b *Broker) mkdir(ctx context.Context, req wire.Request) wire.Response {
 	if b.State == nil {
