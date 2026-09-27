@@ -61,3 +61,12 @@ func TestCommandUsesNsenterWhenConfigured(t *testing.T) {
 		t.Fatalf("args=%v want prefix=%v", args, wantPrefix)
 	}
 }
+
+func TestCommandRejectsUnknownExecutable(t *testing.T) {
+	t.Setenv(envHostRoot, "")
+	name, args := commandArgs("definitely-not-allowed", "--version")
+	if name != "" || args != nil {
+		t.Fatalf("unknown executable should fail closed, got name=%q args=%v", name, args)
+	}
+}
+
