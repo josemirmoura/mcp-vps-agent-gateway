@@ -6,79 +6,84 @@ Checked: 2026-09-27.
 
 ~~~text
 ChatGPT Web
-   -> custom MCP app
-   -> HTTPS /mcp endpoint
+   -> OAuth discovery + dynamic client registration
+   -> HTTPS /mcp
    -> Gateway
    -> Broker
    -> VPS
+   -> tamper-evident audit
 ~~~
 
-The server architecture is MCP-client independent. ChatGPT product availability is a separate completion gate.
+The installation completion rule is deliberately stricter than "containers are healthy."
 
-## Current OpenAI product constraint
+## Prerequisites
 
-OpenAI currently documents full MCP support, including write/modify actions, for ChatGPT Business, Enterprise and Edu on ChatGPT web.
+1. Local installation has already passed `bash scripts/verify.sh`.
+2. A DNS hostname points to the VPS.
+3. Integrated auth has passed:
 
-Official source:
-https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
+~~~bash
+bash scripts/setup-integrated-auth.sh --domain mcp.example.com
+~~~
 
-The same official page states that Pro users can connect MCPs with read/fetch permissions, but Full MCP is not currently available to Pro.
+That command must finish with `INTEGRATED AUTH: READY`.
 
-Do not infer write support for another plan/surface merely because the MCP server works with MCP Inspector or another client.
+## Connection
 
-ChatGPT connects to remote MCP servers. A local/private-network MCP cannot be attached directly unless a supported secure tunnel/remote route is used.
+Run:
 
-## Current documented connection flow
+~~~bash
+bash scripts/connect-chatgpt.sh
+~~~
 
-For an eligible workspace/surface:
+The script first reruns the public checks, prints the exact MCP endpoint and OAuth issuer, then shows the current ChatGPT connection steps.
 
-1. Enable Developer Mode in the workspace/user settings described by the current OpenAI documentation.
-2. Go to Apps and create a custom app.
-3. Provide the remote HTTPS MCP endpoint.
-4. Select OAuth authentication and complete the provider authorization flow.
-5. Scan tools.
-6. Create the app.
-7. In a new web chat, select or mention the app.
-8. Call a harmless tool such as system.info.
-9. Verify the matching authenticated call in Broker audit.
+The intended standards flow is:
 
-The OpenAI UI and permissions are version-sensitive. Recheck the official page at release/setup time.
+1. ChatGPT reads RFC 9728 protected-resource metadata from the MCP host.
+2. ChatGPT discovers the ZITADEL authorization server.
+3. ChatGPT dynamically registers an OAuth public client.
+4. The operator signs in with the dedicated VPS operator account.
+5. Authorization Code + PKCE completes.
+6. ChatGPT discovers the MCP tools.
+7. The operator invokes `system.info`.
+8. The Gateway validates the access token against the integrated issuer.
+9. The Broker matches the stable subject and applies policy.
+10. The audit chain records the successful tool invocation.
 
-## Our package completion rule
+The ChatGPT product UI is version-sensitive, so button names and workspace eligibility must be rechecked against current official OpenAI documentation at release/setup time.
 
-scripts/connect-chatgpt.sh shows the tutorial and then waits for an audited system.info call from the configured subject.
+## Completion gate
 
-Showing the tutorial is not success.
+`scripts/connect-chatgpt.sh` waits on the Broker for a new authenticated `system.info` event from the expected subject.
 
 ~~~text
 tutorial shown
- -> ChatGPT app connected
- -> system.info invoked from ChatGPT
- -> expected subject authenticated
- -> Broker policy allows
- -> execution succeeds
- -> audit record observed
- -> installation complete
+ != success
+
+ChatGPT app connected
+ + authenticated system.info
+ + expected subject
+ + Broker policy allow
+ + successful VPS execution
+ + matching audit record
+ = INSTALLATION COMPLETE
 ~~~
 
-If the target ChatGPT plan/workspace cannot invoke the required tool, the script times out and installation remains incomplete.
-
-## Authentication
-
-For the public ChatGPT route, configure VPS_AGENT_AUTH_MODE=oidc. The Gateway publishes RFC 9728 protected-resource metadata and validates issuer, audience/resource, signature, expiration, scopes and subject. The Broker then independently checks the expected subject and policy.
-
-If the OpenAI integration requires refresh-token support, follow the current OpenAI guidance for offline_access/refresh-token issuance.
-
-Static bearer auth exists only for local/laboratory acceptance. The public write-capable ChatGPT path uses OAuth/OIDC. Current OpenAI guidance states that ChatGPT does not present custom API keys to MCP servers.
+If that event does not arrive before the timeout, installation is still incomplete.
 
 ## Transport
 
-Use MCP Streamable HTTP over remote HTTPS at /mcp.
+The MCP transport is Streamable HTTP over HTTPS at:
 
-Do not invent a custom WebSocket protocol.
+~~~text
+https://<domain>/mcp
+~~~
 
-## Security
+No custom WebSocket transport is introduced.
 
-ChatGPT host confirmations and app permissions are additional UX/safety controls. They never replace Broker authorization.
+## Security boundary
 
-Tool definitions may be frozen/reviewed by the ChatGPT workspace. If the MCP tool schema changes, refresh/review the app actions using the current OpenAI workspace flow.
+ChatGPT confirmations and app permissions are additional UX controls. They never replace server-side authorization.
+
+The Gateway authenticates. The Broker authorizes. The VPS owner chooses the policy.
