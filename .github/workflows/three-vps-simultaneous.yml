@@ -1,0 +1,129 @@
+name: three-vps-simultaneous-acceptance
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'internal/**'
+      - 'cmd/**'
+      - 'scripts/**'
+      - 'compose*.yaml'
+      - 'Dockerfile'
+      - 'config/**'
+      - '.github/workflows/three-vps-simultaneous.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  vps:
+    name: VPS ${{ matrix.key }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - key: alpha
+            name: 'VPS Agent | Alpha'
+          - key: beta
+            name: 'VPS Agent | Beta'
+          - key: gamma
+            name: 'VPS Agent | Gamma'
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run full package on independent ephemeral machine
+        run: bash scripts/multi-instance-acceptance.sh "${{ matrix.key }}" "${{ matrix.name }}"
+
+      - name: Upload per-VPS evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-instance-${{ matrix.key }}-${{ github.run_id }}
+          path: multi-instance-evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+  collision-proof:
+    name: Prove simultaneous isolation
+    needs: vps
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: multi-instance-*-${{ github.run_id }}
+          path: gathered
+          merge-multiple: true
+
+      - name: Assert three machines overlapped and did not collide
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob, json
+
+          files=sorted(glob.glob("gathered/evidence-*.json"))
+          assert len(files)==3, files
+          rows=[json.load(open(p)) for p in files]
+
+          ids=[r["instance_id"] for r in rows]
+          names=[r["instance_name"] for r in rows]
+          hosts=[r["hostname"] for r in rows]
+          static_fps=[r["static_token_sha256"] for r in rows]
+          admin_fps=[r["admin_token_sha256"] for r in rows]
+          audit_heads=[r["audit"]["head_hash"] for r in rows]
+
+          assert len(set(ids))==3, ids
+          assert len(set(names))==3, names
+          assert len(set(hosts))==3, hosts
+          assert len(set(static_fps))==3, static_fps
+          assert len(set(admin_fps))==3, admin_fps
+          assert len(set(audit_heads))==3, audit_heads
+
+          # Deliberately identical client-facing identifiers across all three
+          # machines. They must coexist because state is local to each VPS.
+          assert {r["subject"] for r in rows}=={"multi-operator"}, rows
+          assert {r["operation_id"] for r in rows}=={"shared-collision-operation-001"}, rows
+          assert {r["logical_path"] for r in rows}=={"/opt/vps-agent-multi/shared.txt"}, rows
+          assert {r["final_content"] for r in rows}=={"after"}, rows
+
+          # Prove the three disposable VPS jobs were alive at the same time,
+          # not merely three sequential executions.
+          overlap_start=max(r["start_epoch"] for r in rows)
+          overlap_end=min(r["end_epoch"] for r in rows)
+          assert overlap_start < overlap_end, {
+              "message":"the three VPS jobs did not overlap in time",
+              "intervals":[(r["instance_key"],r["start_epoch"],r["end_epoch"]) for r in rows],
+          }
+
+          summary={
+              "result":"PASS",
+              "vps_count":3,
+              "simultaneous_overlap_seconds":overlap_end-overlap_start,
+              "instances":[
+                  {
+                      "key":r["instance_key"],
+                      "name":r["instance_name"],
+                      "id":r["instance_id"],
+                      "hostname":r["hostname"],
+                      "audit_head":r["audit"]["head_hash"],
+                      "audit_events":r["audit"]["events"],
+                  }
+                  for r in rows
+              ],
+              "shared_subject":"multi-operator",
+              "shared_operation_id":"shared-collision-operation-001",
+              "shared_logical_path":"/opt/vps-agent-multi/shared.txt",
+          }
+          print(json.dumps(summary,indent=2,sort_keys=True))
+          open("three-vps-summary.json","w").write(json.dumps(summary,indent=2,sort_keys=True)+"\n")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: three-vps-summary-${{ github.run_id }}
+          path: three-vps-summary.json
+          if-no-files-found: error
+          retention-days: 30
