@@ -2,17 +2,19 @@
 
 ## Current stage
 
-**PRE-ALPHA / DOCS-FIRST**
+**AUTOMATED RELEASE CANDIDATE / EXTERNAL CHATGPT GATE PENDING**
 
-There is currently:
+The Docker-first Go implementation now has repeatable clean-runner validation across the core Scoped runtime, package lifecycle and host-operation path.
 
-- no supported production binary
-- no Docker image
-- no stable release
-- no compatibility promise
-- no long-running production validation of this repository's implementation
+There is still:
 
-The architecture and gates are the product today.
+- no stable production release
+- no production compatibility promise
+- no long-running real-VPS deployment history
+- no completed real ChatGPT Web OAuth product-surface gate against the target workspace/VPS
+- no production claim for Full/admin shell
+
+Laboratory evidence now covers the Docker package end-to-end on a clean Ubuntu runner: filesystem CRUD, authorization denial, sandboxed shell/jobs, host systemd, host Docker/Compose, diagnostics and audit. Automated acceptance is substantially beyond the original R0/R1 architecture phase, but the product is not promoted to a stable release until the actual ChatGPT Web integration route is proven on the target workspace and VPS.
 
 ## Maturity ladder
 
@@ -94,4 +96,6 @@ Prefer:
 
 ## Current next milestone
 
-The next milestone is **Gate 0A + Gate 0B**, not another architecture subsystem.
+The implementation has clean-room evidence through the broad Scoped toolbox and the Docker packaging path.
+
+The next external milestone is **Gate 0A on the actual ChatGPT Web surface**, followed by a real-VPS Scoped pilot and long-running reliability work. See [implementation-validation.md](implementation-validation.md).

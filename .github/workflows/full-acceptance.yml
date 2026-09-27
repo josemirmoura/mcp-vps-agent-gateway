@@ -1,0 +1,330 @@
+name: full-ephemeral-acceptance
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scoped-acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          cache: true
+
+      - name: Build
+        run: |
+          go mod tidy
+          mkdir -p dist acceptance
+          go build -o dist/vps-agent-gateway ./cmd/vps-agent-gateway
+          go build -o dist/vps-agent-broker ./cmd/vps-agent-broker
+          go build -o dist/vps-agent ./cmd/vps-agent
+          go build -o dist/vps-agent-proof ./cmd/vps-agent-proof
+
+      - name: Provision clean VPS-like environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo groupadd --system vps-agent 2>/dev/null || true
+          sudo useradd --system --gid vps-agent --no-create-home --shell /usr/sbin/nologin vps-agent 2>/dev/null || true
+
+          sudo install -m 0755 dist/vps-agent-gateway /usr/local/bin/vps-agent-gateway
+          sudo install -m 0755 dist/vps-agent-broker /usr/local/bin/vps-agent-broker
+          sudo install -m 0755 dist/vps-agent /usr/local/bin/vps-agent
+
+          sudo install -d -o root -g vps-agent -m 0750 /etc/vps-agent
+          sudo install -d -o root -g vps-agent -m 0750 /var/lib/vps-agent
+          sudo install -d -o root -g vps-agent -m 0750 /var/lib/vps-agent/proof
+
+          cat > /tmp/policy.yaml <<'YAML'
+          version: 1
+          mode: scoped
+          features:
+            full_mode_enabled: false
+          filesystem:
+            read:
+              - /var/lib/vps-agent/proof
+            write:
+              - /var/lib/vps-agent/proof
+          network:
+            mode: blocked
+            destinations: []
+          services:
+            inspect:
+              - vps-agent-test.service
+            manage:
+              - vps-agent-test.service
+            actions:
+              - status
+              - restart
+          docker:
+            inspect: []
+            manage: []
+            actions: []
+          shell:
+            enabled: false
+            cwd_roots: []
+            max_runtime_seconds: 300
+            max_output_bytes: 1048576
+          privilege:
+            admin: broker-only
+          replay:
+            require_idempotency_for_safe_writes: true
+            blind_retry_non_replay_safe: false
+          grant:
+            required: true
+            max_ttl_minutes: 60
+          YAML
+          sudo install -o root -g root -m 0600 /tmp/policy.yaml /etc/vps-agent/policy.yaml
+
+          PROOF_TOKEN="$(openssl rand -hex 24)"
+          ADMIN_TOKEN="$(openssl rand -hex 24)"
+          echo "::add-mask::$PROOF_TOKEN"
+          echo "::add-mask::$ADMIN_TOKEN"
+          {
+            echo "VPS_AGENT_BROKER_SOCKET=/run/vps-agent/broker.sock"
+            echo "VPS_AGENT_LISTEN=127.0.0.1:18080"
+            echo "VPS_AGENT_AUTH_MODE=static"
+            echo "VPS_AGENT_STATIC_TOKEN=$PROOF_TOKEN"
+            echo "VPS_AGENT_STATIC_SUBJECT=josemir-proof"
+          } | sudo tee /etc/vps-agent/gateway.env >/dev/null
+          {
+            echo "VPS_AGENT_POLICY=/etc/vps-agent/policy.yaml"
+            echo "VPS_AGENT_BROKER_SOCKET=/run/vps-agent/broker.sock"
+            echo "VPS_AGENT_STATE_DB=/var/lib/vps-agent/state.db"
+            echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN"
+            echo "VPS_AGENT_EXPECTED_SUBJECT=josemir-proof"
+          } | sudo tee /etc/vps-agent/broker.env >/dev/null
+          sudo chmod 0600 /etc/vps-agent/gateway.env /etc/vps-agent/broker.env
+
+          echo "VPS_AGENT_PROOF_TOKEN=$PROOF_TOKEN" >> "$GITHUB_ENV"
+          echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN" >> "$GITHUB_ENV"
+
+          sudo install -m 0644 tests/fixtures/systemd/vps-agent-broker.service /etc/systemd/system/vps-agent-broker.service
+          sudo install -m 0644 tests/fixtures/systemd/vps-agent-gateway.service /etc/systemd/system/vps-agent-gateway.service
+
+          cat > /tmp/vps-agent-test.service <<'UNIT'
+          [Unit]
+          Description=Disposable VPS Agent acceptance service
+          [Service]
+          Type=simple
+          ExecStart=/usr/bin/sleep infinity
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+          sudo install -m 0644 /tmp/vps-agent-test.service /etc/systemd/system/vps-agent-test.service
+
+          sudo systemctl daemon-reload
+          sudo systemctl start vps-agent-test.service vps-agent-broker.service vps-agent-gateway.service
+
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:18080/healthz >/dev/null 2>&1 && sudo test -S /run/vps-agent/broker.sock; then
+              exit 0
+            fi
+            sleep 0.25
+          done
+          sudo systemctl status vps-agent-broker.service vps-agent-gateway.service --no-pager || true
+          exit 1
+
+      - name: Verify privilege boundary
+        run: |
+          set -euo pipefail
+          ! sudo -u vps-agent cat /etc/vps-agent/broker.env >/dev/null 2>&1
+          ! sudo -u vps-agent cat /etc/vps-agent/policy.yaml >/dev/null 2>&1
+          ! sudo -u vps-agent cat /var/lib/vps-agent/state.db >/dev/null 2>&1
+          sudo stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent | tee acceptance/privilege-boundary.txt
+
+      - name: Scenario 1 - real file write and read
+        run: |
+          cat > acceptance/file.json <<'JSON'
+          {
+            "id": "accept-file",
+            "subject": "josemir-proof",
+            "type": "file_write_read",
+            "path": "/var/lib/vps-agent/proof/acceptance.txt",
+            "content": "full acceptance via MCP -> Gateway -> Broker -> Linux"
+          }
+          JSON
+          ./dist/vps-agent-proof             -request acceptance/file.json             -endpoint http://127.0.0.1:18080/mcp             -token "$VPS_AGENT_PROOF_TOKEN"             -output acceptance/file-evidence.json
+          sudo test "$(sudo cat /var/lib/vps-agent/proof/acceptance.txt)" = "full acceptance via MCP -> Gateway -> Broker -> Linux"
+          sudo sha256sum /var/lib/vps-agent/proof/acceptance.txt | tee acceptance/file-sha256.txt
+
+      - name: Scenario 2 - /etc/shadow must be denied
+        run: |
+          cat > acceptance/deny.json <<'JSON'
+          {
+            "id": "accept-deny",
+            "subject": "josemir-proof",
+            "type": "file_read_denied",
+            "path": "/etc/shadow"
+          }
+          JSON
+          ./dist/vps-agent-proof             -request acceptance/deny.json             -endpoint http://127.0.0.1:18080/mcp             -token "$VPS_AGENT_PROOF_TOKEN"             -output acceptance/deny-evidence.json
+
+      - name: Scenario 3 - real systemd restart
+        run: |
+          systemctl show vps-agent-test.service -p MainPID -p ActiveState --no-pager | tee acceptance/service-before.txt
+          BEFORE="$(systemctl show vps-agent-test.service -p MainPID --value)"
+          cat > acceptance/restart.json <<'JSON'
+          {
+            "id": "accept-restart",
+            "subject": "josemir-proof",
+            "type": "service_restart",
+            "service": "vps-agent-test.service"
+          }
+          JSON
+          ./dist/vps-agent-proof             -request acceptance/restart.json             -endpoint http://127.0.0.1:18080/mcp             -token "$VPS_AGENT_PROOF_TOKEN"             -output acceptance/restart-evidence.json
+          AFTER="$(systemctl show vps-agent-test.service -p MainPID --value)"
+          systemctl show vps-agent-test.service -p MainPID -p ActiveState --no-pager | tee acceptance/service-after.txt
+          test "$BEFORE" -gt 0
+          test "$AFTER" -gt 0
+          test "$BEFORE" != "$AFTER"
+          test "$(systemctl is-active vps-agent-test.service)" = "active"
+
+      - name: Verify audit after all scenarios
+        run: |
+          sudo --preserve-env=VPS_AGENT_ADMIN_TOKEN /usr/local/bin/vps-agent audit-status             --socket /run/vps-agent/broker.sock             | tee acceptance/audit-status.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open("acceptance/audit-status.json"))
+          assert x["ok"] is True, x
+          r=x["result"]
+          assert r["valid"] is True, r
+          assert r["events"] >= 6, r
+          print("AUDIT PASS", r)
+          PY
+
+      - name: Capture journals
+        if: always()
+        run: |
+          sudo journalctl -u vps-agent-broker.service --no-pager > acceptance/broker-journal.txt || true
+          sudo journalctl -u vps-agent-gateway.service --no-pager > acceptance/gateway-journal.txt || true
+          sudo journalctl -u vps-agent-test.service --no-pager > acceptance/test-service-journal.txt || true
+          hostname > acceptance/hostname.txt
+          uname -a > acceptance/uname.txt
+
+      - name: Upload acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-scoped-acceptance-${{ github.run_id }}
+          path: acceptance/
+          if-no-files-found: error
+          retention-days: 30
+
+  elevation-acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          cache: true
+
+      - name: Build focused acceptance binaries
+        run: |
+          go mod tidy
+          mkdir -p dist elevation
+          go build -o dist/vps-agent-broker ./cmd/vps-agent-broker
+          go build -o dist/vps-agent ./cmd/vps-agent
+
+      - name: Provision Full-disabled-by-default boundary then explicit lab enablement
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo groupadd --system vps-agent 2>/dev/null || true
+          sudo install -m 0755 dist/vps-agent-broker /usr/local/bin/vps-agent-broker
+          sudo install -m 0755 dist/vps-agent /usr/local/bin/vps-agent
+          sudo install -d -o root -g vps-agent -m 0750 /etc/vps-agent /var/lib/vps-agent /run/vps-agent
+
+          ADMIN_TOKEN="$(openssl rand -hex 24)"
+          echo "::add-mask::$ADMIN_TOKEN"
+          echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN" >> "$GITHUB_ENV"
+
+          cat > /tmp/full.yaml <<'YAML'
+          version: 1
+          mode: full
+          enabled: true
+          features:
+            full_mode_enabled: true
+          capabilities:
+            - shell.admin
+            - systemd.admin
+          filesystem:
+            read: []
+            write: []
+          network:
+            mode: blocked
+            destinations: []
+            unrestricted_requires_separate_approval: true
+          services:
+            inspect: []
+            manage: []
+            actions: []
+          docker:
+            inspect: []
+            manage: []
+            actions: []
+          shell:
+            enabled: false
+            cwd_roots: []
+            max_runtime_seconds: 60
+            max_output_bytes: 1048576
+          privilege:
+            admin: broker-only
+          replay:
+            require_idempotency_for_safe_writes: true
+            blind_retry_non_replay_safe: false
+          grant:
+            required: true
+            max_ttl_minutes: 5
+            out_of_band_approval: true
+            step_up_auth: true
+          YAML
+          sudo install -o root -g root -m 0600 /tmp/full.yaml /etc/vps-agent/policy.yaml
+
+          {
+            echo "VPS_AGENT_POLICY=/etc/vps-agent/policy.yaml"
+            echo "VPS_AGENT_BROKER_SOCKET=/run/vps-agent/broker.sock"
+            echo "VPS_AGENT_STATE_DB=/var/lib/vps-agent/state.db"
+            echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN"
+            echo "VPS_AGENT_EXPECTED_SUBJECT=alice"
+          } | sudo tee /etc/vps-agent/broker.env >/dev/null
+          sudo chmod 0600 /etc/vps-agent/broker.env
+
+          sudo install -m 0644 tests/fixtures/systemd/vps-agent-broker.service /etc/systemd/system/vps-agent-broker.service
+          sudo systemctl daemon-reload
+          sudo systemctl start vps-agent-broker.service
+          for i in $(seq 1 40); do
+            sudo test -S /run/vps-agent/broker.sock && exit 0
+            sleep 0.25
+          done
+          exit 1
+
+      - name: Validate out-of-band operator surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo --preserve-env=VPS_AGENT_ADMIN_TOKEN /usr/local/bin/vps-agent approvals             --socket /run/vps-agent/broker.sock | tee elevation/empty-approvals.json
+          sudo --preserve-env=VPS_AGENT_ADMIN_TOKEN /usr/local/bin/vps-agent revoke-all             --socket /run/vps-agent/broker.sock | tee elevation/revoke-all.json
+          sudo --preserve-env=VPS_AGENT_ADMIN_TOKEN /usr/local/bin/vps-agent audit-status             --socket /run/vps-agent/broker.sock | tee elevation/audit-status.json
+
+      - name: Run approval security tests against same code
+        run: |
+          go test -count=1 -run 'TestElevationRequiresOutOfBandOperatorDecision' ./internal/broker
+          go test -count=1 -run 'TestApprovalLifecycle|TestGrantSubjectCapabilityAndExpiry|TestElevatedJobDeadlineCannotOutliveGrant|TestJobRejectsForeignGrant' ./internal/state ./internal/jobs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: elevation-acceptance-${{ github.run_id }}
+          path: elevation/
+          if-no-files-found: error
+          retention-days: 30

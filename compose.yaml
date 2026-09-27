@@ -1,0 +1,101 @@
+name: mcp-vps-agent
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "${VPS_AGENT_LOG_MAX_SIZE:-10m}"
+    max-file: "${VPS_AGENT_LOG_MAX_FILES:-5}"
+
+services:
+  broker:
+    build:
+      context: .
+      target: broker
+    image: ${VPS_AGENT_BROKER_IMAGE:-mcp-vps-agent-broker:local}
+    restart: unless-stopped
+    logging: *default-logging
+    user: "0:65532"
+    privileged: true
+    pid: host
+    network_mode: host
+    environment:
+      VPS_AGENT_POLICY: /etc/vps-agent/policy.yaml
+      VPS_AGENT_BROKER_SOCKET: /run/vps-agent/broker.sock
+      VPS_AGENT_STATE_DB: /var/lib/vps-agent/state.db
+      VPS_AGENT_ADMIN_TOKEN: ${VPS_AGENT_ADMIN_TOKEN:?set VPS_AGENT_ADMIN_TOKEN in .env}
+      VPS_AGENT_EXPECTED_SUBJECT: ${VPS_AGENT_SUBJECT:-operator}
+      VPS_AGENT_HOST_ROOT: /host
+      VPS_AGENT_HOST_NSENTER: "1"
+      VPS_AGENT_PHYSICAL_SCOPE_ROOT: ${VPS_AGENT_SCOPE_ROOT:-/opt/my-app}
+      VPS_AGENT_WHOLE_HOST: ${VPS_AGENT_WHOLE_HOST:-0}
+      VPS_AGENT_INSTANCE_ID: ${VPS_AGENT_INSTANCE_ID:-}
+      VPS_AGENT_INSTANCE_NAME: ${VPS_AGENT_INSTANCE_NAME:-vps-agent}
+      VPS_AGENT_MAX_CONCURRENT_REQUESTS: ${VPS_AGENT_MAX_CONCURRENT_REQUESTS:-64}
+    volumes:
+      - type: bind
+        source: ${VPS_AGENT_SCOPE_ROOT:-/opt/my-app}
+        target: /host${VPS_AGENT_SCOPE_ROOT:-/opt/my-app}
+        bind:
+          propagation: rslave
+          create_host_path: false
+      - type: bind
+        source: ./config/policy.yaml
+        target: /etc/vps-agent/policy.yaml
+        read_only: true
+      - type: bind
+        source: ./state
+        target: /var/lib/vps-agent
+      - broker-run:/run/vps-agent
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/vps-agent", "audit-status", "--socket", "/run/vps-agent/broker.sock"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:false
+
+  gateway:
+    build:
+      context: .
+      target: gateway
+    image: ${VPS_AGENT_GATEWAY_IMAGE:-mcp-vps-agent-gateway:local}
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      broker:
+        condition: service_healthy
+    environment:
+      VPS_AGENT_BROKER_SOCKET: /run/vps-agent/broker.sock
+      VPS_AGENT_LISTEN: 0.0.0.0:8080
+      VPS_AGENT_AUTH_MODE: ${VPS_AGENT_AUTH_MODE:-static}
+      VPS_AGENT_STATIC_TOKEN: ${VPS_AGENT_STATIC_TOKEN:-}
+      VPS_AGENT_STATIC_SUBJECT: ${VPS_AGENT_SUBJECT:-operator}
+      VPS_AGENT_OIDC_ISSUER: ${VPS_AGENT_OIDC_ISSUER:-}
+      VPS_AGENT_OIDC_AUDIENCE: ${VPS_AGENT_OIDC_AUDIENCE:-}
+      VPS_AGENT_REQUIRED_SCOPES: ${VPS_AGENT_REQUIRED_SCOPES:-}
+      VPS_AGENT_PUBLIC_URL: ${VPS_AGENT_PUBLIC_URL:-}
+      VPS_AGENT_OAUTH_RESOURCE: ${VPS_AGENT_OAUTH_RESOURCE:-}
+      VPS_AGENT_RESOURCE_METADATA_URL: ${VPS_AGENT_RESOURCE_METADATA_URL:-}
+      VPS_AGENT_INSTANCE_ID: ${VPS_AGENT_INSTANCE_ID:-}
+      VPS_AGENT_INSTANCE_NAME: ${VPS_AGENT_INSTANCE_NAME:-vps-agent}
+    volumes:
+      - broker-run:/run/vps-agent
+    ports:
+      - "${VPS_AGENT_BIND_ADDRESS:-127.0.0.1}:${VPS_AGENT_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  broker-run:

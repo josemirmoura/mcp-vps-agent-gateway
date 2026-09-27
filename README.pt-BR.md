@@ -1,156 +1,166 @@
 # MCP VPS Agent Gateway
 
-Arquitetura de referência orientada a segurança para conectar ChatGPT ou outro cliente MCP a uma VPS Linux sem transformar o modelo em fronteira de segurança.
+Plano de controle MCP orientado a segurança para permitir que ChatGPT ou outro cliente MCP trabalhe numa VPS Linux com a autoridade escolhida explicitamente pelo dono da VPS.
 
-> **Status: PRE-ALPHA / DOCS-FIRST.** Ainda não existe binário pronto para produção nem release estável.
+> **Status: candidato a release no que depende de aceitação automatizada.** Os workflows em Ubuntu 24.04 validam o pacote Docker de ponta a ponta. Um release estável ainda depende do gate externo OAuth no ChatGPT Web e de uma chamada real auditada contra o deployment alvo.
 
-## O que é
+## A ideia
 
-O alvo é:
+Um único pacote traz a caixa de ferramentas ampla. **Quem decide a porção da VPS entregue ao MCP é o usuário.**
+
+~~~text
+um projeto:         /opt/meu-app
+várias raízes:      /opt/app + /var/www/site + /srv/dados
+filesystem inteiro: /
+~~~
+
+Filesystem é só uma dimensão. A policy controla separadamente shell, units systemd, recursos Docker/Compose, rede, pacotes, usuários/grupos, firewall e administração temporária.
+
+**O LLM nunca é a fronteira de segurança. O servidor decide.**
+
+## Runtime
 
 ~~~text
 ChatGPT Web / cliente MCP
         |
-        | Streamable HTTP
+        | HTTPS + MCP Streamable HTTP
         v
-vps-agent-gateway      sem root
+Gateway container
+sem root, sem /host
         |
-        | Unix socket
+        | Unix socket protegido
         v
-vps-agent-broker       privilegiado, somente local
+Broker container
+fronteira privilegiada
         |
+        | host montado em /host
         v
-Linux / systemd / Docker
+Linux / systemd / Docker / arquivos
 ~~~
 
-O Gateway cuida de MCP, autenticação e schemas.
+Docker é o mecanismo de empacotamento. O Broker continua sendo um componente privilegiado e deve ser tratado como equivalente a root na porção delegada. A policy server-side é autoritativa.
 
-O Broker é a fronteira real de segurança: policy, estado, jobs, filesystem, Docker/systemd, secrets e execução privilegiada.
+## Começo rápido
 
-> **O LLM nunca é a fronteira de segurança.**
-
-## O que ainda não é
-
-Hoje este repositório não é:
-
-- software plug-and-play
-- imagem Docker pronta
-- release de produção
-- shell root genérico para IA
-- garantia de que todo plano do ChatGPT aceite MCP privado com escrita
-
-A arquitetura completa é o norte. A implementação começa pequena.
-
-## Modos
-
-- **Controlled** — inspeção com mudanças estreitamente controladas.
-- **Scoped** — autonomia dentro de um perímetro explícito.
-- **Full** — pacote temporário de capabilities, opcional e desligado por padrão.
-
-O trabalho rotineiro deve acontecer em Scoped. Full é excepcional.
-
-## Stack de referência
-
-- **Gateway:** Go + SDK MCP oficial para Go
-- **Broker:** Go
-- **IPC:** Unix Domain Socket
-- **Transporte:** MCP Streamable HTTP
-- **Estado:** SQLite, aberto somente pelo Broker
-- **Isolamento:** systemd transient units + cgroups
-- **Segredos:** systemd credentials e/ou arquivos root-owned
-- **Sandbox adicional:** Landlock quando disponível
-- **Entrada:** reverse proxy existente ou túnel privado suportado
-
-Sem Kubernetes, Redis, service mesh ou daemon separado de policy.
-
-## Início rápido
-
-### 1. Clone
+Requisitos: VPS Linux, Docker Engine, plugin Docker Compose, Git, OpenSSL e Python 3.
 
 ~~~bash
 git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
 cd mcp-vps-agent-gateway
+
+bash scripts/init.sh
+$EDITOR .env config/policy.yaml
+
+docker compose up -d --build
+bash scripts/verify.sh
 ~~~
 
-### 2. Leia primeiro
+O bootstrap cria segredos locais aleatórios, ID estável da instância, estado e uma policy do operador **fora do Git**, a partir de config/policy.example.yaml. Defina `VPS_AGENT_SCOPE_ROOT` no `.env` como um diretório existente da VPS que será o teto físico do filesystem e mantenha filesystem, shell e Compose da policy dentro desse teto. O bootstrap não escolhe a autoridade da VPS.
+
+A verificação local prova health, negação de token inválido, chamada MCP real de system.info e integridade do audit chain. **A instalação ainda não terminou.**
+
+### Autoridade de filesystem sobre o host inteiro
+
+Scoped é o padrão. Para expor deliberadamente o filesystem inteiro ao Broker, use o override explícito:
+
+~~~bash
+sed -i 's/^VPS_AGENT_WHOLE_HOST=.*/VPS_AGENT_WHOLE_HOST=1/' .env
+docker compose -f compose.yaml -f compose.host.yaml up -d --build
+~~~
+
+`compose.host.yaml` é a chave deliberada de whole-host e define `/` como teto físico do Broker. A policy server-side continua controlando quais operações MCP são permitidas.
+### HTTPS público + ChatGPT
+
+Para uma conexão do ChatGPT com escrita, use um Authorization Server OAuth/OIDC aderente ao padrão MCP e configure endpoint público, issuer, audience/resource e subject esperado no .env. Bearer estático fica restrito a laboratório/acceptance local.
+
+~~~dotenv
+VPS_AGENT_DOMAIN=mcp.exemplo.com
+VPS_AGENT_PUBLIC_URL=https://mcp.exemplo.com/mcp
+VPS_AGENT_AUTH_MODE=oidc
+VPS_AGENT_OIDC_ISSUER=https://auth.exemplo.com
+VPS_AGENT_OIDC_AUDIENCE=https://mcp.exemplo.com/mcp
+VPS_AGENT_SUBJECT=<subject-esperado-do-token>
+~~~
+
+Depois:
+
+~~~bash
+docker compose -f compose.yaml -f compose.https.yaml up -d --build
+bash scripts/verify-public.sh
+bash scripts/connect-chatgpt.sh
+~~~
+
+O verificador público exige HTTPS, discovery OAuth e negação fail-closed sem autenticação. O script de conexão mostra o fluxo atual do ChatGPT Web e espera uma **nova chamada auditada de system.info feita pelo ChatGPT**.
 
 ~~~text
-docs/README.md
-docs/project-status.md
-docs/mvp-first.md
-docs/architecture.md
-AGENTS.md
+tutorial
+ -> app OAuth conectado no ChatGPT
+ -> ChatGPT chama o MCP
+ -> Gateway autentica
+ -> Broker valida subject + policy
+ -> operação autorizada chega à VPS
+ -> audit registra
+ -> INSTALAÇÃO CONCLUÍDA
 ~~~
 
-### 3. Faça o Gate 0A antes de código privilegiado
+Sem a chamada real, a instalação permanece incompleta.
 
-Valide qual caminho real do ChatGPT será usado.
+Orientação oficial verificada em 27/09/2026: Full MCP com escrita/modificação está documentado no ChatGPT Web para Business, Enterprise e Edu. Pro fica limitado a read/fetch. MCP autenticado com escrita usa OAuth 2.1; o ChatGPT não apresenta API keys customizadas.
 
-Em 2026-09-26, a OpenAI documenta MCP privado completo com write/modify em Developer Mode para Business, Enterprise e Edu. Não assuma que Plus Web aceita um MCP privado customizado com escrita.
+Fontes oficiais:
+- https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
+- https://developers.openai.com/plugins/build/auth
+## Caixa de ferramentas
 
-Veja [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
+A implementação atual inclui filesystem completo em escopo, shell/jobs sandboxed, systemd tipado, Docker/Compose, diagnósticos, pacotes, usuários/grupos, UFW, elevação fora do canal MCP, SQLite exclusivo do Broker, journal de operações, fencing locks e audit hash-chain.
 
-### 4. Implemente somente o Gate 0B
+Uma capability existir no pacote não significa que esteja habilitada. Quem decide é config/policy.yaml.
 
-Exponha apenas:
+Delete recursivo, chmod/chown, pacotes, usuários, firewall, rede irrestrita e shell administrativo são escolhas explícitas. file.chmod pode aplicar 0777 se o dono da VPS habilitar essa capability.
 
-~~~text
-system.info
-file.read_test
-file.write_test
+## Segurança
+
+- Gateway roda sem root e não recebe /host.
+- No modo Scoped, o pacote monta fisicamente apenas `VPS_AGENT_SCOPE_ROOT`; acesso ao filesystem inteiro exige o override explícito `compose.host.yaml`.
+- Broker não expõe API TCP; o Gateway usa Unix socket.
+- Broker reautoriza cada chamada privilegiada pela policy.
+- Gateway não recebe Docker socket.
+- filesystem bloqueia traversal e symlink escape.
+- writes usam operation journal e idempotência.
+- mutações usam locks/fencing quando necessário.
+- resultados de tools são dados não confiáveis.
+- Full não implica rede irrestrita.
+- secrets não aparecem em tools genéricas.
+
+## Validação
+
+O GitHub Actions valida vet, race detector, govulncheck, simulação adversarial, systemd real, Docker real, acceptance Gateway -> Broker -> Linux, acceptance do pacote Docker e testes negativos.
+
+Veja [validação da implementação](docs/implementation-validation.md).
+
+## Operação
+
+~~~bash
+bash scripts/diagnose.sh status
+bash scripts/diagnose.sh logs 200
+bash scripts/diagnose.sh audit 100
+
+bash scripts/update.sh
+bash scripts/remove.sh safe
+VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge
 ~~~
 
-Restrinja arquivos a:
-
-~~~text
-/tmp/vps-agent-poc/
-~~~
-
-Ainda não adicione root, Docker, SQLite, Full, approval ou shell genérico.
-
-### 5. Entregue isto a um agente de código
-
-~~~text
-Leia AGENTS.md, docs/README.md e docs/mvp-first.md.
-Implemente somente o Gate 0B usando Go e o SDK MCP oficial para Go.
-Não implemente execução privilegiada, Docker, Full, approval,
-SQLite ou shell genérico.
-Adicione testes de confinamento de caminhos, entradas inválidas e erros claros.
-~~~
-
-## Escada de implementação
-
-~~~text
-Gate -1   Adotar / adaptar / construir
-Gate 0A   Provar a superfície real do ChatGPT
-Gate 0B   POC MCP seguro de leitura/escrita
-Gate 1    Uma ação privilegiada tipada
-Gate 2    Um stack real em Scoped
-Gate 3    Estado/jobs/secrets duráveis
-Gate 4    Escritas validadas mais amplas
-Gate 5    Elevação temporária opcional
-~~~
-
-Cada gate precisa justificar a próxima camada.
-
-## Segurança central
-
-- Gateway nunca roda como root.
-- Gateway nunca recebe Docker socket.
-- Broker reautoriza toda chamada privilegiada.
-- Policy é deny-by-default e autoritativa dentro do Broker.
-- Só o Broker abre o SQLite.
-- Writes replay-safe usam idempotência gerada pela infraestrutura.
-- Writes non-replay-safe nunca recebem retry cego.
-- Filesystem resiste a traversal e symlink escape.
-- Resultados de tools são dados não confiáveis.
-- O modelo não registra MCP downstream dinamicamente.
-- Full nasce desligado e não implica rede irrestrita.
-- Secrets não são expostos por ferramenta genérica de leitura.
-
+A remoção segura preserva configuração e auditoria. O purge exige confirmação explícita e remove apenas artefatos do MCP. O update faz backup da configuração/estado, usa Git fast-forward, verifica o runtime novo e restaura código/estado anterior se a verificação falhar.
 ## Documentação
 
-A ordem canônica e as regras de precedência estão em [docs/README.md](docs/README.md).
+- [Modelo do produto](docs/product-model.md)
+- [Fluxo Docker e primeira execução](docs/installer-flow.md)
+- [Arquitetura](docs/architecture.md)
+- [Autenticação](docs/authentication.md)
+- [Múltiplas instâncias](docs/multi-instance.md)
+- [Integração ChatGPT](docs/chatgpt-integration.md)
+- [Threat model](docs/threat-model.md)
+- [Hardening](docs/security-hardening-v2.md)
 
 ## Licença
 

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Security-first Docker MCP gateway for scoped, auditable ChatGPT administration of a Linux VPS.">
+  <title>MCP VPS Agent Gateway</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <nav>
+      <strong>MCP VPS Agent Gateway</strong>
+      <div><a href="https://github.com/josemirmoura/mcp-vps-agent-gateway">GitHub</a> <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/README.pt-BR.md">PT-BR</a></div>
+    </nav>
+    <div class="hero-copy">
+      <p class="eyebrow">Docker-first · policy-enforced · auditable</p>
+      <h1>Give ChatGPT real VPS capabilities without handing the model an unrestricted root shell.</h1>
+      <p class="lede">A remote MCP Gateway authenticates the client. A privileged local Broker re-authorizes every host operation against the scope chosen by the VPS owner.</p>
+      <div class="actions"><a class="button" href="#quick-start">Quick Start</a><a class="button secondary" href="https://github.com/josemirmoura/mcp-vps-agent-gateway">Read the docs</a></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="grid three">
+      <article><h2>Operator-defined authority</h2><p>Delegate one project, several roots, selected services and containers, or broader host authority. Filesystem, shell, systemd, Docker, network and admin capabilities remain separate policy decisions.</p></article>
+      <article><h2>Privilege stays server-side</h2><p>The Gateway is non-root and receives neither <code>/host</code> nor the Docker socket. The Broker is local-only, privileged and policy-authoritative.</p></article>
+      <article><h2>Proof before success</h2><p>Healthy containers are only a checkpoint. Installation completes after a real ChatGPT MCP call crosses authentication, policy, Broker execution and the tamper-evident audit trail.</p></article>
+    </section>
+
+    <section>
+      <p class="eyebrow">Architecture</p>
+      <h2>Small surface, explicit trust boundaries</h2>
+      <div class="architecture">
+        <div class="node"><strong>ChatGPT</strong><span>OAuth + HTTPS MCP</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><strong>Gateway</strong><span>non-root</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><strong>Broker</strong><span>local privileged boundary</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><strong>VPS</strong><span>Linux · systemd · Docker · files</span></div>
+      </div>
+    </section>
+
+    <section class="grid two">
+      <article><p class="eyebrow">Security</p><h2>The LLM is not the authorization engine.</h2><p>Deny-by-default policy, scoped filesystem resolution, isolated shell/jobs, bounded requests, expected-subject checks, operation journals, locks/fencing and a Broker-owned audit hash chain keep authority in code the operator controls.</p></article>
+      <article><p class="eyebrow">Toolbox</p><h2>Useful enough to run a server.</h2><p>Filesystem CRUD, durable shell/jobs, systemd, Docker/Compose, diagnostics, package inventory/management, users/groups, UFW and temporary out-of-band elevation are available when policy enables them.</p></article>
+    </section>
+
+    <section id="quick-start" class="quick">
+      <p class="eyebrow">Quick Start</p>
+      <h2>Clone, choose scope, start, verify.</h2>
+      <pre><code>git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
+cd mcp-vps-agent-gateway
+bash scripts/init.sh
+$EDITOR config/policy.yaml
+docker compose up -d --build
+bash scripts/verify.sh</code></pre>
+      <p>For ChatGPT, add a remote HTTPS endpoint plus OAuth/OIDC, run <code>scripts/verify-public.sh</code>, then <code>scripts/connect-chatgpt.sh</code>. The final script waits for the real audited call before declaring installation complete.</p>
+    </section>
+
+    <section class="grid two">
+      <article><p class="eyebrow">Operations</p><h2>Terminal-first after day one.</h2><pre><code>bash scripts/diagnose.sh status
+bash scripts/update.sh
+bash scripts/remove.sh safe</code></pre></article>
+      <article><p class="eyebrow">Validation</p><h2>CI exercises the host path, not just mocks.</h2><p>Clean Ubuntu runners test Docker package health, auth denial, scoped filesystem and shell behavior, real systemd and Docker restarts, Compose lifecycle, elevation rules and audit integrity.</p></article>
+    </section>
+  </main>
+
+  <footer><span>Apache-2.0</span><a href="https://github.com/josemirmoura/mcp-vps-agent-gateway">Repository and technical documentation →</a></footer>
+</body>
+</html>

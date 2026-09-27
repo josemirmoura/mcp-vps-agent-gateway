@@ -1,0 +1,11 @@
+services:
+  broker:
+    environment:
+      VPS_AGENT_PHYSICAL_SCOPE_ROOT: "/"
+      VPS_AGENT_WHOLE_HOST: "1"
+    volumes:
+      - type: bind
+        source: /
+        target: /host
+        bind:
+          propagation: rslave

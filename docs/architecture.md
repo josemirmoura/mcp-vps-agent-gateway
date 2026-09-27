@@ -103,6 +103,20 @@ The Broker owns:
 
 The Gateway is treated as an untrusted deputy.
 
+## Product capability model
+
+The product ships one broad tool/capability catalog. Effective authority is selected by policy, not by building different binaries.
+
+A user may authorize:
+
+- one project root
+- several selected roots/resources
+- the whole host
+
+Filesystem scope is only one dimension. systemd units, Docker resources, shell roots, network destinations and administrative actions are independently scoped.
+
+See [product-model.md](product-model.md).
+
 ## Policy is a module, not a service
 
 The Policy Engine lives inside the Broker. It is not a third daemon.

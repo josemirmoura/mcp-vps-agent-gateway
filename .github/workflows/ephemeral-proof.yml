@@ -1,0 +1,371 @@
+name: ephemeral-vps-proof
+
+on:
+  pull_request:
+    paths:
+      - 'proof/request.json'
+      - '.github/workflows/ephemeral-proof.yml'
+      - 'cmd/**'
+      - 'internal/**'
+      - 'tests/fixtures/systemd/**'
+      - 'examples/policies/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          cache: true
+
+      - name: Build binaries
+        run: |
+          go mod tidy
+          mkdir -p dist
+          go build -o dist/vps-agent-gateway ./cmd/vps-agent-gateway
+          go build -o dist/vps-agent-broker ./cmd/vps-agent-broker
+          go build -o dist/vps-agent ./cmd/vps-agent
+          go build -o dist/vps-agent-proof ./cmd/vps-agent-proof
+
+      - name: Provision disposable VPS environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p proof/runtime
+
+          sudo groupadd --system vps-agent 2>/dev/null || true
+          if ! id vps-agent >/dev/null 2>&1; then
+            sudo useradd --system --gid vps-agent --no-create-home --shell /usr/sbin/nologin vps-agent
+          fi
+
+          sudo install -m 0755 dist/vps-agent-gateway /usr/local/bin/vps-agent-gateway
+          sudo install -m 0755 dist/vps-agent-broker /usr/local/bin/vps-agent-broker
+          sudo install -m 0755 dist/vps-agent /usr/local/bin/vps-agent
+
+          sudo install -d -o root -g vps-agent -m 0750 /etc/vps-agent
+          sudo install -d -o root -g vps-agent -m 0750 /var/lib/vps-agent
+          sudo install -d -o root -g vps-agent -m 0750 /var/lib/vps-agent/proof
+
+          cat > /tmp/policy.yaml <<'YAML'
+          version: 1
+          mode: scoped
+
+          features:
+            full_mode_enabled: false
+
+          filesystem:
+            read:
+              - /var/lib/vps-agent/proof
+              - /opt/josemir-agradece-seu-gpt
+            write:
+              - /var/lib/vps-agent/proof
+              - /opt/josemir-agradece-seu-gpt
+
+          network:
+            mode: blocked
+            destinations: []
+
+          services:
+            inspect:
+              - vps-agent-test.service
+            manage:
+              - vps-agent-test.service
+            actions:
+              - status
+              - restart
+
+          docker:
+            inspect: []
+            manage: []
+            actions: []
+
+          shell:
+            enabled: false
+            cwd_roots: []
+            max_runtime_seconds: 300
+            max_output_bytes: 1048576
+
+          privilege:
+            admin: broker-only
+
+          replay:
+            require_idempotency_for_safe_writes: true
+            blind_retry_non_replay_safe: false
+
+          grant:
+            required: true
+            max_ttl_minutes: 60
+          YAML
+          sudo install -o root -g root -m 0600 /tmp/policy.yaml /etc/vps-agent/policy.yaml
+
+          PROOF_TOKEN="$(openssl rand -hex 24)"
+          ADMIN_TOKEN="$(openssl rand -hex 24)"
+          echo "::add-mask::$PROOF_TOKEN"
+          echo "::add-mask::$ADMIN_TOKEN"
+          {
+            echo "VPS_AGENT_BROKER_SOCKET=/run/vps-agent/broker.sock"
+            echo "VPS_AGENT_LISTEN=127.0.0.1:18080"
+            echo "VPS_AGENT_AUTH_MODE=static"
+            echo "VPS_AGENT_STATIC_TOKEN=$PROOF_TOKEN"
+            echo "VPS_AGENT_STATIC_SUBJECT=josemir-proof"
+          } | sudo tee /etc/vps-agent/gateway.env >/dev/null
+          {
+            echo "VPS_AGENT_POLICY=/etc/vps-agent/policy.yaml"
+            echo "VPS_AGENT_BROKER_SOCKET=/run/vps-agent/broker.sock"
+            echo "VPS_AGENT_STATE_DB=/var/lib/vps-agent/state.db"
+            echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN"
+            echo "VPS_AGENT_EXPECTED_SUBJECT=josemir-proof"
+          } | sudo tee /etc/vps-agent/broker.env >/dev/null
+          sudo chown root:root /etc/vps-agent/gateway.env /etc/vps-agent/broker.env
+          sudo chmod 0600 /etc/vps-agent/gateway.env /etc/vps-agent/broker.env
+
+          echo "VPS_AGENT_PROOF_TOKEN=$PROOF_TOKEN" >> "$GITHUB_ENV"
+          echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN" >> "$GITHUB_ENV"
+
+          sudo install -m 0644 tests/fixtures/systemd/vps-agent-broker.service /etc/systemd/system/vps-agent-broker.service
+          sudo install -m 0644 tests/fixtures/systemd/vps-agent-gateway.service /etc/systemd/system/vps-agent-gateway.service
+          sudo install -d -m 0755 /etc/systemd/system/vps-agent-broker.service.d
+          cat > /tmp/proof-opt.conf <<'DROPIN'
+          [Service]
+          ReadWritePaths=/opt
+          DROPIN
+          sudo install -m 0644 /tmp/proof-opt.conf /etc/systemd/system/vps-agent-broker.service.d/proof-opt.conf
+
+          cat > /tmp/vps-agent-test.service <<'UNIT'
+          [Unit]
+          Description=Disposable VPS Agent proof service
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/bin/sleep infinity
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+          sudo install -m 0644 /tmp/vps-agent-test.service /etc/systemd/system/vps-agent-test.service
+
+          sudo systemctl daemon-reload
+          sudo systemctl start vps-agent-test.service
+          sudo systemctl start vps-agent-broker.service
+          sudo systemctl start vps-agent-gateway.service
+
+          ready=0
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:18080/healthz >/dev/null 2>&1 && sudo test -S /run/vps-agent/broker.sock; then
+              ready=1
+              break
+            fi
+            sleep 0.25
+          done
+
+          if [ "$ready" != "1" ]; then
+            sudo systemctl status vps-agent-broker.service --no-pager > proof/runtime/broker-status-on-failure.txt 2>&1 || true
+            sudo systemctl status vps-agent-gateway.service --no-pager > proof/runtime/gateway-status-on-failure.txt 2>&1 || true
+            sudo journalctl -u vps-agent-broker.service --no-pager > proof/runtime/broker-journal-on-failure.txt 2>&1 || true
+            sudo journalctl -u vps-agent-gateway.service --no-pager > proof/runtime/gateway-journal-on-failure.txt 2>&1 || true
+            sudo stat -c '%A %U:%G %n' /run/vps-agent /var/lib/vps-agent > proof/runtime/directories-on-failure.txt 2>&1 || true
+            echo "Broker/Gateway readiness failed"
+            cat proof/runtime/broker-status-on-failure.txt || true
+            cat proof/runtime/broker-journal-on-failure.txt || true
+            exit 1
+          fi
+
+          curl -fsS http://127.0.0.1:18080/healthz
+          sudo stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent
+
+          # Privilege-boundary proof: the Gateway OS user must not read
+          # Broker secrets, authoritative policy, or Broker-owned SQLite.
+          if sudo -u vps-agent cat /etc/vps-agent/broker.env >/dev/null 2>&1; then
+            echo "SECURITY FAILURE: Gateway user can read broker.env"
+            exit 1
+          fi
+          if sudo -u vps-agent cat /etc/vps-agent/policy.yaml >/dev/null 2>&1; then
+            echo "SECURITY FAILURE: Gateway user can read authoritative policy"
+            exit 1
+          fi
+          if sudo -u vps-agent cat /var/lib/vps-agent/state.db >/dev/null 2>&1; then
+            echo "SECURITY FAILURE: Gateway user can read Broker SQLite"
+            exit 1
+          fi
+
+      - name: Capture before state
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p proof/runtime
+          hostname > proof/runtime/hostname.txt
+          uname -a > proof/runtime/uname.txt
+          sudo stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent > proof/runtime/permissions-before.txt
+          systemctl show vps-agent-test.service -p ActiveState -p MainPID -p ActiveEnterTimestamp --no-pager > proof/runtime/service-before.txt
+          systemctl show vps-agent-gateway.service -p ActiveState -p MainPID --no-pager > proof/runtime/gateway.txt
+          systemctl show vps-agent-broker.service -p ActiveState -p MainPID --no-pager > proof/runtime/broker.txt
+
+      - name: Execute request through real MCP Gateway and Broker
+        id: execute
+        shell: bash
+        run: |
+          set +e
+          ./dist/vps-agent-proof \
+            -request proof/request.json \
+            -endpoint http://127.0.0.1:18080/mcp \
+            -token "$VPS_AGENT_PROOF_TOKEN" \
+            -output proof/evidence.json \
+            | tee proof/runtime/proof-client.log
+          rc=${PIPESTATUS[0]}
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Capture after state and audit
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          systemctl show vps-agent-test.service -p ActiveState -p MainPID -p ActiveEnterTimestamp --no-pager > proof/runtime/service-after.txt
+          sudo stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent > proof/runtime/permissions-after.txt
+
+          sudo --preserve-env=VPS_AGENT_ADMIN_TOKEN /usr/local/bin/vps-agent audit-status \
+            --socket /run/vps-agent/broker.sock \
+            > proof/audit-status.json 2>proof/runtime/audit-status.stderr
+
+          sudo journalctl -u vps-agent-broker.service --no-pager > proof/runtime/broker-journal.txt
+          sudo journalctl -u vps-agent-gateway.service --no-pager > proof/runtime/gateway-journal.txt
+          sudo journalctl -u vps-agent-test.service --no-pager > proof/runtime/test-service-journal.txt
+
+          REQUEST_TYPE="$(python3 -c 'import json; print(json.load(open("proof/request.json"))["type"])')"
+          REQUEST_PATH="$(python3 -c 'import json; print(json.load(open("proof/request.json")).get("path",""))')"
+          if [ "$REQUEST_TYPE" = "file_write_read" ] && [ -n "$REQUEST_PATH" ] && sudo test -f "$REQUEST_PATH"; then
+            sudo sha256sum "$REQUEST_PATH" > proof/runtime/file-sha256.txt
+            sudo cat "$REQUEST_PATH" > proof/runtime/file-content.txt
+          fi
+
+          if [ "$REQUEST_TYPE" = "directory_html_and_file" ]; then
+            DIRECTORY="$(python3 -c 'import json; print(json.load(open("proof/request.json"))["directory"])')"
+            HTML_PATH="$(python3 -c 'import json; print(json.load(open("proof/request.json"))["html_path"])')"
+            SECOND_PATH="$(python3 -c 'import json; print(json.load(open("proof/request.json"))["second_path"])')"
+            sudo test -d "$DIRECTORY"
+            sudo test -f "$HTML_PATH"
+            sudo test -f "$SECOND_PATH"
+            sudo stat -c '%A %U:%G %n' "$DIRECTORY" "$HTML_PATH" "$SECOND_PATH" > proof/runtime/user-request-paths.txt
+            sudo sha256sum "$HTML_PATH" > proof/runtime/html-sha256.txt
+            sudo sha256sum "$SECOND_PATH" > proof/runtime/second-sha256.txt
+            sudo cat "$HTML_PATH" > proof/runtime/html-content.txt
+            sudo cat "$SECOND_PATH" > proof/runtime/second-content.txt
+          fi
+
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+
+          evidence_path = pathlib.Path("proof/evidence.json")
+          if evidence_path.exists():
+              evidence = json.loads(evidence_path.read_text())
+          else:
+              evidence = {"success": False, "steps": [], "error": "proof client did not create evidence.json"}
+
+          def read(path):
+              p = pathlib.Path(path)
+              return p.read_text().strip() if p.exists() else None
+
+          evidence["github"] = {
+              "run_id": os.environ.get("GITHUB_RUN_ID"),
+              "run_number": os.environ.get("GITHUB_RUN_NUMBER"),
+              "sha": os.environ.get("GITHUB_SHA"),
+              "repository": os.environ.get("GITHUB_REPOSITORY"),
+              "runner_os": os.environ.get("RUNNER_OS"),
+              "runner_arch": os.environ.get("RUNNER_ARCH"),
+          }
+          evidence["runtime"] = {
+              "hostname": read("proof/runtime/hostname.txt"),
+              "uname": read("proof/runtime/uname.txt"),
+              "service_before": read("proof/runtime/service-before.txt"),
+              "service_after": read("proof/runtime/service-after.txt"),
+              "socket_permissions": read("proof/runtime/permissions-after.txt"),
+              "file_sha256": read("proof/runtime/file-sha256.txt"),
+              "file_content": read("proof/runtime/file-content.txt"),
+              "user_request_paths": read("proof/runtime/user-request-paths.txt"),
+              "html_sha256": read("proof/runtime/html-sha256.txt"),
+              "html_content": read("proof/runtime/html-content.txt"),
+              "second_sha256": read("proof/runtime/second-sha256.txt"),
+              "second_content": read("proof/runtime/second-content.txt"),
+          }
+          audit_raw = read("proof/audit-status.json")
+          try:
+              evidence["audit"] = json.loads(audit_raw) if audit_raw else None
+          except Exception:
+              evidence["audit"] = {"parse_error": True, "raw": audit_raw}
+          raw_rc = os.environ.get("PROOF_RC", "1")
+          evidence["proof_client_exit_code"] = int(raw_rc) if raw_rc.strip() else 1
+          evidence_path.write_text(json.dumps(evidence, indent=2))
+          PY
+        env:
+          PROOF_RC: ${{ steps.execute.outputs.rc }}
+
+      - name: Upload proof evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ephemeral-vps-proof-${{ github.run_id }}
+          path: proof/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enforce proof result
+        if: always()
+        shell: bash
+        run: |
+          test "${{ steps.execute.outputs.rc }}" = "0"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          with open("proof/evidence.json") as f:
+              evidence=json.load(f)
+          with open("proof/request.json") as f:
+              request=json.load(f)
+
+          assert evidence.get("success") is True, evidence
+          assert evidence.get("proof_client_exit_code") == 0, evidence
+
+          audit=evidence.get("audit") or {}
+          assert audit.get("ok") is True, audit
+          assert audit.get("result",{}).get("valid") is True, audit
+          assert audit.get("result",{}).get("events",0) >= 1, audit
+
+          if request["type"] == "file_write_read":
+              assert evidence["runtime"].get("file_content") == request.get("content",""), evidence["runtime"]
+              assert evidence["runtime"].get("file_sha256"), evidence["runtime"]
+
+          if request["type"] == "file_read_denied":
+              assert len(evidence.get("steps",[])) == 1
+              step=evidence["steps"][0]
+              assert step.get("expected_denial") is True and step.get("is_error") is True, step
+
+          if request["type"] == "directory_html_and_file":
+              runtime=evidence["runtime"]
+              assert runtime.get("html_content") == request.get("html_content",""), runtime
+              assert runtime.get("second_content") == request.get("second_content",""), runtime
+              assert runtime.get("html_sha256"), runtime
+              assert runtime.get("second_sha256"), runtime
+              assert "♥" in runtime.get("html_content",""), runtime
+              assert request.get("directory","") in (runtime.get("user_request_paths") or ""), runtime
+
+          if request["type"] == "service_restart":
+              def pid(text):
+                  for line in (text or "").splitlines():
+                      if line.startswith("MainPID="):
+                          return int(line.split("=",1)[1])
+                  return 0
+              before=pid(evidence["runtime"].get("service_before"))
+              after=pid(evidence["runtime"].get("service_after"))
+              assert before > 0 and after > 0 and before != after, (before, after, evidence["runtime"])
+              assert "ActiveState=active" in (evidence["runtime"].get("service_after") or "")
+
+          print("EPHEMERAL VPS PROOF: PASS")
+          PY
