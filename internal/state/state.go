@@ -309,6 +309,26 @@ func (s *Store) IssueGrant(ctx context.Context, subject string, capabilities []s
 	return Grant{ID: id, Subject: subject, Capabilities: caps, ExpiresAt: exp}, nil
 }
 
+func (s *Store) GetGrant(ctx context.Context, grantID string) (Grant, error) {
+	var g Grant
+	var rawCaps string
+	var expires int64
+	var revoked sql.NullInt64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT subject, capabilities, expires_at, revoked_at FROM grants WHERE grant_id=?`, grantID).
+		Scan(&g.Subject, &rawCaps, &expires, &revoked)
+	if err != nil {
+		return Grant{}, err
+	}
+	g.ID = grantID
+	g.ExpiresAt = time.Unix(0, expires)
+	g.Revoked = revoked.Valid
+	if err := json.Unmarshal([]byte(rawCaps), &g.Capabilities); err != nil {
+		return Grant{}, err
+	}
+	return g, nil
+}
+
 func (s *Store) ValidateGrant(ctx context.Context, grantID, subject, capability string) (bool, error) {
 	var storedSubject, rawCaps string
 	var expires int64
