@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -56,6 +57,7 @@ func main() {
 		ResourceIdentifier:   resource,
 		InstanceID:           os.Getenv("VPS_AGENT_INSTANCE_ID"),
 		InstanceName:         getenv("VPS_AGENT_INSTANCE_NAME", "vps-agent"),
+		MaxConcurrentRequests: getenvInt("VPS_AGENT_MAX_CONCURRENT_REQUESTS", 64),
 	}
 	if issuer != "" {
 		authCfg.AuthorizationServers = []string{issuer}
@@ -107,6 +109,14 @@ func splitScopes(raw string) []string {
 	return strings.FieldsFunc(raw, func(r rune) bool {
 		return r == ',' || unicode.IsSpace(r)
 	})
+}
+
+func getenvInt(name string, fallback int) int {
+	v := os.Getenv(name)
+	if v == "" { return fallback }
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 { return fallback }
+	return n
 }
 
 func getenv(name, fallback string) string {
