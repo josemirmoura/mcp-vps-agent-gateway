@@ -30,6 +30,8 @@ type Broker struct {
 	Jobs       *jobs.Manager
 	AdminToken      string
 	ExpectedSubject string
+	InstanceID      string
+	InstanceName    string
 }
 
 func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
@@ -59,7 +61,7 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		host, _ := os.Hostname()
 		return ok(req.ID, map[string]any{
 			"hostname": host, "goos": runtime.GOOS, "goarch": runtime.GOARCH,
-			"cpus": runtime.NumCPU(),
+			"cpus": runtime.NumCPU(), "instance_id": b.InstanceID, "instance_name": b.InstanceName,
 		})
 	case "system.health":
 		auditOK := true
