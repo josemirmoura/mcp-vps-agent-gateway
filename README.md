@@ -71,7 +71,7 @@ docker compose -f compose.yaml -f compose.host.yaml up -d --build
 `compose.host.yaml` is the deliberate whole-host switch and sets the Broker's physical ceiling to `/`. Server-side policy still controls which MCP operations are allowed.
 ### Finish installation: integrated OAuth + ChatGPT
 
-The supported public path is self-hosted OAuth/OIDC inside this package. No Auth0/Okta/Entra account and no OpenAI tunnel are required.
+The supported public path is self-hosted OAuth/OIDC inside this package. No third-party identity service or separate tunnel is required.
 
 Before running the next command, create a DNS A/AAAA record for a hostname you control and point it at the VPS. Then run:
 
