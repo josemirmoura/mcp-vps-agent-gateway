@@ -65,14 +65,13 @@ func aptAction(ctx context.Context, action, name string) (string, error) {
 	return text, nil
 }
 
-func userList() ([]map[string]any, error) {
-	f, err := os.Open(hostexec.Path("/etc/passwd"))
+func userList(ctx context.Context) ([]map[string]any, error) {
+	out, err := hostexec.CommandContext(ctx, "getent", "passwd").Output()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getent passwd: %w", err)
 	}
-	defer f.Close()
 	var result []map[string]any
-	s := bufio.NewScanner(f)
+	s := bufio.NewScanner(strings.NewReader(string(out)))
 	for s.Scan() {
 		p := strings.Split(s.Text(), ":")
 		if len(p) < 7 {
@@ -85,11 +84,11 @@ func userList() ([]map[string]any, error) {
 	return result, s.Err()
 }
 
-func userInspect(name string) (map[string]any, error) {
+func userInspect(ctx context.Context, name string) (map[string]any, error) {
 	if !userNameRE.MatchString(name) {
 		return nil, errors.New("invalid username")
 	}
-	rows, err := userList()
+	rows, err := userList(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -124,14 +123,13 @@ func userAction(ctx context.Context, action, name string, createHome bool) (stri
 	}
 }
 
-func groupList() ([]map[string]any, error) {
-	f, err := os.Open(hostexec.Path("/etc/group"))
+func groupList(ctx context.Context) ([]map[string]any, error) {
+	out, err := hostexec.CommandContext(ctx, "getent", "group").Output()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getent group: %w", err)
 	}
-	defer f.Close()
 	var result []map[string]any
-	s := bufio.NewScanner(f)
+	s := bufio.NewScanner(strings.NewReader(string(out)))
 	for s.Scan() {
 		p := strings.Split(s.Text(), ":")
 		if len(p) < 4 {
@@ -147,11 +145,11 @@ func groupList() ([]map[string]any, error) {
 	return result, s.Err()
 }
 
-func groupInspect(name string) (map[string]any, error) {
+func groupInspect(ctx context.Context, name string) (map[string]any, error) {
 	if !groupNameRE.MatchString(name) {
 		return nil, errors.New("invalid group name")
 	}
-	rows, err := groupList()
+	rows, err := groupList(ctx)
 	if err != nil {
 		return nil, err
 	}
