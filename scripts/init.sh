@@ -176,7 +176,7 @@ else
 ERROR: VPS_AGENT_SCOPE_ROOT does not exist: $SCOPE_ROOT
 
 Create it first, for example:
-  sudo install -d -o "\$USER" -g "\$USER" -m 0750 "$SCOPE_ROOT"
+  sudo install -d -o "\$USER" -g "\$(id -gn)" -m 0750 "$SCOPE_ROOT"
 
 Or choose an existing directory:
   bash scripts/init.sh --scope /absolute/existing/path
