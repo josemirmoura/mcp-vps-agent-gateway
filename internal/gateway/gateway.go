@@ -799,6 +799,7 @@ func (s *Server) callWithGrant(ctx context.Context, tool, resource, action strin
 	}
 	resp, err := s.Executor.Call(ctx, req)
 	if err != nil {
+		if s.Metrics != nil { s.Metrics.observeIPCFailure() }
 		return err
 	}
 	if !resp.OK {
@@ -834,6 +835,7 @@ func (s *Server) call(ctx context.Context, tool, resource, action string, args [
 	}
 	resp, err := s.Executor.Call(ctx, req)
 	if err != nil {
+		if s.Metrics != nil { s.Metrics.observeIPCFailure() }
 		return err
 	}
 	if !resp.OK {
