@@ -33,9 +33,14 @@ jobs:
         run: |
           mkdir -p dist/linux-amd64 dist/linux-arm64
           for arch in amd64 arm64; do
-            for cmd in vps-agent-gateway vps-agent-broker vps-agent; do
+            for cmd in vps-agent-gateway vps-agent-broker vps-agent vps-agent-setup; do
               CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags="-s -w" -o "dist/linux-$arch/$cmd" "./cmd/$cmd"
             done
+          done
+          for arch in amd64 arm64; do
+            cp LICENSE README.md README.pt-BR.md "dist/linux-$arch/"
+            tar -C "dist/linux-$arch" -czf "dist/vps-agent-linux-$arch.tar.gz" .
+            sha256sum "dist/vps-agent-linux-$arch.tar.gz" > "dist/vps-agent-linux-$arch.tar.gz.sha256"
           done
       - uses: actions/upload-artifact@v4
         with:
