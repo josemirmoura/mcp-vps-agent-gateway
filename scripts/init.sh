@@ -47,11 +47,35 @@ if [ -z "$SCOPE_ROOT" ]; then
   echo "ERROR: set VPS_AGENT_SCOPE_ROOT in .env before starting the Scoped package." >&2
   exit 1
 fi
+if [[ "$SCOPE_ROOT" != /* ]]; then
+  echo "ERROR: VPS_AGENT_SCOPE_ROOT must be an absolute path." >&2
+  exit 1
+fi
+NORMALIZED_SCOPE_ROOT="$(python3 - "$SCOPE_ROOT" <<'PY'
+import os
+import sys
+print(os.path.normpath(sys.argv[1]))
+PY
+)"
+if [ "$NORMALIZED_SCOPE_ROOT" != "$SCOPE_ROOT" ]; then
+  echo "ERROR: VPS_AGENT_SCOPE_ROOT must be canonical (no '..', '.' or trailing slash): $SCOPE_ROOT" >&2
+  exit 1
+fi
 if [ "$SCOPE_ROOT" = "/" ]; then
   echo "NOTE: whole-host authority requires the explicit compose.host.yaml override."
-elif [ ! -d "$SCOPE_ROOT" ]; then
-  echo "NOTE: VPS_AGENT_SCOPE_ROOT does not exist yet: $SCOPE_ROOT"
-  echo "Create that directory or change .env before docker compose up."
+else
+  CHECK_PATH="$SCOPE_ROOT"
+  while [ "$CHECK_PATH" != "/" ]; do
+    if [ -L "$CHECK_PATH" ]; then
+      echo "ERROR: VPS_AGENT_SCOPE_ROOT may not traverse symlinks: $CHECK_PATH" >&2
+      exit 1
+    fi
+    CHECK_PATH="$(dirname "$CHECK_PATH")"
+  done
+  if [ ! -d "$SCOPE_ROOT" ]; then
+    echo "NOTE: VPS_AGENT_SCOPE_ROOT does not exist yet: $SCOPE_ROOT"
+    echo "Create that directory or change .env before docker compose up."
+  fi
 fi
 
 docker compose config -q

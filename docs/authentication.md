@@ -59,6 +59,8 @@ Configure VPS_AGENT_SUBJECT to the exact stable sub claim issued by your Authori
 
 ## Fail-closed rules
 
+- The standalone Gateway defaults to 127.0.0.1:8080.
+- Auth mode none is accepted only on a loopback listener; an unauthenticated non-loopback bind makes the Gateway refuse startup.
 - A non-empty VPS_AGENT_PUBLIC_URL with auth mode static or none makes the Gateway refuse startup.
 - verify-public.sh rejects non-HTTPS public URLs.
 - verify-public.sh requires OAuth Protected Resource Metadata.

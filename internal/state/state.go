@@ -410,9 +410,22 @@ func (s *Store) ValidateGrant(ctx context.Context, grantID, subject, capability 
 }
 
 func (s *Store) RevokeAll(ctx context.Context) error {
-	_, err := s.db.ExecContext(ctx,
-		`UPDATE grants SET revoked_at=? WHERE revoked_at IS NULL`, time.Now().UnixNano())
-	return err
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	now := time.Now().UnixNano()
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE grants SET revoked_at=? WHERE revoked_at IS NULL`, now); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE approvals SET status='revoked', decided_at=? WHERE status='pending'`, now); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 type AuditEvent struct {
