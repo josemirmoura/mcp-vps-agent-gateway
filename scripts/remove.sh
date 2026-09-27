@@ -93,12 +93,19 @@ fi
 
 if [ -n "${VPS_AGENT_PUBLIC_URL:-}" ]; then
   code="$(curl --silent --show-error --max-time 5 --output /dev/null --write-out '%{http_code}' "${VPS_AGENT_PUBLIC_URL}" 2>/dev/null || true)"
-  if [ -n "$code" ] && [ "$code" != "000" ]; then
-    echo "Removal incomplete: public endpoint still returned HTTP $code." >&2
-    echo "Disable the external reverse proxy/tunnel/DNS route and run this command again." >&2
-    exit 1
-  fi
-  echo "Public endpoint is no longer reachable from this host."
+  case "$code" in
+    000|"")
+      echo "Public MCP endpoint is no longer reachable from this host."
+      ;;
+    404|410)
+      echo "Public MCP route is gone (HTTP $code from the remaining edge proxy)."
+      ;;
+    *)
+      echo "Removal incomplete: the MCP URL still returned HTTP $code instead of disappearing." >&2
+      echo "Check for a stale proxy route before considering removal complete." >&2
+      exit 1
+      ;;
+  esac
 fi
 
 if [ "$mode" = "safe" ]; then
