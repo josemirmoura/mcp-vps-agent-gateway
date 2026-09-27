@@ -53,6 +53,8 @@ func main() {
 		RequiredScopes:       splitScopes(os.Getenv("VPS_AGENT_REQUIRED_SCOPES")),
 		ResourceMetadataURL:  metadataURL,
 		ResourceIdentifier:   resource,
+		InstanceID:           os.Getenv("VPS_AGENT_INSTANCE_ID"),
+		InstanceName:         getenv("VPS_AGENT_INSTANCE_NAME", "vps-agent"),
 	}
 	if issuer != "" {
 		authCfg.AuthorizationServers = []string{issuer}
