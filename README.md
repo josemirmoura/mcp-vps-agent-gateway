@@ -49,16 +49,25 @@ git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
 cd mcp-vps-agent-gateway
 
 bash scripts/init.sh
-$EDITOR config/policy.yaml
+$EDITOR .env config/policy.yaml
 
 docker compose up -d --build
 bash scripts/verify.sh
 ~~~
 
-The bootstrap creates random local secrets, a stable instance ID, local state and an **untracked** operator policy from config/policy.example.yaml. It never chooses VPS authority for you.
+The bootstrap creates random local secrets, a stable instance ID, local state and an **untracked** operator policy from config/policy.example.yaml. Set `VPS_AGENT_SCOPE_ROOT` in `.env` to an existing host directory that forms the physical filesystem ceiling, then keep filesystem, shell and Compose paths in policy inside that ceiling. It never chooses VPS authority for you.
 
 Local verification proves health, invalid-token denial, a real MCP system.info call and audit-chain integrity. **Installation is still not complete.**
 
+### Whole-host filesystem authority
+
+Scoped is the default. To deliberately expose the whole host filesystem to the Broker, use the explicit override:
+
+~~~bash
+docker compose -f compose.yaml -f compose.host.yaml up -d --build
+~~~
+
+`compose.host.yaml` is the deliberate whole-host switch. Server-side policy still controls which MCP operations are allowed.
 ### Public HTTPS + ChatGPT
 
 For a write-capable ChatGPT connection, use a standards-based OAuth/OIDC authorization server and set the public endpoint, issuer, audience/resource and expected token subject in .env. Static bearer auth is intentionally local/lab only.
