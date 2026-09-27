@@ -122,6 +122,12 @@ jobs:
               command: ["sh", "-c", "sleep 1200"]
           YAML
 
+          # shell.run_as=root must own the delegated work root because the
+          # Scoped sandbox intentionally drops DAC override capabilities.
+          sudo chown -R root:root /tmp/vps-agent-docker-proof
+          sudo chmod 0755 /tmp/vps-agent-docker-proof
+          sudo chmod 0755 /tmp/vps-agent-docker-proof/compose
+
       - name: Validate Compose package
         run: docker compose config -q
 
