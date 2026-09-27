@@ -133,6 +133,38 @@ jobs:
       - name: Build Docker package
         run: docker compose build
 
+      - name: Scan Gateway image for critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: mcp-vps-agent-gateway:ci
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          output: evidence/trivy-gateway.txt
+
+      - name: Scan Broker image for critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: mcp-vps-agent-broker:ci
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          output: evidence/trivy-broker.txt
+
+      - name: Generate image SBOMs
+        shell: bash
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.74.0 image --format cyclonedx --output /tmp/gateway.cdx.json mcp-vps-agent-gateway:ci
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.74.0 image --format cyclonedx --output /tmp/broker.cdx.json mcp-vps-agent-broker:ci
+          cp /tmp/gateway.cdx.json evidence/sbom-gateway.cdx.json
+          cp /tmp/broker.cdx.json evidence/sbom-broker.cdx.json
+
       - name: Start Docker package
         run: docker compose up -d
 
