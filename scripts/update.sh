@@ -49,7 +49,7 @@ rollback() {
   rm -rf state
   tar -xzf "$backup_dir/operator-state.tar.gz"
   "${compose[@]}" up -d --build
-  ./scripts/verify.sh
+  bash ./scripts/verify.sh
   printf '{"time":"%s","from":"%s","to":"%s","result":"rolled_back"}\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$current" "$target_sha" >> state/update.log
 }
@@ -58,7 +58,7 @@ trap rollback ERR
 git merge --ff-only "$target"
 docker compose config -q
 "${compose[@]}" up -d --build
-./scripts/verify.sh
+bash ./scripts/verify.sh
 
 trap - ERR
 printf '{"time":"%s","from":"%s","to":"%s","result":"success"}\n' \
