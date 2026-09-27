@@ -64,6 +64,7 @@ Local verification proves health, invalid-token denial, a real MCP system.info c
 Scoped is the default. To deliberately expose the whole host filesystem to the Broker, use the explicit override:
 
 ~~~bash
+sed -i 's/^VPS_AGENT_WHOLE_HOST=.*/VPS_AGENT_WHOLE_HOST=1/' .env
 docker compose -f compose.yaml -f compose.host.yaml up -d --build
 ~~~
 
