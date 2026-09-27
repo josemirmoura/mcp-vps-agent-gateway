@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"net/http"
 	"strings"
@@ -64,7 +65,7 @@ func staticVerifier(token, subject string) mcpauth.TokenVerifier {
 		subject = "static-user"
 	}
 	return func(_ context.Context, got string, _ *http.Request) (*mcpauth.TokenInfo, error) {
-		if token == "" || got != token {
+		if token == "" || len(got) != len(token) || subtle.ConstantTimeCompare([]byte(got), []byte(token)) != 1 {
 			return nil, mcpauth.ErrInvalidToken
 		}
 		return &mcpauth.TokenInfo{
