@@ -346,6 +346,9 @@ func (b *Broker) writeFile(ctx context.Context, req wire.Request, data []byte) w
 		}
 	}
 	if err := b.FS.WriteFileAtomic(req.Resource, data); err != nil {
+		if b.State != nil {
+			_ = b.State.AbortOperation(context.Background(), req.InvocationID)
+		}
 		return deny(req.ID, "permission_denied", err.Error())
 	}
 	result, _ := json.Marshal(map[string]any{"bytes": len(data), "written": true})
