@@ -47,3 +47,51 @@ func TestManagerPersistsAndScopesJobs(t *testing.T) {
 		t.Fatalf("cancel err=%v cancelled=%v", err, runner.cancelled)
 	}
 }
+
+
+func TestElevatedJobDeadlineCannotOutliveGrant(t *testing.T) {
+	store, err := state.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	runner := &fakeRunner{}
+	m := &Manager{State: store, Runner: runner}
+	ctx := context.Background()
+
+	grant, err := store.IssueGrant(ctx, "alice", []string{"shell.admin"}, 50*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec, err := m.Start(ctx, "alice", "shell.exec_admin", "/srv/app", grant.ID, sandbox.Spec{
+		Unit: "job-grant-boundary", Command: "sleep 60", CWD: "/srv/app",
+		Runtime: time.Minute, NetworkMode: "blocked",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec.Deadline.After(grant.ExpiresAt.Add(5 * time.Millisecond)) {
+		t.Fatalf("job deadline %v outlived grant %v", rec.Deadline, grant.ExpiresAt)
+	}
+}
+
+func TestJobRejectsForeignGrant(t *testing.T) {
+	store, err := state.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	m := &Manager{State: store, Runner: &fakeRunner{}}
+	ctx := context.Background()
+	grant, err := store.IssueGrant(ctx, "alice", []string{"shell.admin"}, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = m.Start(ctx, "bob", "shell.exec_admin", "/srv/app", grant.ID, sandbox.Spec{
+		Unit: "job-foreign-grant", Command: "true", CWD: "/srv/app",
+		Runtime: time.Minute, NetworkMode: "blocked",
+	})
+	if err == nil {
+		t.Fatal("foreign subject grant was accepted")
+	}
+}
