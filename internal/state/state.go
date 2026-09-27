@@ -393,6 +393,32 @@ func (s *Store) AppendAudit(ctx context.Context, ev AuditEvent) (string, error) 
 	return digest, nil
 }
 
+type AuditStatus struct {
+	Valid    bool   `json:"valid"`
+	Events   int64  `json:"events"`
+	HeadHash string `json:"head_hash"`
+}
+
+func (s *Store) AuditStatus(ctx context.Context) (AuditStatus, error) {
+	if err := s.VerifyAudit(ctx); err != nil {
+		return AuditStatus{Valid: false}, err
+	}
+	var status AuditStatus
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*), COALESCE(MAX(seq),0) FROM audit_events`).Scan(&status.Events, new(int64))
+	if err != nil {
+		return AuditStatus{}, err
+	}
+	if status.Events > 0 {
+		if err := s.db.QueryRowContext(ctx, `SELECT hash FROM audit_events ORDER BY seq DESC LIMIT 1`).Scan(&status.HeadHash); err != nil {
+			return AuditStatus{}, err
+		}
+	} else {
+		status.HeadHash = "GENESIS"
+	}
+	status.Valid = true
+	return status, nil
+}
+
 func (s *Store) VerifyAudit(ctx context.Context) error {
 	rows, err := s.db.QueryContext(ctx, `SELECT seq,event_json,prev_hash,hash FROM audit_events ORDER BY seq`)
 	if err != nil {
