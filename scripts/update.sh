@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+if [ ! -f .env ] || [ ! -f config/policy.yaml ]; then
+  echo "Missing .env or config/policy.yaml. Run ./scripts/init.sh first." >&2
+  exit 1
+fi
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "Tracked working tree has local changes. Commit/stash them before update." >&2
+  exit 1
+fi
+
+set -a
+. ./.env
+set +a
+
+current="$(git rev-parse HEAD)"
+target="${VPS_AGENT_UPDATE_REF:-origin/main}"
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+backup_dir="backups/$stamp"
+mkdir -p "$backup_dir"
+chmod 700 backups "$backup_dir"
+
+compose=(docker compose)
+if [ -n "${VPS_AGENT_DOMAIN:-}" ] && [ -f compose.https.yaml ]; then
+  compose=(docker compose -f compose.yaml -f compose.https.yaml)
+fi
+
+echo "Current version: $current"
+git fetch --tags origin
+target_sha="$(git rev-parse "$target")"
+echo "Target version:  $target_sha"
+if [ "$current" = "$target_sha" ]; then
+  echo "Already at target version."
+  exit 0
+fi
+
+echo "Stopping package for a consistent state backup..."
+"${compose[@]}" stop
+
+tar -czf "$backup_dir/operator-state.tar.gz" .env config/policy.yaml state
+printf '%s\n' "$current" >"$backup_dir/previous-commit"
+printf '%s\n' "$target_sha" >"$backup_dir/target-commit"
+
+rollback() {
+  echo "Update failed; rolling back to $current..." >&2
+  git reset --hard "$current"
+  rm -rf state
+  tar -xzf "$backup_dir/operator-state.tar.gz"
+  "${compose[@]}" up -d --build
+  ./scripts/verify.sh
+  printf '{"time":"%s","from":"%s","to":"%s","result":"rolled_back"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$current" "$target_sha" >> state/update.log
+}
+trap rollback ERR
+
+git merge --ff-only "$target"
+docker compose config -q
+"${compose[@]}" up -d --build
+./scripts/verify.sh
+
+trap - ERR
+printf '{"time":"%s","from":"%s","to":"%s","result":"success"}\n' \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$current" "$target_sha" >> state/update.log
+
+echo "UPDATE COMPLETE: $current -> $target_sha"
+echo "Backup retained at $backup_dir"
