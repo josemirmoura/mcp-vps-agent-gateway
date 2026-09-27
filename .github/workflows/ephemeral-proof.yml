@@ -150,7 +150,7 @@ jobs:
 
           ready=0
           for i in $(seq 1 40); do
-            if curl -fsS http://127.0.0.1:18080/healthz >/dev/null 2>&1 && test -S /run/vps-agent/broker.sock; then
+            if curl -fsS http://127.0.0.1:18080/healthz >/dev/null 2>&1 && sudo test -S /run/vps-agent/broker.sock; then
               ready=1
               break
             fi
@@ -162,7 +162,7 @@ jobs:
             sudo systemctl status vps-agent-gateway.service --no-pager > proof/runtime/gateway-status-on-failure.txt 2>&1 || true
             sudo journalctl -u vps-agent-broker.service --no-pager > proof/runtime/broker-journal-on-failure.txt 2>&1 || true
             sudo journalctl -u vps-agent-gateway.service --no-pager > proof/runtime/gateway-journal-on-failure.txt 2>&1 || true
-            stat -c '%A %U:%G %n' /run/vps-agent /var/lib/vps-agent > proof/runtime/directories-on-failure.txt 2>&1 || true
+            sudo stat -c '%A %U:%G %n' /run/vps-agent /var/lib/vps-agent > proof/runtime/directories-on-failure.txt 2>&1 || true
             echo "Broker/Gateway readiness failed"
             cat proof/runtime/broker-status-on-failure.txt || true
             cat proof/runtime/broker-journal-on-failure.txt || true
@@ -170,7 +170,7 @@ jobs:
           fi
 
           curl -fsS http://127.0.0.1:18080/healthz
-          stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent
+          sudo stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent
 
       - name: Capture before state
         shell: bash
@@ -179,7 +179,7 @@ jobs:
           mkdir -p proof/runtime
           hostname > proof/runtime/hostname.txt
           uname -a > proof/runtime/uname.txt
-          stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent > proof/runtime/permissions-before.txt
+          sudo stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent > proof/runtime/permissions-before.txt
           systemctl show vps-agent-test.service -p ActiveState -p MainPID -p ActiveEnterTimestamp --no-pager > proof/runtime/service-before.txt
           systemctl show vps-agent-gateway.service -p ActiveState -p MainPID --no-pager > proof/runtime/gateway.txt
           systemctl show vps-agent-broker.service -p ActiveState -p MainPID --no-pager > proof/runtime/broker.txt
@@ -205,9 +205,9 @@ jobs:
         run: |
           set +e
           systemctl show vps-agent-test.service -p ActiveState -p MainPID -p ActiveEnterTimestamp --no-pager > proof/runtime/service-after.txt
-          stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent > proof/runtime/permissions-after.txt
+          sudo stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent > proof/runtime/permissions-after.txt
 
-          /usr/local/bin/vps-agent audit-status \
+          sudo /usr/local/bin/vps-agent audit-status \
             --admin-token "$VPS_AGENT_ADMIN_TOKEN" \
             --socket /run/vps-agent/broker.sock \
             > proof/audit-status.json 2>proof/runtime/audit-status.stderr
