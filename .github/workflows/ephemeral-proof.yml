@@ -217,9 +217,11 @@ jobs:
           sudo journalctl -u vps-agent-gateway.service --no-pager > proof/runtime/gateway-journal.txt
           sudo journalctl -u vps-agent-test.service --no-pager > proof/runtime/test-service-journal.txt
 
-          if [ -f /var/lib/vps-agent/proof/prova-inicial.txt ]; then
-            sudo sha256sum /var/lib/vps-agent/proof/prova-inicial.txt > proof/runtime/file-sha256.txt
-            sudo cat /var/lib/vps-agent/proof/prova-inicial.txt > proof/runtime/file-content.txt
+          REQUEST_TYPE="$(python3 -c 'import json; print(json.load(open("proof/request.json"))["type"])')"
+          REQUEST_PATH="$(python3 -c 'import json; print(json.load(open("proof/request.json")).get("path",""))')"
+          if [ "$REQUEST_TYPE" = "file_write_read" ] && [ -n "$REQUEST_PATH" ] && sudo test -f "$REQUEST_PATH"; then
+            sudo sha256sum "$REQUEST_PATH" > proof/runtime/file-sha256.txt
+            sudo cat "$REQUEST_PATH" > proof/runtime/file-content.txt
           fi
 
           python3 - <<'PY'
@@ -252,7 +254,11 @@ jobs:
               "file_sha256": read("proof/runtime/file-sha256.txt"),
               "file_content": read("proof/runtime/file-content.txt"),
           }
-          evidence["audit"] = read("proof/audit-status.json")
+          audit_raw = read("proof/audit-status.json")
+          try:
+              evidence["audit"] = json.loads(audit_raw) if audit_raw else None
+          except Exception:
+              evidence["audit"] = {"parse_error": True, "raw": audit_raw}
           raw_rc = os.environ.get("PROOF_RC", "1")
           evidence["proof_client_exit_code"] = int(raw_rc) if raw_rc.strip() else 1
           evidence_path.write_text(json.dumps(evidence, indent=2))
@@ -276,8 +282,40 @@ jobs:
           test "${{ steps.execute.outputs.rc }}" = "0"
           python3 - <<'PY'
           import json
+          from pathlib import Path
+
           with open("proof/evidence.json") as f:
               evidence=json.load(f)
+          with open("proof/request.json") as f:
+              request=json.load(f)
+
           assert evidence.get("success") is True, evidence
+          assert evidence.get("proof_client_exit_code") == 0, evidence
+
+          audit=evidence.get("audit") or {}
+          assert audit.get("ok") is True, audit
+          assert audit.get("result",{}).get("valid") is True, audit
+          assert audit.get("result",{}).get("events",0) >= 1, audit
+
+          if request["type"] == "file_write_read":
+              assert evidence["runtime"].get("file_content") == request.get("content",""), evidence["runtime"]
+              assert evidence["runtime"].get("file_sha256"), evidence["runtime"]
+
+          if request["type"] == "file_read_denied":
+              assert len(evidence.get("steps",[])) == 1
+              step=evidence["steps"][0]
+              assert step.get("expected_denial") is True and step.get("is_error") is True, step
+
+          if request["type"] == "service_restart":
+              def pid(text):
+                  for line in (text or "").splitlines():
+                      if line.startswith("MainPID="):
+                          return int(line.split("=",1)[1])
+                  return 0
+              before=pid(evidence["runtime"].get("service_before"))
+              after=pid(evidence["runtime"].get("service_after"))
+              assert before > 0 and after > 0 and before != after, (before, after, evidence["runtime"])
+              assert "ActiveState=active" in (evidence["runtime"].get("service_after") or "")
+
           print("EPHEMERAL VPS PROOF: PASS")
           PY
