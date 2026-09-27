@@ -53,7 +53,8 @@ func main() {
 	flag.StringVar(&output, "output", "proof/evidence.json", "evidence output JSON")
 	flag.Parse()
 
-	// #nosec G304 -- requestFile is an explicit operator-supplied proof-harness input, not an MCP-controlled path.\n\traw, err := os.ReadFile(requestFile)
+	// #nosec G304 -- requestFile is an explicit operator-supplied proof-harness input, not an MCP-controlled path.
+	raw, err := os.ReadFile(requestFile)
 	must(err)
 	var req Request
 	must(json.Unmarshal(raw, &req))
