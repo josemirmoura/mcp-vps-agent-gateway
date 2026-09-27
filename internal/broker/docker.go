@@ -166,41 +166,61 @@ func (d DockerCLI) Restart(ctx context.Context, name string) (map[string]any, er
 	return d.Inspect(ctx, name)
 }
 
-func canonicalComposeDir(dir string) (string, error) {
+func canonicalComposeProject(dir string) (string, string, error) {
 	if !filepath.IsAbs(dir) {
-		return "", errors.New("compose project directory must be absolute")
+		return "", "", errors.New("compose project directory must be absolute")
 	}
 	clean := filepath.Clean(dir)
 	physical := hostexec.Path(clean)
 	info, err := os.Lstat(physical)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return "", errors.New("compose project directory must be a real directory, not a symlink")
+		return "", "", errors.New("compose project directory must be a real directory, not a symlink")
 	}
 	resolved, err := filepath.EvalSymlinks(physical)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if filepath.Clean(resolved) != filepath.Clean(physical) {
-		return "", errors.New("compose project directory resolves through symlink")
+		return "", "", errors.New("compose project directory resolves through symlink")
 	}
-	return clean, nil
+
+	for _, name := range []string{"compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"} {
+		canonicalFile := filepath.Join(clean, name)
+		physicalFile := hostexec.Path(canonicalFile)
+		fi, err := os.Lstat(physicalFile)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return "", "", err
+		}
+		if fi.Mode()&os.ModeSymlink != 0 || !fi.Mode().IsRegular() {
+			return "", "", fmt.Errorf("compose file %s must be a regular non-symlink file", canonicalFile)
+		}
+		return clean, canonicalFile, nil
+	}
+	return "", "", errors.New("no supported Compose file found in authorized project directory")
 }
 
 func composeCommand(ctx context.Context, dir string, args ...string) (string, error) {
-	dir, err := canonicalComposeDir(dir)
+	dir, composeFile, err := canonicalComposeProject(dir)
 	if err != nil {
 		return "", err
 	}
-	base := []string{"compose", "--project-directory", dir}
+	base := []string{"compose", "-f", composeFile, "--project-directory", dir}
 	cmd := hostexec.CommandContext(ctx, "docker", append(base, args...)...)
 	out, err := cmd.CombinedOutput()
+	text := boundedOutput(out)
 	if err != nil {
-		return boundedOutput(out), fmt.Errorf("docker compose %s: %w", strings.Join(args, " "), err)
+		if text != "" {
+			return text, fmt.Errorf("docker compose %s: %s: %w", strings.Join(args, " "), text, err)
+		}
+		return text, fmt.Errorf("docker compose %s: %w", strings.Join(args, " "), err)
 	}
-	return boundedOutput(out), nil
+	return text, nil
 }
 
 func (DockerCLI) ComposeValidate(ctx context.Context, dir string) error {
