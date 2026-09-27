@@ -156,3 +156,14 @@ python3 sim/architecture_sim.py --fuzz 100000 --lock-fuzz 50000 --seed 26092026
 ~~~
 
 The simulator uses only the Python standard library and is intentionally separate from production Go code.
+
+
+## Continuous validation
+
+The repository includes:
+
+~~~text
+.github/workflows/architecture-simulation.yml
+~~~
+
+Changes to the simulator or core architecture/security/runtime documents trigger the adversarial simulation in GitHub Actions. This keeps the architectural model executable as the design evolves.
