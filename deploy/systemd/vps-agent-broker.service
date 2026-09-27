@@ -1,0 +1,21 @@
+[Unit]
+Description=MCP VPS Agent Privileged Broker
+After=local-fs.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+EnvironmentFile=-/etc/vps-agent/broker.env
+ExecStart=/usr/local/bin/vps-agent-broker
+Restart=on-failure
+RestartSec=2
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run/vps-agent /var/lib/vps-agent /tmp/vps-agent-poc
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target
