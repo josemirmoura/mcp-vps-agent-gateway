@@ -32,7 +32,6 @@ jobs:
             echo "VPS_AGENT_AUTH_MODE=static"
             echo "VPS_AGENT_GATEWAY_IMAGE=mcp-vps-agent-gateway:ci"
             echo "VPS_AGENT_BROKER_IMAGE=mcp-vps-agent-broker:ci"
-            echo "VPS_AGENT_PUBLIC_URL=https://example.invalid/mcp"
           } > .env
           chmod 600 .env
           echo "::add-mask::$ADMIN_TOKEN"
