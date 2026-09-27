@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/hostexec"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/jobs"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/policy"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/sandbox"
@@ -66,9 +67,14 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 	switch req.Tool {
 	case "system.info":
 		host, _ := os.Hostname()
+		if out, err := hostexec.CommandContext(ctx, "hostname").Output(); err == nil && strings.TrimSpace(string(out)) != "" {
+			host = strings.TrimSpace(string(out))
+		}
 		return ok(req.ID, map[string]any{
 			"hostname": host, "goos": runtime.GOOS, "goarch": runtime.GOARCH,
 			"cpus": runtime.NumCPU(), "instance_id": b.InstanceID, "instance_name": b.InstanceName,
+			"physical_scope_root": os.Getenv("VPS_AGENT_PHYSICAL_SCOPE_ROOT"),
+			"whole_host": os.Getenv("VPS_AGENT_WHOLE_HOST") == "1",
 		})
 	case "system.health":
 		auditOK := true
