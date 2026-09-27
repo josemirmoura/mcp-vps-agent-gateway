@@ -53,8 +53,6 @@ if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ] && [ -f compose.integrated-auth
   if [ "${VPS_AGENT_BUNDLED_PROXY:-0}" = "1" ] && [ -f compose.integrated-auth.proxy.yaml ]; then
     compose+=(-f compose.integrated-auth.proxy.yaml)
   fi
-elif [ -n "${VPS_AGENT_DOMAIN:-}" ] && [ -f compose.https.yaml ]; then
-  compose+=(-f compose.https.yaml)
 fi
 
 if [ -f .env ] && [ -n "$project_ids" ]; then
@@ -116,7 +114,7 @@ Preserved:
   .env (with rotated local credentials)
   config/policy.yaml
   state/ audit and operation history
-  package Caddy data volumes
+  integrated identity state on safe remove
   every VPS resource the MCP was allowed to manage
 EOF
   exit 0
@@ -127,8 +125,6 @@ if [ -f .env ]; then
 fi
 docker volume rm \
   mcp-vps-agent_broker-run \
-  mcp-vps-agent_caddy-data \
-  mcp-vps-agent_caddy-config \
   mcp-vps-agent_zitadel-postgres-data \
   mcp-vps-agent_zitadel-bootstrap \
   mcp-vps-agent_vps-agent-letsencrypt \
