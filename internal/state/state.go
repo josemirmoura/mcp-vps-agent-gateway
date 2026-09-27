@@ -42,7 +42,7 @@ func Open(filename string) (*Store, error) {
 		"PRAGMA foreign_keys=ON",
 	} {
 		if _, err := db.Exec(pragma); err != nil {
-			db.Close()
+			_ = db.Close()
 			return nil, fmt.Errorf("%s: %w", pragma, err)
 		}
 	}
