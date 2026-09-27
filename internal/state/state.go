@@ -167,6 +167,22 @@ func (s *Store) BeginOperation(ctx context.Context, invocationID, subject, tool,
 	return OperationReconcile, nil, nil
 }
 
+func (s *Store) AbortOperation(ctx context.Context, invocationID string) error {
+	res, err := s.db.ExecContext(ctx,
+		`DELETE FROM operations WHERE invocation_id=? AND state='pending'`, invocationID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return errors.New("operation is not pending")
+	}
+	return nil
+}
+
 func (s *Store) CompleteOperation(ctx context.Context, invocationID string, response []byte) error {
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE operations SET state='done', response=?, updated_at=? WHERE invocation_id=? AND state='pending'`,
