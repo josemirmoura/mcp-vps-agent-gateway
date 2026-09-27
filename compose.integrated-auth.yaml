@@ -106,7 +106,7 @@ services:
       - traefik.http.routers.vps-agent-dcr.middlewares=vps-agent-auth-ratelimit
       - traefik.http.routers.vps-agent-dcr.service=vps-agent-zitadel-api
       - traefik.http.routers.vps-agent-dcr.priority=700
-      - traefik.http.routers.vps-agent-auth.rule=Host(`${VPS_AGENT_DOMAIN}`)
+      - traefik.http.routers.vps-agent-auth.rule=Host(`${VPS_AGENT_DOMAIN}`) && (PathPrefix(`/oauth/v2`) || PathPrefix(`/oidc/v1`) || Path(`/.well-known/openid-configuration`) || Path(`/.well-known/oauth-authorization-server`))
       - traefik.http.routers.vps-agent-auth.entrypoints=websecure
       - traefik.http.routers.vps-agent-auth.tls=true
       - traefik.http.routers.vps-agent-auth.tls.certresolver=${VPS_AGENT_TRAEFIK_CERTRESOLVER:-letsencrypt}
