@@ -16,9 +16,9 @@ type fakeRunner struct {
 func (f *fakeRunner) Start(_ context.Context, s sandbox.Spec) (Job, error) {
 	return Job{ID: s.Unit, Unit: s.Unit, State: "running", Deadline: time.Now().Add(s.Runtime)}, nil
 }
-func (f *fakeRunner) Status(context.Context, Job) (string, error) { return "running", nil }
+func (f *fakeRunner) Status(context.Context, Job) (string, error)    { return "running", nil }
 func (f *fakeRunner) Tail(context.Context, Job, int) (string, error) { return "hello", nil }
-func (f *fakeRunner) Cancel(context.Context, Job) error { f.cancelled = true; return nil }
+func (f *fakeRunner) Cancel(context.Context, Job) error              { f.cancelled = true; return nil }
 
 func TestManagerPersistsAndScopesJobs(t *testing.T) {
 	store, err := state.Open(":memory:")

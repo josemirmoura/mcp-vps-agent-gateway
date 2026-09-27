@@ -37,7 +37,7 @@ func main() {
 	b := &broker.Broker{
 		Policy: cfg, FS: fs, State: store,
 		Services: broker.SystemdManager{}, Docker: broker.DockerCLI{},
-		Jobs: &jobs.Manager{State: store, Runner: jobs.SystemdRunner{}},
+		Jobs:       &jobs.Manager{State: store, Runner: jobs.SystemdRunner{}},
 		AdminToken: os.Getenv("VPS_AGENT_ADMIN_TOKEN"),
 	}
 

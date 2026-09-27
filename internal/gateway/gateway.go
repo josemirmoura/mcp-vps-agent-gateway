@@ -353,4 +353,3 @@ func Handler(exec Executor, auth AuthConfig) http.Handler {
 	})
 	return mux
 }
-

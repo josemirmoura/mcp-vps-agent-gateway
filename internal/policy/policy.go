@@ -17,12 +17,12 @@ type Config struct {
 	Enabled  bool     `yaml:"enabled,omitempty"`
 	Features Features `yaml:"features,omitempty"`
 
-	Filesystem FilesystemPolicy `yaml:"filesystem"`
-	Network    NetworkPolicy    `yaml:"network"`
-	Services   ResourcePolicy   `yaml:"services"`
-	Docker     ResourcePolicy   `yaml:"docker"`
-	Shell      ShellPolicy      `yaml:"shell"`
-	Privilege  PrivilegePolicy  `yaml:"privilege"`
+	Filesystem   FilesystemPolicy `yaml:"filesystem"`
+	Network      NetworkPolicy    `yaml:"network"`
+	Services     ResourcePolicy   `yaml:"services"`
+	Docker       ResourcePolicy   `yaml:"docker"`
+	Shell        ShellPolicy      `yaml:"shell"`
+	Privilege    PrivilegePolicy  `yaml:"privilege"`
 	Replay       ReplayPolicy     `yaml:"replay"`
 	Grant        GrantPolicy      `yaml:"grant,omitempty"`
 	Capabilities []string         `yaml:"capabilities,omitempty"`

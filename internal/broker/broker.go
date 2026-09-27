@@ -59,13 +59,13 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		}
 		return ok(req.ID, map[string]any{
 			"ok": true, "audit_chain_ok": auditOK,
-			"state_configured": b.State != nil,
+			"state_configured":  b.State != nil,
 			"docker_configured": b.Docker != nil,
-			"jobs_configured": b.Jobs != nil,
+			"jobs_configured":   b.Jobs != nil,
 		})
 	case "permissions.status":
 		return ok(req.ID, map[string]any{
-			"mode": b.Policy.Mode,
+			"mode":         b.Policy.Mode,
 			"full_enabled": b.Policy.Features.FullModeEnabled && b.Policy.Enabled,
 		})
 	case "file.read", "file.read_test":
