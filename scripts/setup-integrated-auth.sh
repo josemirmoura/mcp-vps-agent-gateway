@@ -235,7 +235,7 @@ assert x.get("issuer","").rstrip("/") == f"https://{domain}", x.get("issuer")
 print("OIDC DISCOVERY: PASS")
 PY
 
-BOOTSTRAP_PAT="$("${compose[@]}" exec -T zitadel-api cat /zitadel/bootstrap/bootstrap-admin.pat 2>/dev/null || true)"
+BOOTSTRAP_PAT="$(docker run --rm -v mcp-vps-agent_zitadel-bootstrap:/zitadel/bootstrap:ro alpine:3.22 cat /zitadel/bootstrap/bootstrap-admin.pat 2>/dev/null || true)"
 if [ -z "$BOOTSTRAP_PAT" ]; then
   echo "ERROR: ZITADEL bootstrap PAT was not produced." >&2
   exit 1
@@ -337,7 +337,7 @@ print("DYNAMIC CLIENT REGISTRATION: PASS")
 PY
 
 # The bootstrap machine PAT is no longer needed after DCR and operator creation.
-"${compose[@]}" exec -T zitadel-api rm -f /zitadel/bootstrap/bootstrap-admin.pat >/dev/null 2>&1 || true
+docker run --rm -v mcp-vps-agent_zitadel-bootstrap:/zitadel/bootstrap alpine:3.22 rm -f /zitadel/bootstrap/bootstrap-admin.pat >/dev/null 2>&1 || true
 
 echo "Switching Gateway and Broker to the integrated identity..."
 "${compose[@]}" up -d --build --force-recreate broker gateway
