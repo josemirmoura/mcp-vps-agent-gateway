@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/jobs"
@@ -71,6 +72,85 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			"docker_configured": b.Docker != nil,
 			"jobs_configured":   b.Jobs != nil,
 		})
+	case "system.disk":
+		if !b.Policy.CanDiagnostic("system.disk") {
+			return deny(req.ID, "permission_denied", "disk diagnostics are disabled by policy")
+		}
+		info, err := diskInfo(ctx)
+		if err != nil {
+			return deny(req.ID, "diagnostic_error", err.Error())
+		}
+		return ok(req.ID, map[string]any{"filesystems": info})
+	case "system.memory":
+		if !b.Policy.CanDiagnostic("system.memory") {
+			return deny(req.ID, "permission_denied", "memory diagnostics are disabled by policy")
+		}
+		info, err := memoryInfo()
+		if err != nil {
+			return deny(req.ID, "diagnostic_error", err.Error())
+		}
+		return ok(req.ID, info)
+	case "process.list":
+		if !b.Policy.CanDiagnostic("process.list") {
+			return deny(req.ID, "permission_denied", "process listing is disabled by policy")
+		}
+		var in struct { Limit int `json:"limit"` }
+		if len(req.Args) > 0 {
+			if err := json.Unmarshal(req.Args, &in); err != nil {
+				return deny(req.ID, "invalid_args", err.Error())
+			}
+		}
+		rows, err := processList(ctx, in.Limit)
+		if err != nil {
+			return deny(req.ID, "diagnostic_error", err.Error())
+		}
+		return ok(req.ID, map[string]any{"processes": rows})
+	case "process.inspect":
+		if !b.Policy.CanDiagnostic("process.inspect") {
+			return deny(req.ID, "permission_denied", "process inspection is disabled by policy")
+		}
+		pid, err := strconv.Atoi(req.Resource)
+		if err != nil {
+			return deny(req.ID, "invalid_args", "resource must be a numeric pid")
+		}
+		info, err := processInspect(pid)
+		if err != nil {
+			return deny(req.ID, "diagnostic_error", err.Error())
+		}
+		return ok(req.ID, info)
+	case "network.listen":
+		if !b.Policy.CanDiagnostic("network.listen") {
+			return deny(req.ID, "permission_denied", "network listener diagnostics are disabled by policy")
+		}
+		var in struct { Limit int `json:"limit"` }
+		if len(req.Args) > 0 {
+			if err := json.Unmarshal(req.Args, &in); err != nil {
+				return deny(req.ID, "invalid_args", err.Error())
+			}
+		}
+		rows, err := listenInfo(ctx, in.Limit)
+		if err != nil {
+			return deny(req.ID, "diagnostic_error", err.Error())
+		}
+		return ok(req.ID, map[string]any{"listeners": rows})
+	case "network.check":
+		if !b.Policy.CanDiagnostic("network.check") {
+			return deny(req.ID, "permission_denied", "network checks are disabled by policy")
+		}
+		if !b.Policy.CanNetworkDestination(req.Resource) {
+			return deny(req.ID, "permission_denied", "network destination is outside policy")
+		}
+		var in struct { TimeoutSeconds int `json:"timeout_seconds"` }
+		if len(req.Args) > 0 {
+			if err := json.Unmarshal(req.Args, &in); err != nil {
+				return deny(req.ID, "invalid_args", err.Error())
+			}
+		}
+		result, err := networkCheck(ctx, req.Resource, time.Duration(in.TimeoutSeconds)*time.Second)
+		if err != nil {
+			return deny(req.ID, "diagnostic_error", err.Error())
+		}
+		return ok(req.ID, result)
 	case "permissions.status":
 		return ok(req.ID, map[string]any{
 			"mode":         b.Policy.Mode,
