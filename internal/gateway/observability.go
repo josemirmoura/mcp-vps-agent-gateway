@@ -15,7 +15,7 @@ type toolMetric struct {
 	Successes    uint64 `json:"successes"`
 	Failures     uint64 `json:"failures"`
 	Denies       uint64 `json:"denies"`
-	LatencyNanos uint64 `json:"latency_nanos_total"`
+	LatencyNanos int64 `json:"latency_nanos_total"`
 }
 
 type runtimeMetrics struct {
@@ -42,7 +42,7 @@ func (m *runtimeMetrics) observeTool(tool string, started time.Time, err error) 
 	m.mu.Lock()
 	tm := m.tools[tool]
 	tm.Calls++
-	tm.LatencyNanos += uint64(time.Since(started))
+	tm.LatencyNanos += time.Since(started).Nanoseconds()
 	if err == nil {
 		tm.Successes++
 	} else {
