@@ -863,7 +863,7 @@ func randomID() (string, error) {
 }
 
 func Handler(exec Executor, auth AuthConfig) http.Handler {
-	metrics := newRuntimeMetrics()
+	metrics := newRuntimeMetrics(auth.InstanceID, auth.InstanceName)
 	server := newMCPServer(exec, metrics)
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return server
