@@ -22,6 +22,8 @@ type AuthConfig struct {
 	ResourceMetadataURL  string
 	ResourceIdentifier   string
 	AuthorizationServers []string
+	InstanceID           string
+	InstanceName         string
 }
 
 func (a AuthConfig) ProtectedResourceMetadataHandler() http.Handler {
