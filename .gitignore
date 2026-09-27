@@ -26,3 +26,5 @@ tmp/
 # Docker runtime state
 state/
 config/policy.yaml
+diagnostics/
+backups/
