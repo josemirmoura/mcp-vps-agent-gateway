@@ -3,7 +3,6 @@ package gateway
 import (
 	"context"
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -11,8 +10,6 @@ import (
 	"net/http"
 	"os"
 	"runtime"
-	"strings"
-	"time"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/ipc"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/securefs"
@@ -82,40 +79,6 @@ func SubjectFromContext(ctx context.Context) string {
 		return v
 	}
 	return "anonymous"
-}
-
-type AuthConfig struct {
-	Mode          string
-	StaticToken   string
-	StaticSubject string
-}
-
-func (a AuthConfig) Wrap(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		subject := a.StaticSubject
-		if subject == "" {
-			subject = "local-dev"
-		}
-		switch a.Mode {
-		case "", "none":
-		case "static":
-			const prefix = "Bearer "
-			h := r.Header.Get("Authorization")
-			if !strings.HasPrefix(h, prefix) {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return
-			}
-			got := strings.TrimPrefix(h, prefix)
-			if len(got) != len(a.StaticToken) || subtle.ConstantTimeCompare([]byte(got), []byte(a.StaticToken)) != 1 {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return
-			}
-		default:
-			http.Error(w, "authentication mode not configured", http.StatusServiceUnavailable)
-			return
-		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), subjectKey{}, subject)))
-	})
 }
 
 type Server struct {
@@ -391,4 +354,3 @@ func Handler(exec Executor, auth AuthConfig) http.Handler {
 	return mux
 }
 
-var _ = time.Second
