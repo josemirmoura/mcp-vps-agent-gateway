@@ -64,6 +64,7 @@ A verificação local prova health, negação de token inválido, chamada MCP re
 Scoped é o padrão. Para expor deliberadamente o filesystem inteiro ao Broker, use o override explícito:
 
 ~~~bash
+sed -i 's/^VPS_AGENT_WHOLE_HOST=.*/VPS_AGENT_WHOLE_HOST=1/' .env
 docker compose -f compose.yaml -f compose.host.yaml up -d --build
 ~~~
 
