@@ -137,9 +137,9 @@ jobs:
           go test ./internal/securefs -run='^$' -fuzz=FuzzSelectRootNeverEscapes -fuzztime=10s
           go test ./internal/policy -run='^$' -fuzz=FuzzPolicyLoadNeverPanics -fuzztime=10s
       - name: Secret scan
-        uses: gitleaks/gitleaks-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.24.3
+          gitleaks dir . --redact --exit-code=2 --report-format=sarif --report-path=results.sarif
       - name: Upload security report
         if: always()
         uses: actions/upload-artifact@v4
