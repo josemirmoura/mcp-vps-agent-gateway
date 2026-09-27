@@ -66,9 +66,9 @@ func aptAction(ctx context.Context, action, name string) (string, error) {
 }
 
 func userList(ctx context.Context) ([]map[string]any, error) {
-	out, err := hostexec.CommandContext(ctx, "getent", "passwd").Output()
+	out, err := hostexec.CommandContext(ctx, "cat", "/etc/passwd").Output()
 	if err != nil {
-		return nil, fmt.Errorf("getent passwd: %w", err)
+		return nil, fmt.Errorf("read host /etc/passwd: %w", err)
 	}
 	var result []map[string]any
 	s := bufio.NewScanner(strings.NewReader(string(out)))
@@ -124,9 +124,9 @@ func userAction(ctx context.Context, action, name string, createHome bool) (stri
 }
 
 func groupList(ctx context.Context) ([]map[string]any, error) {
-	out, err := hostexec.CommandContext(ctx, "getent", "group").Output()
+	out, err := hostexec.CommandContext(ctx, "cat", "/etc/group").Output()
 	if err != nil {
-		return nil, fmt.Errorf("getent group: %w", err)
+		return nil, fmt.Errorf("read host /etc/group: %w", err)
 	}
 	var result []map[string]any
 	s := bufio.NewScanner(strings.NewReader(string(out)))
