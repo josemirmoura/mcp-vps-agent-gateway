@@ -40,7 +40,6 @@ jobs:
             echo "VPS_AGENT_DOMAIN=mcp.example.invalid"
             echo "VPS_AGENT_PUBLIC_URL=https://mcp.example.invalid/mcp"
             echo "VPS_AGENT_OIDC_ISSUER=https://mcp.example.invalid"
-            echo "VPS_AGENT_OIDC_AUDIENCE="
             echo "VPS_AGENT_OAUTH_RESOURCE=https://mcp.example.invalid/mcp"
             echo "VPS_AGENT_RESOURCE_METADATA_URL=https://mcp.example.invalid/.well-known/oauth-protected-resource"
             echo "VPS_AGENT_REQUIRED_SCOPES=openid"
@@ -129,7 +128,11 @@ jobs:
           x=json.load(open('/tmp/oidc-after.json'))
           assert x.get('registration_endpoint'), x
           assert 'S256' in x.get('code_challenge_methods_supported',[]), x
-          print('DCR + PKCE DISCOVERY: PASS')
+          assert 'offline_access' in x.get('scopes_supported',[]), x
+          assert 'authorization_code' in x.get('grant_types_supported',[]), x
+          assert 'refresh_token' in x.get('grant_types_supported',[]), x
+          assert 'none' in x.get('token_endpoint_auth_methods_supported',[]), x
+          print('DCR + PKCE + REFRESH DISCOVERY: PASS')
           PY
 
           curl_ci             -X POST http://zitadel-api:8080/oauth/v2/register             -H 'Content-Type: application/json'             --data '{"client_name":"CI MCP Client","redirect_uris":["https://example.com/callback"],"grant_types":["authorization_code","refresh_token"],"response_types":["code"],"token_endpoint_auth_method":"none"}'             > /tmp/dcr-client.json
