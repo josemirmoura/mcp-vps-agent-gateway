@@ -32,38 +32,6 @@ func NewServer(socket string, handler Handler) *Server {
 	return &Server{socket: socket, handler: handler}
 }
 
-func peerUID(conn net.Conn) (uint32, error) {
-	uc, ok := conn.(*net.UnixConn)
-	if !ok {
-		return 0, errors.New("broker IPC requires Unix domain socket")
-	}
-	raw, err := uc.SyscallConn()
-	if err != nil {
-		return 0, err
-	}
-	var (
-		cred *unix.Ucred
-		ctrlErr error
-	)
-	if err := raw.Control(func(fd uintptr) {
-		cred, ctrlErr = unix.GetsockoptUcred(int(fd), unix.SOL_SOCKET, unix.SO_PEERCRED)
-	}); err != nil {
-		return 0, err
-	}
-	if ctrlErr != nil {
-		return 0, ctrlErr
-	}
-	if cred == nil {
-		return 0, errors.New("missing peer credentials")
-	}
-	return cred.Uid, nil
-}
-
-func allowedPeerUID(uid uint32) bool {
-	return uid == 0 || uid == 65532
-}
-
-
 func (s *Server) AllowPeerUIDs(uids ...uint32) {
 	if s.AllowedPeerUIDs == nil {
 		s.AllowedPeerUIDs = make(map[uint32]struct{}, len(uids))
@@ -141,11 +109,6 @@ func (s *Server) Serve(ctx context.Context) error {
 		}
 		if !s.peerAllowed(conn) {
 			_ = json.NewEncoder(conn).Encode(wire.ErrorResponse("", "unauthorized_peer", "Unix peer credential is not authorized"))
-			_ = conn.Close()
-			continue
-		}
-		uid, err := peerUID(conn)
-		if err != nil || !allowedPeerUID(uid) {
 			_ = conn.Close()
 			continue
 		}
