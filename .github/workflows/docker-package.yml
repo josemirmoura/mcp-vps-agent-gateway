@@ -198,9 +198,10 @@ jobs:
           # not existing in the runtime image. Prove both the dependency and
           # the real endpoint, rather than weakening the healthcheck.
           docker compose exec -T gateway sh -ec 'command -v curl >/dev/null; curl -fsS http://127.0.0.1:8080/healthz'
-          SOCKET=/var/lib/docker/volumes/mcp-vps-agent_broker-run/_data/broker.sock
-          test -S "$SOCKET"
-          stat -c 'socket-mode=%a socket-uid=%u socket-gid=%g' "$SOCKET" | tee evidence/broker-socket.txt
+          SOCKET_DIR="$(docker volume inspect -f '{{.Mountpoint}}' mcp-vps-agent_broker-run)"
+          SOCKET="$SOCKET_DIR/broker.sock"
+          sudo test -S "$SOCKET"
+          sudo stat -c 'socket-mode=%a socket-uid=%u socket-gid=%g' "$SOCKET" | tee evidence/broker-socket.txt
 
           # Give the probe the socket group (GID 65532), so filesystem
           # permissions alone allow the connection. The Broker must still
