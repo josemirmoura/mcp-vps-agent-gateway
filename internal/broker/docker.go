@@ -7,10 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
+		"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/hostexec"
 )
 
 const dockerOutputLimit = 1 << 20
@@ -69,7 +70,7 @@ func boundedOutput(out []byte) string {
 }
 
 func (DockerCLI) List(ctx context.Context) ([]map[string]any, error) {
-	cmd := exec.CommandContext(ctx, "docker", "ps", "-a", "--format", "{{json .}}")
+	cmd := hostexec.CommandContext(ctx, "docker", "ps", "-a", "--format", "{{json .}}")
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("docker ps: %w", err)
@@ -89,7 +90,7 @@ func (DockerCLI) List(ctx context.Context) ([]map[string]any, error) {
 }
 
 func (DockerCLI) Inspect(ctx context.Context, name string) (map[string]any, error) {
-	out, err := exec.CommandContext(ctx, "docker", "inspect", name).Output()
+	out, err := hostexec.CommandContext(ctx, "docker", "inspect", name).Output()
 	if err != nil {
 		return nil, fmt.Errorf("docker inspect %s: %w", name, err)
 	}
@@ -134,7 +135,7 @@ func (DockerCLI) Logs(ctx context.Context, name string, lines int) (string, erro
 	if lines > 1000 {
 		lines = 1000
 	}
-	out, err := exec.CommandContext(ctx, "docker", "logs", "--tail", strconv.Itoa(lines), name).CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "docker", "logs", "--tail", strconv.Itoa(lines), name).CombinedOutput()
 	if err != nil {
 		return boundedOutput(out), fmt.Errorf("docker logs %s: %w", name, err)
 	}
@@ -142,7 +143,7 @@ func (DockerCLI) Logs(ctx context.Context, name string, lines int) (string, erro
 }
 
 func (d DockerCLI) Start(ctx context.Context, name string) (map[string]any, error) {
-	out, err := exec.CommandContext(ctx, "docker", "start", name).CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "docker", "start", name).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("docker start %s: %s: %w", name, boundedOutput(out), err)
 	}
@@ -150,7 +151,7 @@ func (d DockerCLI) Start(ctx context.Context, name string) (map[string]any, erro
 }
 
 func (d DockerCLI) Stop(ctx context.Context, name string) (map[string]any, error) {
-	out, err := exec.CommandContext(ctx, "docker", "stop", name).CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "docker", "stop", name).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("docker stop %s: %s: %w", name, boundedOutput(out), err)
 	}
@@ -158,7 +159,7 @@ func (d DockerCLI) Stop(ctx context.Context, name string) (map[string]any, error
 }
 
 func (d DockerCLI) Restart(ctx context.Context, name string) (map[string]any, error) {
-	out, err := exec.CommandContext(ctx, "docker", "restart", name).CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "docker", "restart", name).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("docker restart %s: %s: %w", name, boundedOutput(out), err)
 	}
@@ -170,18 +171,19 @@ func canonicalComposeDir(dir string) (string, error) {
 		return "", errors.New("compose project directory must be absolute")
 	}
 	clean := filepath.Clean(dir)
-	info, err := os.Lstat(clean)
+	physical := hostexec.Path(clean)
+	info, err := os.Lstat(physical)
 	if err != nil {
 		return "", err
 	}
 	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return "", errors.New("compose project directory must be a real directory, not a symlink")
 	}
-	resolved, err := filepath.EvalSymlinks(clean)
+	resolved, err := filepath.EvalSymlinks(physical)
 	if err != nil {
 		return "", err
 	}
-	if resolved != clean {
+	if filepath.Clean(resolved) != filepath.Clean(physical) {
 		return "", errors.New("compose project directory resolves through symlink")
 	}
 	return clean, nil
@@ -193,7 +195,7 @@ func composeCommand(ctx context.Context, dir string, args ...string) (string, er
 		return "", err
 	}
 	base := []string{"compose", "--project-directory", dir}
-	cmd := exec.CommandContext(ctx, "docker", append(base, args...)...)
+	cmd := hostexec.CommandContext(ctx, "docker", append(base, args...)...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return boundedOutput(out), fmt.Errorf("docker compose %s: %w", strings.Join(args, " "), err)
