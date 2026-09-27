@@ -17,14 +17,14 @@ Each installation instead gets:
 Example:
 
 ~~~dotenv
-VPS_AGENT_INSTANCE_NAME=VPS Agent | Loja
+VPS_AGENT_INSTANCE_NAME="VPS Agent | Loja"
 VPS_AGENT_PUBLIC_URL=https://mcp-loja.example.com/mcp
 ~~~
 
 On another VPS:
 
 ~~~dotenv
-VPS_AGENT_INSTANCE_NAME=VPS Agent | Blog
+VPS_AGENT_INSTANCE_NAME="VPS Agent | Blog"
 VPS_AGENT_PUBLIC_URL=https://mcp-blog.example.com/mcp
 ~~~
 
