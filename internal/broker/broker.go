@@ -938,8 +938,9 @@ func (b *Broker) startShellJob(ctx context.Context, req wire.Request, admin bool
 	spec := sandbox.Spec{
 		Unit: shellUnit(req.InvocationID), User: user, Command: in.Command, CWD: in.CWD,
 		ReadOnlyPaths: uniqueStrings(readOnly), ReadWritePaths: uniqueStrings(readWrite),
-		InaccessiblePaths: inaccessible, Runtime: runtimeRequested,
-		MemoryMaxBytes: memory, TasksMax: tasks, NetworkMode: networkMode, Admin: admin,
+		InaccessiblePaths: inaccessible, IsolateFilesystem: !admin && !b.Policy.ShellMayReadHost(),
+		Runtime: runtimeRequested, MemoryMaxBytes: memory, TasksMax: tasks,
+		NetworkMode: networkMode, Admin: admin,
 	}
 	rec, err := b.Jobs.Start(ctx, req.Subject, req.Tool, in.CWD, req.GrantID, spec)
 	if err != nil {
