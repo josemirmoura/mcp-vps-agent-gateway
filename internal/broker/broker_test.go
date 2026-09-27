@@ -100,7 +100,7 @@ func TestPendingRestartRequiresReconciliation(t *testing.T) {
 		ID: "1", Subject: "alice", Tool: "service.restart",
 		Resource: "vps-agent-test.service", InvocationID: "uncertain",
 	}
-	h, _ := state.HashRequest(map[string]any{"subject": req.Subject, "tool": req.Tool, "service": req.Resource})
+	h, _ := state.HashRequest(map[string]any{"subject": req.Subject, "tool": req.Tool, "service": req.Resource, "action": "restart"})
 	if _, _, err := store.BeginOperation(context.Background(), req.InvocationID, req.Subject, req.Tool, h); err != nil {
 		t.Fatal(err)
 	}
