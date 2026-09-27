@@ -8,10 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"regexp"
+		"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/hostexec"
 )
 
 var packageNameRE = regexp.MustCompile("^[a-z0-9][a-z0-9+.-]*(?::[a-z0-9]+)?$")
@@ -25,7 +26,7 @@ func packageList(ctx context.Context, limit int) ([]map[string]any, error) {
 	if limit > 2000 {
 		limit = 2000
 	}
-	out, err := exec.CommandContext(ctx, "dpkg-query", "-W", "-f=${binary:Package}\\t${Version}\\t${db:Status-Status}\\n").Output()
+	out, err := hostexec.CommandContext(ctx, "dpkg-query", "-W", "-f=${binary:Package}\\t${Version}\\t${db:Status-Status}\\n").Output()
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +55,7 @@ func aptAction(ctx context.Context, action, name string) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported package action %q", action)
 	}
-	cmd := exec.CommandContext(ctx, "apt-get", args...)
+	cmd := hostexec.CommandContext(ctx, "apt-get", args...)
 	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
 	out, err := cmd.CombinedOutput()
 	text := boundedOutput(out)
@@ -65,7 +66,7 @@ func aptAction(ctx context.Context, action, name string) (string, error) {
 }
 
 func userList() ([]map[string]any, error) {
-	f, err := os.Open("/etc/passwd")
+	f, err := os.Open(hostexec.Path("/etc/passwd"))
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +125,7 @@ func userAction(ctx context.Context, action, name string, createHome bool) (stri
 }
 
 func groupList() ([]map[string]any, error) {
-	f, err := os.Open("/etc/group")
+	f, err := os.Open(hostexec.Path("/etc/group"))
 	if err != nil {
 		return nil, err
 	}
@@ -177,16 +178,10 @@ func groupAction(ctx context.Context, action, name string) (string, error) {
 }
 
 func firewallStatus(ctx context.Context) (string, error) {
-	if _, err := exec.LookPath("ufw"); err != nil {
-		return "", errors.New("ufw is not installed")
-	}
 	return runBounded(ctx, "ufw", "status", "verbose")
 }
 
 func firewallAction(ctx context.Context, action, port, protocol, source string) (string, error) {
-	if _, err := exec.LookPath("ufw"); err != nil {
-		return "", errors.New("ufw is not installed")
-	}
 	n, err := strconv.Atoi(port)
 	if err != nil || n < 1 || n > 65535 {
 		return "", errors.New("port must be 1..65535")
@@ -232,7 +227,7 @@ func firewallAction(ctx context.Context, action, port, protocol, source string) 
 }
 
 func runBounded(ctx context.Context, name string, args ...string) (string, error) {
-	out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, name, args...).CombinedOutput()
 	text := boundedOutput(out)
 	if err != nil {
 		return text, fmt.Errorf("%s: %w", name, err)
