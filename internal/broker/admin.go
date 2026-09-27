@@ -66,7 +66,8 @@ func aptAction(ctx context.Context, action, name string) (string, error) {
 }
 
 func userList(_ context.Context) ([]map[string]any, error) {
-	// #nosec G304 -- fixed Broker-owned system path; the MCP caller cannot choose this filename.\n	f, err := os.Open(hostexec.SystemPath("/etc/passwd"))
+	// #nosec G304 -- fixed Broker-owned system path; the MCP caller cannot choose this filename.
+	f, err := os.Open(hostexec.SystemPath("/etc/passwd"))
 	if err != nil {
 		return nil, fmt.Errorf("read host /etc/passwd: %w", err)
 	}
@@ -125,7 +126,8 @@ func userAction(ctx context.Context, action, name string, createHome bool) (stri
 }
 
 func groupList(_ context.Context) ([]map[string]any, error) {
-	// #nosec G304 -- fixed Broker-owned system path; the MCP caller cannot choose this filename.\n	f, err := os.Open(hostexec.SystemPath("/etc/group"))
+	// #nosec G304 -- fixed Broker-owned system path; the MCP caller cannot choose this filename.
+	f, err := os.Open(hostexec.SystemPath("/etc/group"))
 	if err != nil {
 		return nil, fmt.Errorf("read host /etc/group: %w", err)
 	}
