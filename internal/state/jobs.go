@@ -80,7 +80,7 @@ func (s *Store) GetJob(ctx context.Context, id string) (JobRecord, error) {
 
 func (s *Store) ListActiveJobs(ctx context.Context) ([]JobRecord, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT job_id FROM jobs WHERE state IN ('starting','running','cancelling') ORDER BY created_at`)
+		`SELECT job_id FROM jobs WHERE state IN ('starting','running','active','activating','reloading','deactivating','cancelling') ORDER BY created_at`)
 	if err != nil {
 		return nil, err
 	}
