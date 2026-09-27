@@ -52,6 +52,31 @@ func TestSymlinkEscapeDenied(t *testing.T) {
 	}
 }
 
+func TestConfiguredSymlinkRootRejected(t *testing.T) {
+	outside := t.TempDir()
+	base := t.TempDir()
+	link := filepath.Join(base, "authorized")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	if _, err := New([]string{link}, []string{link}, 1024); err == nil {
+		t.Fatal("configured authorized root symlink was accepted")
+	}
+}
+
+func TestConfiguredRootWithSymlinkAncestorRejected(t *testing.T) {
+	outside := t.TempDir()
+	base := t.TempDir()
+	link := filepath.Join(base, "linked-parent")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	configured := filepath.Join(link, "child")
+	if _, err := New([]string{configured}, []string{configured}, 1024); err == nil {
+		t.Fatal("configured root below a symlink ancestor was accepted")
+	}
+}
+
 func TestPrefixConfusionDenied(t *testing.T) {
 	base := t.TempDir()
 	root := filepath.Join(base, "app")
