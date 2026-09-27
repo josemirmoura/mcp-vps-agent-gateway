@@ -73,7 +73,7 @@ jobs:
           sudo install -m 0755 /usr/bin/true /usr/local/bin/vps-agent-gateway
           sudo install -m 0755 /usr/bin/true /usr/local/bin/vps-agent-broker
       - name: Verify unit syntax and sandbox directives
-        run: systemd-analyze verify deploy/systemd/vps-agent-gateway.service deploy/systemd/vps-agent-broker.service
+        run: systemd-analyze verify tests/fixtures/systemd/vps-agent-gateway.service tests/fixtures/systemd/vps-agent-broker.service
 
   architecture-simulation:
     runs-on: ubuntu-24.04
