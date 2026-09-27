@@ -121,6 +121,44 @@ type fileMkdirOutput struct {
 	Created bool   `json:"created"`
 }
 
+type fileListInput struct {
+	Path  string `json:"path" jsonschema:"absolute authorized directory path"`
+	Limit int    `json:"limit,omitempty" jsonschema:"maximum entries, capped at 1000"`
+}
+
+type filePatchInput struct {
+	Path           string `json:"path"`
+	OldText        string `json:"old_text"`
+	NewText        string `json:"new_text"`
+	ExpectedSHA256 string `json:"expected_sha256,omitempty"`
+	OperationID    string `json:"operation_id,omitempty"`
+}
+
+type fileDestinationInput struct {
+	Path        string `json:"path"`
+	Destination string `json:"destination"`
+	OperationID string `json:"operation_id,omitempty"`
+}
+
+type fileRemoveInput struct {
+	Path        string `json:"path"`
+	Recursive   bool   `json:"recursive,omitempty"`
+	OperationID string `json:"operation_id,omitempty"`
+}
+
+type fileChmodInput struct {
+	Path        string `json:"path"`
+	Mode        uint32 `json:"mode" jsonschema:"permission bits as integer, e.g. 511 for 0777"`
+	OperationID string `json:"operation_id,omitempty"`
+}
+
+type fileChownInput struct {
+	Path        string `json:"path"`
+	UID         int    `json:"uid"`
+	GID         int    `json:"gid"`
+	OperationID string `json:"operation_id,omitempty"`
+}
+
 type serviceInput struct {
 	Name string `json:"name" jsonschema:"canonical systemd unit name"`
 }
@@ -220,6 +258,94 @@ func NewMCPServer(exec Executor) *mcp.Server {
 		func(ctx context.Context, _ *mcp.CallToolRequest, in fileMkdirInput) (*mcp.CallToolResult, fileMkdirOutput, error) {
 			var out fileMkdirOutput
 			if err := s.call(ctx, "file.mkdir", in.Path, "mkdir", nil, &out, true, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "file.list", Description: "List entries from an authorized directory."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in fileListInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{"limit": in.Limit})
+			if err := s.call(ctx, "file.list", in.Path, "list", args, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "file.stat", Description: "Return metadata for an authorized filesystem path without following it outside policy."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in fileReadInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "file.stat", in.Path, "stat", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "file.hash", Description: "Compute SHA-256 for an authorized regular file."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in fileReadInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "file.hash", in.Path, "hash", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "file.patch", Description: "Patch exactly one text occurrence in an authorized file, optionally guarded by SHA-256."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in filePatchInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{"old_text": in.OldText, "new_text": in.NewText, "expected_sha256": in.ExpectedSHA256})
+			if err := s.call(ctx, "file.patch", in.Path, "patch", args, &out, true, in.OperationID); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "file.copy", Description: "Copy an authorized regular file to an authorized writable destination."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in fileDestinationInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{"destination": in.Destination})
+			if err := s.call(ctx, "file.copy", in.Path, "copy", args, &out, true, in.OperationID); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "file.move", Description: "Move or rename an authorized path within writable scope."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in fileDestinationInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{"destination": in.Destination})
+			if err := s.call(ctx, "file.move", in.Path, "move", args, &out, true, in.OperationID); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "file.remove", Description: "Delete an authorized file or empty directory. Recursive deletion requires a separate policy capability."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in fileRemoveInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{"recursive": in.Recursive})
+			if err := s.call(ctx, "file.remove", in.Path, "remove", args, &out, true, in.OperationID); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "file.chmod", Description: "Change permission bits of an authorized path when explicitly enabled by policy."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in fileChmodInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{"mode": in.Mode})
+			if err := s.call(ctx, "file.chmod", in.Path, "chmod", args, &out, true, in.OperationID); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{Name: "file.chown", Description: "Change numeric ownership of an authorized path when explicitly enabled by policy."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in fileChownInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{"uid": in.UID, "gid": in.GID})
+			if err := s.call(ctx, "file.chown", in.Path, "chown", args, &out, true, in.OperationID); err != nil {
 				return nil, out, err
 			}
 			return nil, out, nil
