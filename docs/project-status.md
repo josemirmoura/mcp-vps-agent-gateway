@@ -2,19 +2,19 @@
 
 ## Current stage
 
-**PRE-ALPHA / EXECUTABLE REFERENCE IMPLEMENTATION**
+**AUTOMATED RELEASE CANDIDATE / EXTERNAL CHATGPT GATE PENDING**
 
-There is now executable Go reference code with repeatable GitHub-runner validation.
+The Docker-first Go implementation now has repeatable clean-runner validation across the core Scoped runtime, package lifecycle and host-operation path.
 
 There is still:
 
 - no stable production release
 - no production compatibility promise
 - no long-running real-VPS deployment history
-- no completed ChatGPT Web product-surface Gate 0A
-- no production-enabled Full/admin shell
+- no completed real ChatGPT Web OAuth product-surface gate against the target workspace/VPS
+- no production claim for Full/admin shell
 
-Laboratory evidence now covers the Docker package end-to-end on a clean Ubuntu runner: filesystem CRUD, authorization denial, sandboxed shell/jobs, host systemd, host Docker/Compose, diagnostics and audit. Formal product maturity still remains pre-R1 until the actual ChatGPT Web integration route is proven on the target account.
+Laboratory evidence now covers the Docker package end-to-end on a clean Ubuntu runner: filesystem CRUD, authorization denial, sandboxed shell/jobs, host systemd, host Docker/Compose, diagnostics and audit. Automated acceptance is substantially beyond the original R0/R1 architecture phase, but the product is not promoted to a stable release until the actual ChatGPT Web integration route is proven on the target workspace and VPS.
 
 ## Maturity ladder
 
