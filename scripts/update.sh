@@ -57,7 +57,25 @@ trap rollback ERR
 
 git merge --ff-only "$target"
 docker compose config -q
-"${compose[@]}" up -d --build
+
+echo "Building target images before touching the real state database..."
+"${compose[@]}" build
+
+migration_dir="$backup_dir/migration-check"
+mkdir -p "$migration_dir"
+tar -xzf "$backup_dir/operator-state.tar.gz" -C "$migration_dir" state
+if [ ! -f "$migration_dir/state/state.db" ]; then
+  echo "State backup does not contain state/state.db; refusing update." >&2
+  false
+fi
+broker_image="${VPS_AGENT_BROKER_IMAGE:-mcp-vps-agent-broker:local}"
+echo "Validating target schema migration and audit chain on a copied database..."
+docker run --rm \
+  --entrypoint /usr/local/bin/vps-agent \
+  -v "$PWD/$migration_dir/state:/check" \
+  "$broker_image" state-check --db /check/state.db | tee "$backup_dir/migration-check.json"
+
+"${compose[@]}" up -d
 bash ./scripts/verify.sh
 
 trap - ERR
