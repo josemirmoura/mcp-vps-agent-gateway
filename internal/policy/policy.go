@@ -185,10 +185,13 @@ func (c *Config) CanPackage(name, action string) bool {
 	if !matchAny(c.Packages.Actions, action) {
 		return false
 	}
+	if action == "update" {
+		return true
+	}
 	if action == "list" || action == "status" {
 		return matchAny(c.Packages.Inspect, name) || matchAny(c.Packages.Manage, name)
 	}
-	return matchAny(c.Packages.Manage, name) || (name == "" && matchAny(c.Packages.Manage, "*"))
+	return matchAny(c.Packages.Manage, name)
 }
 
 func (c *Config) CanUser(name, action string) bool {
