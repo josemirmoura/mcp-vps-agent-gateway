@@ -8,10 +8,9 @@ services:
     image: ${VPS_AGENT_BROKER_IMAGE:-mcp-vps-agent-broker:local}
     restart: unless-stopped
     user: "0:65532"
+    privileged: true
+    pid: host
     network_mode: host
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
     environment:
       VPS_AGENT_POLICY: /etc/vps-agent/policy.yaml
       VPS_AGENT_BROKER_SOCKET: /run/vps-agent/broker.sock
@@ -19,6 +18,7 @@ services:
       VPS_AGENT_ADMIN_TOKEN: ${VPS_AGENT_ADMIN_TOKEN:?set VPS_AGENT_ADMIN_TOKEN in .env}
       VPS_AGENT_EXPECTED_SUBJECT: ${VPS_AGENT_SUBJECT:-operator}
       VPS_AGENT_HOST_ROOT: /host
+      VPS_AGENT_HOST_NSENTER: "1"
     volumes:
       - type: bind
         source: /
