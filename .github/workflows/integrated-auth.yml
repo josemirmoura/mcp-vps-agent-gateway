@@ -59,21 +59,24 @@ jobs:
           } > .env
           chmod 600 .env config/policy.yaml
 
-      - name: Start ZITADEL and PostgreSQL
+      - name: Start ZITADEL, Login UI and PostgreSQL
         shell: bash
         run: |
           set -euo pipefail
-          docker compose -f compose.yaml -f compose.integrated-auth.yaml up -d zitadel-postgres zitadel-api
+          COMPOSE=(docker compose -f compose.yaml -f compose.integrated-auth.yaml)
+          "${COMPOSE[@]}" up -d zitadel-postgres zitadel-api zitadel-login
           for _ in $(seq 1 120); do
-            cid="$(docker compose -f compose.yaml -f compose.integrated-auth.yaml ps -q zitadel-api)"
-            status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid" 2>/dev/null || true)"
-            if [ "$status" = healthy ]; then
-              docker compose -f compose.yaml -f compose.integrated-auth.yaml ps
+            api_id="$("${COMPOSE[@]}" ps -q zitadel-api)"
+            login_id="$("${COMPOSE[@]}" ps -q zitadel-login)"
+            api_status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$api_id" 2>/dev/null || true)"
+            login_status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$login_id" 2>/dev/null || true)"
+            if [ "$api_status" = healthy ] && [ "$login_status" = healthy ]; then
+              "${COMPOSE[@]}" ps
               exit 0
             fi
             sleep 2
           done
-          docker compose -f compose.yaml -f compose.integrated-auth.yaml logs --no-color zitadel-api zitadel-postgres
+          "${COMPOSE[@]}" logs --no-color zitadel-api zitadel-login zitadel-postgres
           exit 1
 
       - name: Enable DCR and create operator through real ZITADEL API
