@@ -16,17 +16,122 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Prepare stock scoped root
+      - name: Prepare explicit scoped root
         run: |
-          sudo mkdir -p /opt/my-app
-          sudo chmod 0777 /opt/my-app
+          sudo rm -rf /opt/my-app /opt/vps-agent-lifecycle-scope /opt/vps-agent-lifecycle-scope
+          sudo install -d -o "$USER" -g "$USER" -m 0750 /opt/vps-agent-lifecycle-scope
 
-      - name: Bootstrap stock package
+      - name: Missing default scope fails before Docker
         run: |
-          bash scripts/init.sh
+          if bash scripts/init.sh > /tmp/bootstrap-missing-scope.txt 2>&1; then
+            echo "bootstrap unexpectedly accepted a missing default scope" >&2
+            exit 1
+          fi
+          grep -q 'VPS_AGENT_SCOPE_ROOT does not exist: /opt/my-app' /tmp/bootstrap-missing-scope.txt
           test -f .env
           test -f config/policy.yaml
-          grep -q '^VPS_AGENT_SCOPE_ROOT=/opt/my-app$' .env
+
+      - name: Bootstrap explicit scope and migrate template policy
+        run: |
+          bash scripts/init.sh --scope /opt/vps-agent-lifecycle-scope
+          grep -q '^VPS_AGENT_SCOPE_ROOT=/opt/vps-agent-lifecycle-scope
+        run: |
+          docker compose up -d --build
+          bash scripts/verify.sh
+
+      - name: Diagnostic bundle is redacted
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -a; . ./.env; set +a
+          admin="$VPS_AGENT_ADMIN_TOKEN"
+          static="$VPS_AGENT_STATIC_TOKEN"
+          bash scripts/diagnose.sh bundle /tmp/vps-agent-diagnostic.tar.gz
+          mkdir /tmp/diagnostic
+          tar -xzf /tmp/vps-agent-diagnostic.tar.gz -C /tmp/diagnostic
+          ! grep -R -F "$admin" /tmp/diagnostic
+          ! grep -R -F "$static" /tmp/diagnostic
+
+      - name: Successful update preserves state and policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name lifecycle-ci
+          git config user.email lifecycle-ci@example.invalid
+          base="$(git rev-parse HEAD)"
+          cp config/policy.yaml /tmp/policy.before
+          cp state/state.db /tmp/state.before
+
+          git switch -c lifecycle-current "$base"
+          git switch -c lifecycle-good-target
+          printf 'lifecycle update target\n' > .lifecycle-update-marker
+          git add .lifecycle-update-marker
+          git commit -m 'test: lifecycle good update target'
+          good="$(git rev-parse HEAD)"
+          git branch lifecycle-good-ref "$good"
+          git switch lifecycle-current
+
+          VPS_AGENT_UPDATE_REF=lifecycle-good-ref bash scripts/update.sh
+          test "$(git rev-parse HEAD)" = "$good"
+          cmp /tmp/policy.before config/policy.yaml
+          docker compose exec -T broker /usr/local/bin/vps-agent audit-status >/tmp/audit.after-update.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/audit.after-update.json'))
+          assert x['ok'] is True and x['result']['valid'] is True, x
+          PY
+
+      - name: Failed update rolls back code and state
+        shell: bash
+        run: |
+          set -euo pipefail
+          good="$(git rev-parse HEAD)"
+          git switch -c lifecycle-bad-target
+          printf 'THIS IS NOT A DOCKERFILE\n' > Dockerfile
+          git add Dockerfile
+          git commit -m 'test: lifecycle broken update target'
+          bad="$(git rev-parse HEAD)"
+          git branch lifecycle-bad-ref "$bad"
+          git switch lifecycle-current
+          test "$(git rev-parse HEAD)" = "$good"
+
+          if VPS_AGENT_UPDATE_REF=lifecycle-bad-ref bash scripts/update.sh; then
+            echo 'broken update unexpectedly succeeded' >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$good"
+          cmp /tmp/policy.before config/policy.yaml
+          bash scripts/verify.sh
+
+      - name: Safe remove preserves operator state
+        run: |
+          bash scripts/remove.sh safe
+          test -f .env
+          test -f config/policy.yaml
+          test -f state/state.db
+          test -z "$(docker ps -q --filter label=com.docker.compose.project=mcp-vps-agent)"
+
+      - name: Reinstall after safe remove
+        run: |
+          docker compose up -d --build
+          bash scripts/verify.sh
+
+      - name: Full purge removes only MCP-owned local state
+        run: |
+          VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge
+          test ! -e .env
+          test ! -e config/policy.yaml
+          test ! -e state
+          test -d /opt/vps-agent-lifecycle-scope
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v --remove-orphans || true
+          sudo rm -rf /opt/my-app
+ .env
+          grep -q '/opt/vps-agent-lifecycle-scope' config/policy.yaml
+          ! grep -q '/opt/my-app' config/policy.yaml
           ! grep -q 'CHANGE_ME_' .env
 
       - name: Start and verify stock package
