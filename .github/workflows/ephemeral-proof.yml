@@ -102,7 +102,7 @@ jobs:
             required: true
             max_ttl_minutes: 60
           YAML
-          sudo install -o root -g vps-agent -m 0640 /tmp/policy.yaml /etc/vps-agent/policy.yaml
+          sudo install -o root -g root -m 0600 /tmp/policy.yaml /etc/vps-agent/policy.yaml
 
           PROOF_TOKEN="$(openssl rand -hex 24)"
           ADMIN_TOKEN="$(openssl rand -hex 24)"
@@ -122,8 +122,8 @@ jobs:
             echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN"
             echo "VPS_AGENT_EXPECTED_SUBJECT=josemir-proof"
           } | sudo tee /etc/vps-agent/broker.env >/dev/null
-          sudo chown root:vps-agent /etc/vps-agent/gateway.env /etc/vps-agent/broker.env
-          sudo chmod 0640 /etc/vps-agent/gateway.env /etc/vps-agent/broker.env
+          sudo chown root:root /etc/vps-agent/gateway.env /etc/vps-agent/broker.env
+          sudo chmod 0600 /etc/vps-agent/gateway.env /etc/vps-agent/broker.env
 
           echo "VPS_AGENT_PROOF_TOKEN=$PROOF_TOKEN" >> "$GITHUB_ENV"
           echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN" >> "$GITHUB_ENV"
@@ -173,6 +173,21 @@ jobs:
           curl -fsS http://127.0.0.1:18080/healthz
           sudo stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent
 
+          # Privilege-boundary proof: the Gateway OS user must not read
+          # Broker secrets, authoritative policy, or Broker-owned SQLite.
+          if sudo -u vps-agent cat /etc/vps-agent/broker.env >/dev/null 2>&1; then
+            echo "SECURITY FAILURE: Gateway user can read broker.env"
+            exit 1
+          fi
+          if sudo -u vps-agent cat /etc/vps-agent/policy.yaml >/dev/null 2>&1; then
+            echo "SECURITY FAILURE: Gateway user can read authoritative policy"
+            exit 1
+          fi
+          if sudo -u vps-agent cat /var/lib/vps-agent/state.db >/dev/null 2>&1; then
+            echo "SECURITY FAILURE: Gateway user can read Broker SQLite"
+            exit 1
+          fi
+
       - name: Capture before state
         shell: bash
         run: |
@@ -208,8 +223,7 @@ jobs:
           systemctl show vps-agent-test.service -p ActiveState -p MainPID -p ActiveEnterTimestamp --no-pager > proof/runtime/service-after.txt
           sudo stat -c '%A %U:%G %n' /run/vps-agent /run/vps-agent/broker.sock /var/lib/vps-agent > proof/runtime/permissions-after.txt
 
-          sudo /usr/local/bin/vps-agent audit-status \
-            --admin-token "$VPS_AGENT_ADMIN_TOKEN" \
+          sudo --preserve-env=VPS_AGENT_ADMIN_TOKEN /usr/local/bin/vps-agent audit-status \
             --socket /run/vps-agent/broker.sock \
             > proof/audit-status.json 2>proof/runtime/audit-status.stderr
 
