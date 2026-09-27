@@ -122,10 +122,14 @@ Host confirmations improve UX and safety. They do not replace server-side author
 
 ## Installer handoff
 
-The product installer must treat ChatGPT Web connection as the final installation phase.
+The product installer must treat the **verified ChatGPT Web connection** as the final completion gate.
 
-It should output the configured MCP endpoint, authentication method and effective policy summary, then guide the user through the currently supported ChatGPT Web connection path.
+Showing the connection tutorial happens first. It does not complete installation.
 
-After connection, the installer/runbook must require one harmless end-to-end tool call and confirm the corresponding Broker audit event before declaring setup complete.
+The installer should output the configured MCP endpoint, authentication method and effective policy summary, then guide the user through the currently supported ChatGPT Web connection path.
+
+After the user connects ChatGPT, the installer/runbook must require one harmless end-to-end tool call from ChatGPT itself and verify the corresponding authenticated subject, policy decision, execution result and Broker audit event.
+
+Only after those checks pass may the installer declare setup complete.
 
 Exact UI instructions are version-sensitive and must be checked against current official OpenAI documentation at release/install time.
