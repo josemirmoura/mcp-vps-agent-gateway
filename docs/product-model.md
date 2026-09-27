@@ -17,9 +17,34 @@ same binaries
 
 The LLM never decides the scope.
 
-## Access profiles
+## User-owned scope
 
-The installer should offer three primary profiles.
+The operator decides exactly how much of the VPS is delegated to MCP.
+
+The installer may offer presets for convenience, but presets never define authority by themselves.
+
+The authoritative configuration is always the explicit policy selected and confirmed by the user.
+
+Examples:
+
+~~~text
+one directory:
+/opt/my-app
+
+several directories:
+/opt/app-a
+/var/www/site
+/srv/data
+
+whole filesystem:
+/
+~~~
+
+The same principle applies independently to systemd units, Docker resources, network destinations, package management, users/groups and other administrative resources.
+
+## Convenience profiles
+
+The installer may offer three shortcuts:
 
 ### Project
 
@@ -204,16 +229,17 @@ The product supports the operation; policy decides whether the current installat
 
 The installer should ask the operator:
 
-1. Access profile: Project, Custom, or Whole host.
-2. Allowed filesystem roots.
-3. Filesystem capabilities.
-4. Shell access and sandbox roots.
-5. systemd unit scope/actions.
-6. Docker/Compose scope/actions.
-7. Network policy.
-8. Administrative capabilities.
-9. Approval/elevation behavior.
-10. Authentication and public/private MCP exposure.
+1. Which exact filesystem roots/resources are delegated to MCP.
+2. Optional convenience preset: Project, Custom, or Whole host.
+3. Allowed filesystem roots.
+4. Filesystem capabilities.
+5. Shell access and sandbox roots.
+6. systemd unit scope/actions.
+7. Docker/Compose scope/actions.
+8. Network policy.
+9. Administrative capabilities.
+10. Approval/elevation behavior.
+11. Authentication and public/private MCP exposure.
 
 It then renders a policy file, displays a human-readable summary, asks for explicit confirmation, validates the policy, and only then activates it.
 
@@ -243,3 +269,50 @@ Recommended production packaging:
 A fully privileged all-Docker mode may exist for disposable labs, but should not be the production default.
 
 The product goal is **one-command installation**, not "everything must execute inside one container".
+
+
+## Installation is not complete until ChatGPT is connected
+
+The installer must finish with a guided connection phase for ChatGPT Web.
+
+After runtime installation and policy activation, it must present:
+
+~~~text
+MCP endpoint:
+https://<host>/mcp
+
+Authentication:
+<configured method>
+
+Effective scope:
+<human-readable policy summary>
+
+Next:
+Connect this MCP to ChatGPT Web
+~~~
+
+The final installer stage must:
+
+1. verify the MCP HTTPS endpoint is reachable;
+2. verify authentication;
+3. run a harmless discovery/read test;
+4. show the exact effective authority selected by the user;
+5. provide the current ChatGPT Web connection steps for the supported integration route;
+6. ask the user to execute a harmless test from ChatGPT;
+7. verify that test appears in Broker audit;
+8. only then mark installation complete.
+
+Because ChatGPT product surfaces can change independently from this project, the tutorial must be versioned and revalidated against current official OpenAI documentation at release/install time.
+
+The desired final experience is:
+
+~~~text
+one install command
+ -> choose exactly what MCP may control
+ -> install Gateway + Broker
+ -> validate policy and security
+ -> expose authenticated MCP endpoint
+ -> show ChatGPT Web connection tutorial
+ -> perform first end-to-end ChatGPT test
+ -> installation complete
+~~~
