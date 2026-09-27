@@ -57,6 +57,9 @@ func main() {
 	if issuer != "" {
 		authCfg.AuthorizationServers = []string{issuer}
 	}
+	if os.Getenv("VPS_AGENT_PUBLIC_URL") != "" && authCfg.Mode != "oidc" {
+		log.Fatal("public MCP configuration requires VPS_AGENT_AUTH_MODE=oidc; static/none auth is local-lab only")
+	}
 	if authCfg.Mode == "oidc" {
 		if resource == "" {
 			log.Fatal("VPS_AGENT_OAUTH_RESOURCE or VPS_AGENT_PUBLIC_URL is required in oidc mode")
