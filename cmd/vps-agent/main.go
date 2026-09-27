@@ -33,6 +33,8 @@ func main() {
 		auditTail(os.Args[2:])
 	case "wait-tool":
 		waitTool(os.Args[2:])
+	case "state-check":
+		stateCheck(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -120,6 +122,37 @@ func waitTool(args []string) {
 	os.Exit(1)
 }
 
+func stateCheck(args []string) {
+	fs := flag.NewFlagSet("state-check", flag.ExitOnError)
+	dbFile := fs.String("db", "", "path to a copied Broker SQLite state database")
+	_ = fs.Parse(args)
+	if *dbFile == "" {
+		fmt.Fprintln(os.Stderr, "db is required")
+		os.Exit(2)
+	}
+	store, err := state.Open(*dbFile)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer store.Close()
+	version, err := store.SchemaVersion(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	audit, err := store.AuditStatus(context.Background())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	raw, _ := json.MarshalIndent(map[string]any{
+		"schema_version": version,
+		"audit": audit,
+	}, "", "  ")
+	fmt.Println(string(raw))
+}
+
 func listApprovals(args []string) {
 	fs := flag.NewFlagSet("approvals", flag.ExitOnError)
 	socket, token := common(fs)
@@ -202,7 +235,7 @@ func call(socket string, req wire.Request) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: vps-agent <approvals|approve|deny|revoke-all|audit-status|audit-tail|wait-tool> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: vps-agent <approvals|approve|deny|revoke-all|audit-status|audit-tail|wait-tool|state-check> [flags]")
 }
 
 func getenv(name, fallback string) string {
