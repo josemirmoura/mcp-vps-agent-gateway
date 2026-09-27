@@ -184,7 +184,7 @@ func (s *Store) AcquireLock(ctx context.Context, resource, owner string, ttl tim
 		`SELECT owner, token, expires_at FROM resource_locks WHERE resource=?`, resource).
 		Scan(&curOwner, &curToken, &curExpires)
 	switch {
-	case err == nil && curExpires > now.Unix():
+	case err == nil && curExpires > now.UnixNano():
 		return Lock{}, fmt.Errorf("resource locked by %s", curOwner)
 	case err != nil && !errors.Is(err, sql.ErrNoRows):
 		return Lock{}, err
@@ -208,7 +208,7 @@ func (s *Store) AcquireLock(ctx context.Context, resource, owner string, ttl tim
 	expires := now.Add(ttl)
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO resource_locks(resource, owner, token, expires_at) VALUES(?,?,?,?)`,
-		resource, owner, generation, expires.Unix()); err != nil {
+		resource, owner, generation, expires.UnixNano()); err != nil {
 		return Lock{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -279,7 +279,7 @@ func (s *Store) IssueGrant(ctx context.Context, subject string, capabilities []s
 	raw, _ := json.Marshal(caps)
 	if _, err := s.db.ExecContext(ctx,
 		`INSERT INTO grants(grant_id, subject, capabilities, expires_at) VALUES(?,?,?,?)`,
-		id, subject, string(raw), exp.Unix()); err != nil {
+		id, subject, string(raw), exp.UnixNano()); err != nil {
 		return Grant{}, err
 	}
 	return Grant{ID: id, Subject: subject, Capabilities: caps, ExpiresAt: exp}, nil
@@ -298,7 +298,7 @@ func (s *Store) ValidateGrant(ctx context.Context, grantID, subject, capability 
 	if err != nil {
 		return false, err
 	}
-	if storedSubject != subject || revoked.Valid || time.Now().Unix() >= expires {
+	if storedSubject != subject || revoked.Valid || time.Now().UnixNano() >= expires {
 		return false, nil
 	}
 	var caps []string
@@ -316,7 +316,7 @@ func (s *Store) ValidateGrant(ctx context.Context, grantID, subject, capability 
 
 func (s *Store) RevokeAll(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE grants SET revoked_at=? WHERE revoked_at IS NULL`, time.Now().Unix())
+		`UPDATE grants SET revoked_at=? WHERE revoked_at IS NULL`, time.Now().UnixNano())
 	return err
 }
 
