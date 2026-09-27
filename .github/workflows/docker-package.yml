@@ -155,7 +155,8 @@ jobs:
           #!/usr/bin/env bash
           set -euo pipefail
           tool="$1"; shift
-          args="${1:-{}}"
+          args="${1:-}"
+          if [ -z "$args" ]; then args='{}'; fi
           set -a; . ./.env; set +a
           docker compose exec -T gateway /usr/local/bin/vps-agent-mcp-call             --endpoint http://127.0.0.1:8080/mcp             --token "$VPS_AGENT_STATIC_TOKEN"             --tool "$tool"             --args "$args"
           SH
