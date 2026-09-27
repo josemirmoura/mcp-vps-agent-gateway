@@ -127,3 +127,25 @@ func TestFileWriteAndEscape(t *testing.T) {
 		t.Fatal("escaped read was allowed")
 	}
 }
+
+
+func TestExpectedSubjectCannotBeForgedByGateway(t *testing.T) {
+	b, _, _, _ := testBroker(t)
+	b.ExpectedSubject = "alice"
+
+	allowed := b.Handle(context.Background(), wire.Request{
+		ID: "subject-ok", Subject: "alice", Tool: "service.status",
+		Resource: "vps-agent-test.service",
+	})
+	if !allowed.OK {
+		t.Fatalf("expected configured subject to pass: %+v", allowed)
+	}
+
+	denied := b.Handle(context.Background(), wire.Request{
+		ID: "subject-forged", Subject: "root-admin", Tool: "service.status",
+		Resource: "vps-agent-test.service",
+	})
+	if denied.OK || denied.Error == nil || denied.Error.Code != "identity_mismatch" {
+		t.Fatalf("forged subject was not rejected: %+v", denied)
+	}
+}
