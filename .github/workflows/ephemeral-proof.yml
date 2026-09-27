@@ -64,8 +64,10 @@ jobs:
           filesystem:
             read:
               - /var/lib/vps-agent/proof
+              - /opt/josemir-agradece-seu-gpt
             write:
               - /var/lib/vps-agent/proof
+              - /opt/josemir-agradece-seu-gpt
 
           network:
             mode: blocked
@@ -130,6 +132,12 @@ jobs:
 
           sudo install -m 0644 deploy/systemd/vps-agent-broker.service /etc/systemd/system/vps-agent-broker.service
           sudo install -m 0644 deploy/systemd/vps-agent-gateway.service /etc/systemd/system/vps-agent-gateway.service
+          sudo install -d -m 0755 /etc/systemd/system/vps-agent-broker.service.d
+          cat > /tmp/proof-opt.conf <<'DROPIN'
+          [Service]
+          ReadWritePaths=/opt
+          DROPIN
+          sudo install -m 0644 /tmp/proof-opt.conf /etc/systemd/system/vps-agent-broker.service.d/proof-opt.conf
 
           cat > /tmp/vps-agent-test.service <<'UNIT'
           [Unit]
@@ -238,6 +246,20 @@ jobs:
             sudo cat "$REQUEST_PATH" > proof/runtime/file-content.txt
           fi
 
+          if [ "$REQUEST_TYPE" = "directory_html_and_file" ]; then
+            DIRECTORY="$(python3 -c 'import json; print(json.load(open("proof/request.json"))["directory"])')"
+            HTML_PATH="$(python3 -c 'import json; print(json.load(open("proof/request.json"))["html_path"])')"
+            SECOND_PATH="$(python3 -c 'import json; print(json.load(open("proof/request.json"))["second_path"])')"
+            sudo test -d "$DIRECTORY"
+            sudo test -f "$HTML_PATH"
+            sudo test -f "$SECOND_PATH"
+            sudo stat -c '%A %U:%G %n' "$DIRECTORY" "$HTML_PATH" "$SECOND_PATH" > proof/runtime/user-request-paths.txt
+            sudo sha256sum "$HTML_PATH" > proof/runtime/html-sha256.txt
+            sudo sha256sum "$SECOND_PATH" > proof/runtime/second-sha256.txt
+            sudo cat "$HTML_PATH" > proof/runtime/html-content.txt
+            sudo cat "$SECOND_PATH" > proof/runtime/second-content.txt
+          fi
+
           python3 - <<'PY'
           import json, os, pathlib, subprocess
 
@@ -267,6 +289,11 @@ jobs:
               "socket_permissions": read("proof/runtime/permissions-after.txt"),
               "file_sha256": read("proof/runtime/file-sha256.txt"),
               "file_content": read("proof/runtime/file-content.txt"),
+              "user_request_paths": read("proof/runtime/user-request-paths.txt"),
+              "html_sha256": read("proof/runtime/html-sha256.txt"),
+              "html_content": read("proof/runtime/html-content.txt"),
+              "second_sha256": read("proof/runtime/second-sha256.txt"),
+              "second_content": read("proof/runtime/second-content.txt"),
           }
           audit_raw = read("proof/audit-status.json")
           try:
@@ -319,6 +346,15 @@ jobs:
               assert len(evidence.get("steps",[])) == 1
               step=evidence["steps"][0]
               assert step.get("expected_denial") is True and step.get("is_error") is True, step
+
+          if request["type"] == "directory_html_and_file":
+              runtime=evidence["runtime"]
+              assert runtime.get("html_content") == request.get("html_content",""), runtime
+              assert runtime.get("second_content") == request.get("second_content",""), runtime
+              assert runtime.get("html_sha256"), runtime
+              assert runtime.get("second_sha256"), runtime
+              assert "♥" in runtime.get("html_content",""), runtime
+              assert request.get("directory","") in (runtime.get("user_request_paths") or ""), runtime
 
           if request["type"] == "service_restart":
               def pid(text):
