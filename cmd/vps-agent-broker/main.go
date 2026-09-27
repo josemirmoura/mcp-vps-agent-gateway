@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,13 +16,14 @@ import (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 	policyFile := getenv("VPS_AGENT_POLICY", "/etc/vps-agent/policy.yaml")
 	socket := getenv("VPS_AGENT_BROKER_SOCKET", "/run/vps-agent/broker.sock")
 	dbFile := getenv("VPS_AGENT_STATE_DB", "/var/lib/vps-agent/state.db")
 
 	cfg, err := policy.Load(policyFile)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("fatal", "error", err); os.Exit(1)
 	}
 	fs, err := securefs.NewWithHostRoot(
 		cfg.FileRoots(false),
@@ -31,11 +32,11 @@ func main() {
 		os.Getenv("VPS_AGENT_HOST_ROOT"),
 	)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("fatal", "error", err); os.Exit(1)
 	}
 	store, err := state.Open(dbFile)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("fatal", "error", err); os.Exit(1)
 	}
 	defer store.Close()
 
@@ -51,9 +52,9 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-	log.Printf("broker listening on unix://%s instance_id=%s instance_name=%q", socket, b.InstanceID, b.InstanceName)
+	slog.Info("broker_start", "socket", socket, "instance_id", b.InstanceID, "instance_name", b.InstanceName, "policy", policyFile)
 	if err := ipc.NewServer(socket, b).Serve(ctx); err != nil && ctx.Err() == nil {
-		log.Fatal(err)
+		slog.Error("fatal", "error", err); os.Exit(1)
 	}
 }
 
