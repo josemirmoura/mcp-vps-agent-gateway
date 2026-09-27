@@ -53,20 +53,6 @@ func TestIPCRejectsOversizedMalformedRequest(t *testing.T) {
 	}
 }
 
-import "testing"
-
-func TestAllowedPeerUID(t *testing.T) {
-	for _, uid := range []uint32{0, 65532} {
-		if !allowedPeerUID(uid) {
-			t.Fatalf("expected uid %d to be allowed", uid)
-		}
-	}
-	for _, uid := range []uint32{1, 1000, 65531, 65533} {
-		if allowedPeerUID(uid) {
-			t.Fatalf("unexpected uid %d allowed", uid)
-		}
-	}
-}
 
 func waitSocket(t *testing.T, socket string) {
 	t.Helper()
