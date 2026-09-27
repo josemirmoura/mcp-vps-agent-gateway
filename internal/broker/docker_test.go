@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -29,6 +30,10 @@ func TestDockerCLISmoke(t *testing.T) {
 	}
 
 	d := DockerCLI{}
+	list, err := d.List(ctx)
+	if err != nil || len(list) == 0 {
+		t.Fatalf("docker list err=%v rows=%d", err, len(list))
+	}
 	info, err := d.Inspect(ctx, name)
 	if err != nil || info["name"] != name {
 		t.Fatalf("inspect name=%v err=%v", info["name"], err)
@@ -45,6 +50,31 @@ func TestDockerCLISmoke(t *testing.T) {
 		t.Fatalf("logs=%q err=%v", logs, err)
 	}
 	if _, err := d.Restart(ctx, name); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Stop(ctx, name); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Start(ctx, name); err != nil {
+		t.Fatal(err)
+	}
+
+	composeDir := filepath.Join(t.TempDir(), "compose")
+	if err := os.MkdirAll(composeDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	compose := "services:\n  app:\n    image: alpine:3.22\n    command: [\"sh\",\"-c\",\"echo compose-ready; sleep 30\"]\n"
+	if err := os.WriteFile(filepath.Join(composeDir, "compose.yaml"), []byte(compose), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.ComposeValidate(ctx, composeDir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.ComposeUp(ctx, composeDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = d.ComposeDown(context.Background(), composeDir) })
+	if _, err := d.ComposeDown(ctx, composeDir); err != nil {
 		t.Fatal(err)
 	}
 }
