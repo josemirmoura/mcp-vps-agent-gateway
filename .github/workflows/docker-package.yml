@@ -136,6 +136,15 @@ jobs:
       - name: Start Docker package
         run: docker compose up -d
 
+      - name: Reject unauthorized Broker socket peer
+        run: |
+          docker run --rm --user 1000:1000 \
+            -v mcp-vps-agent_broker-run:/run/vps-agent:ro \
+            busybox:1.37 sh -ec '
+              test ! -r /run/vps-agent/broker.sock
+              test ! -w /run/vps-agent/broker.sock
+            '
+
       - name: Wait for package health
         shell: bash
         run: |
