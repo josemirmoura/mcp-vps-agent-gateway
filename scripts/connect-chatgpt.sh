@@ -17,14 +17,11 @@ if [ -z "$PUBLIC_URL" ]; then
   exit 1
 fi
 
-case "${VPS_AGENT_AUTH_MODE:-static}" in
-  integrated|oidc) ;;
-  *)
-    echo "ChatGPT public connection requires integrated or external OAuth/OIDC." >&2
-    echo "Run scripts/setup-integrated-auth.sh for the default self-hosted path." >&2
-    exit 1
-    ;;
-esac
+if [ "${VPS_AGENT_AUTH_MODE:-static}" != "integrated" ]; then
+  echo "ChatGPT public connection requires the integrated self-hosted OAuth path." >&2
+  echo "Run scripts/setup-integrated-auth.sh first." >&2
+  exit 1
+fi
 
 bash ./scripts/verify-public.sh
 
@@ -36,7 +33,7 @@ MCP endpoint:
   $PUBLIC_URL
 
 Authentication:
-  ${VPS_AGENT_AUTH_MODE:-oidc} OAuth/OIDC via ${VPS_AGENT_OIDC_ISSUER:-<issuer>}
+  integrated OAuth/OIDC via ${VPS_AGENT_OIDC_ISSUER:-<issuer>}
   Protected-resource metadata: ${VPS_AGENT_RESOURCE_METADATA_URL:-<origin>/.well-known/oauth-protected-resource}
 
 Expected authenticated subject:
