@@ -200,20 +200,24 @@ jobs:
           docker compose exec -T gateway sh -ec 'command -v curl >/dev/null; curl -fsS http://127.0.0.1:8080/healthz'
           SOCKET=/var/lib/docker/volumes/mcp-vps-agent_broker-run/_data/broker.sock
           test -S "$SOCKET"
-          test "$(stat -c '%a' "$SOCKET")" = "660"
-          test "$(stat -c '%g' "$SOCKET")" = "65532"
-          # Prove an unrelated uid/gid cannot actually connect. BusyBox test -r/-w
-          # is not a reliable authorization probe for Unix-domain sockets.
-          setpriv --reuid=1000 --regid=1000 --clear-groups python3 - "$SOCKET" <<'PY'
-          import socket, sys
-          s=socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-          try:
-              s.connect(sys.argv[1])
-          except PermissionError:
-              print("UNRELATED UID SOCKET DENIAL: PASS")
-          else:
-              raise SystemExit("unrelated uid unexpectedly connected to Broker socket")
-          PY
+          stat -c 'socket-mode=%a socket-uid=%u socket-gid=%g' "$SOCKET" | tee evidence/broker-socket.txt
+
+          # Give the probe the socket group (GID 65532), so filesystem
+          # permissions alone allow the connection. The Broker must still
+          # reject UID 1000 through SO_PEERCRED before processing any request.
+          if docker run --rm --user 1000:65532 \
+            -e VPS_AGENT_ADMIN_TOKEN=not-a-real-admin-token \
+            -v mcp-vps-agent_broker-run:/run/vps-agent \
+            --entrypoint /usr/local/bin/vps-agent \
+            mcp-vps-agent-broker:ci \
+            audit-status --socket /run/vps-agent/broker.sock \
+            > evidence/unauthorized-peer.txt 2>&1; then
+            echo "SECURITY FAILURE: unauthorized Unix peer reached Broker" >&2
+            exit 1
+          fi
+          cat evidence/unauthorized-peer.txt
+          grep -q 'unauthorized_peer' evidence/unauthorized-peer.txt
+          echo "SO_PEERCRED UNAUTHORIZED UID DENIAL: PASS"
 
       - name: Create MCP helper
         shell: bash
