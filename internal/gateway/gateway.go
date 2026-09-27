@@ -164,9 +164,19 @@ type serviceInput struct {
 }
 
 type serviceOutput struct {
-	Service   string `json:"service"`
-	Status    string `json:"status"`
-	Restarted bool   `json:"restarted,omitempty"`
+	Service string `json:"service"`
+	Status  string `json:"status"`
+	Action  string `json:"action,omitempty"`
+}
+
+type serviceLogsInput struct {
+	Name  string `json:"name"`
+	Lines int    `json:"lines,omitempty"`
+}
+
+type serviceActionInput struct {
+	Name        string `json:"name"`
+	OperationID string `json:"operation_id,omitempty"`
 }
 
 type permissionsOutput struct {
@@ -351,6 +361,15 @@ func NewMCPServer(exec Executor) *mcp.Server {
 			return nil, out, nil
 		})
 
+	mcp.AddTool(server, &mcp.Tool{Name: "service.list", Description: "List only systemd services visible through server-side policy."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "service.list", "", "list", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
 	mcp.AddTool(server, &mcp.Tool{Name: "service.status", Description: "Return status for a systemd service allowed by server-side policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in serviceInput) (*mcp.CallToolResult, serviceOutput, error) {
 			var out serviceOutput
@@ -360,14 +379,27 @@ func NewMCPServer(exec Executor) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "service.restart", Description: "Restart one systemd service only when server-side policy permits it."},
-		func(ctx context.Context, _ *mcp.CallToolRequest, in serviceInput) (*mcp.CallToolResult, serviceOutput, error) {
-			var out serviceOutput
-			if err := s.call(ctx, "service.restart", in.Name, "restart", nil, &out, true, ""); err != nil {
+	mcp.AddTool(server, &mcp.Tool{Name: "service.logs", Description: "Read bounded journal logs for an allowed systemd service."},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in serviceLogsInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{"lines": in.Lines})
+			if err := s.call(ctx, "service.logs", in.Name, "logs", args, &out, false, ""); err != nil {
 				return nil, out, err
 			}
 			return nil, out, nil
 		})
+
+	for _, action := range []string{"start", "stop", "restart", "reload", "enable", "disable"} {
+		action := action
+		mcp.AddTool(server, &mcp.Tool{Name: "service." + action, Description: "Perform the typed systemd " + action + " action when server-side policy permits it."},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in serviceActionInput) (*mcp.CallToolResult, serviceOutput, error) {
+				var out serviceOutput
+				if err := s.call(ctx, "service."+action, in.Name, action, nil, &out, true, in.OperationID); err != nil {
+					return nil, out, err
+				}
+				return nil, out, nil
+			})
+	}
 
 	mcp.AddTool(server, &mcp.Tool{Name: "system.health", Description: "Return non-secret Gateway/Broker health information."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
