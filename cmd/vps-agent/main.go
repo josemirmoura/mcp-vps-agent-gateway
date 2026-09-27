@@ -26,6 +26,8 @@ func main() {
 		decideApproval(os.Args[2:], false)
 	case "revoke-all":
 		revokeAll(os.Args[2:])
+	case "audit-status":
+		auditStatus(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -66,6 +68,17 @@ func decideApproval(args []string, approve bool) {
 	call(*socket, wire.Request{
 		ID: "operator-" + name, Tool: tool, AdminToken: *token, Args: payload,
 	})
+}
+
+func auditStatus(args []string) {
+	fs := flag.NewFlagSet("audit-status", flag.ExitOnError)
+	socket, token := common(fs)
+	_ = fs.Parse(args)
+	if *token == "" {
+		fmt.Fprintln(os.Stderr, "admin token is required")
+		os.Exit(2)
+	}
+	call(*socket, wire.Request{ID: "operator-audit-status", Tool: "admin.audit.status", AdminToken: *token})
 }
 
 func revokeAll(args []string) {
