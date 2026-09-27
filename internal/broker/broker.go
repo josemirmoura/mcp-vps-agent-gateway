@@ -72,14 +72,17 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		})
 	case "system.health":
 		auditOK := true
+		activeJobs := 0
 		if b.State != nil {
 			auditOK = b.State.VerifyAudit(ctx) == nil
+			if jobs, err := b.State.ListActiveJobs(ctx); err == nil { activeJobs = len(jobs) }
 		}
 		return ok(req.ID, map[string]any{
 			"ok": true, "audit_chain_ok": auditOK,
 			"state_configured":  b.State != nil,
 			"docker_configured": b.Docker != nil,
 			"jobs_configured":   b.Jobs != nil,
+			"active_jobs":       activeJobs,
 		})
 	case "system.disk":
 		if !b.Policy.CanDiagnostic("system.disk") {
