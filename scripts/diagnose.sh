@@ -10,27 +10,48 @@ set -a
 . ./.env
 set +a
 
+compose=(docker compose -f compose.yaml)
+if [ "${VPS_AGENT_WHOLE_HOST:-0}" = "1" ]; then
+  compose+=(-f compose.host.yaml)
+fi
+if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ] && [ -f compose.integrated-auth.yaml ]; then
+  compose+=(-f compose.integrated-auth.yaml)
+  if [ "${VPS_AGENT_BUNDLED_PROXY:-0}" = "1" ] && [ -f compose.integrated-auth.proxy.yaml ]; then
+    compose+=(-f compose.integrated-auth.proxy.yaml)
+  fi
+elif [ -n "${VPS_AGENT_DOMAIN:-}" ] && [ -f compose.https.yaml ]; then
+  compose+=(-f compose.https.yaml)
+fi
+
+redaction_secrets=(
+  "${VPS_AGENT_ADMIN_TOKEN:-}"
+  "${VPS_AGENT_STATIC_TOKEN:-}"
+  "${ZITADEL_MASTERKEY:-}"
+  "${ZITADEL_POSTGRES_PASSWORD:-}"
+  "${ZITADEL_BOOTSTRAP_ADMIN_PASSWORD:-}"
+)
+
 cmd="${1:-status}"
 case "$cmd" in
   status)
-    docker compose ps
+    "${compose[@]}" ps
     echo
     for service in broker gateway; do
-      cid="$(docker compose ps -q "$service" 2>/dev/null || true)"
+      cid="$("${compose[@]}" ps -q "$service" 2>/dev/null || true)"
       if [ -n "$cid" ]; then
         printf "%s health: " "$service"
         docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid"
       fi
     done
     echo
-    docker compose exec -T broker /usr/local/bin/vps-agent audit-status
+    "${compose[@]}" exec -T broker /usr/local/bin/vps-agent audit-status
     ;;
   logs)
     tail="${2:-200}"
     tmp="$(mktemp)"
     trap 'rm -f "$tmp"' EXIT
-    docker compose logs --no-color --tail "$tail" >"$tmp"
-    python3 - "$tmp" "${VPS_AGENT_ADMIN_TOKEN:-}" "${VPS_AGENT_STATIC_TOKEN:-}" <<'PY'
+    "${compose[@]}" logs --no-color --tail "$tail" >"$tmp"
+    python3 - "$tmp" "${redaction_secrets[@]}" <<'PY'
 import pathlib, sys
 p=pathlib.Path(sys.argv[1])
 text=p.read_text(errors="replace")
@@ -42,8 +63,8 @@ PY
     ;;
   audit)
     limit="${2:-100}"
-    docker compose exec -T broker /usr/local/bin/vps-agent audit-status
-    docker compose exec -T broker /usr/local/bin/vps-agent audit-tail --limit "$limit"
+    "${compose[@]}" exec -T broker /usr/local/bin/vps-agent audit-status
+    "${compose[@]}" exec -T broker /usr/local/bin/vps-agent audit-tail --limit "$limit"
     ;;
   bundle)
     mkdir -p diagnostics
@@ -52,7 +73,7 @@ PY
     tmp="$(mktemp -d)"
     trap 'rm -rf "$tmp"' EXIT
 
-    docker compose ps >"$tmp/compose-ps.txt" 2>&1 || true
+    "${compose[@]}" ps >"$tmp/compose-ps.txt" 2>&1 || true
     docker version >"$tmp/docker-version.txt" 2>&1 || true
     docker compose version >"$tmp/compose-version.txt" 2>&1 || true
     uname -a >"$tmp/uname.txt" 2>&1 || true
@@ -66,11 +87,11 @@ PY
       printf "oidc_issuer=%s\n" "${VPS_AGENT_OIDC_ISSUER:-}"
     } >"$tmp/runtime.txt"
 
-    docker compose exec -T broker /usr/local/bin/vps-agent audit-status >"$tmp/audit-status.json" 2>&1 || true
-    docker compose exec -T broker /usr/local/bin/vps-agent audit-tail --limit 200 >"$tmp/audit-tail.json" 2>&1 || true
-    docker compose logs --no-color --tail 500 >"$tmp/logs.raw" 2>&1 || true
+    "${compose[@]}" exec -T broker /usr/local/bin/vps-agent audit-status >"$tmp/audit-status.json" 2>&1 || true
+    "${compose[@]}" exec -T broker /usr/local/bin/vps-agent audit-tail --limit 200 >"$tmp/audit-tail.json" 2>&1 || true
+    "${compose[@]}" logs --no-color --tail 500 >"$tmp/logs.raw" 2>&1 || true
 
-    python3 - "$tmp" "${VPS_AGENT_ADMIN_TOKEN:-}" "${VPS_AGENT_STATIC_TOKEN:-}" <<'PY'
+    python3 - "$tmp" "${redaction_secrets[@]}" <<'PY'
 import pathlib, re, sys
 root=pathlib.Path(sys.argv[1])
 secrets=[x for x in sys.argv[2:] if x]
