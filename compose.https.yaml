@@ -2,6 +2,11 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "${VPS_AGENT_LOG_MAX_SIZE:-10m}"
+        max-file: "${VPS_AGENT_LOG_MAX_FILES:-5}"
     depends_on:
       gateway:
         condition: service_healthy
