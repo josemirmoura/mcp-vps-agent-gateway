@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,6 +16,7 @@ import (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 	listen := getenv("VPS_AGENT_LISTEN", ":8080")
 	socket := os.Getenv("VPS_AGENT_BROKER_SOCKET")
 	pocRoot := getenv("VPS_AGENT_POC_ROOT", "/tmp/vps-agent-poc")
@@ -23,17 +24,17 @@ func main() {
 	var exec gateway.Executor
 	if socket == "" {
 		if err := os.MkdirAll(pocRoot, 0o700); err != nil {
-			log.Fatal(err)
+			slog.Error("fatal", "error", err); os.Exit(1)
 		}
 		fs, err := securefs.New([]string{pocRoot}, []string{pocRoot}, securefs.DefaultMaxBytes)
 		if err != nil {
-			log.Fatal(err)
+			slog.Error("fatal", "error", err); os.Exit(1)
 		}
 		exec = gateway.LocalExecutor{FS: fs}
-		log.Printf("starting in Gate 0 local mode; safe root=%s", pocRoot)
+		slog.Info("gateway_local_mode", "safe_root", pocRoot)
 	} else {
 		exec = gateway.BrokerExecutor{Client: ipc.Client{Socket: socket, Timeout: 15 * time.Second}}
-		log.Printf("using broker socket %s", socket)
+		slog.Info("gateway_broker_configured", "socket", socket)
 	}
 
 	issuer := strings.TrimRight(os.Getenv("VPS_AGENT_OIDC_ISSUER"), "/")
@@ -60,11 +61,11 @@ func main() {
 		authCfg.AuthorizationServers = []string{issuer}
 	}
 	if os.Getenv("VPS_AGENT_PUBLIC_URL") != "" && authCfg.Mode != "oidc" {
-		log.Fatal("public MCP configuration requires VPS_AGENT_AUTH_MODE=oidc; static/none auth is local-lab only")
+		slog.Error("public_auth_rejected", "reason", "public MCP configuration requires oidc"); os.Exit(1)
 	}
 	if authCfg.Mode == "oidc" {
 		if resource == "" {
-			log.Fatal("VPS_AGENT_OAUTH_RESOURCE or VPS_AGENT_PUBLIC_URL is required in oidc mode")
+			slog.Error("oidc_config_invalid", "reason", "OAuth resource/public URL required"); os.Exit(1)
 		}
 		audience := os.Getenv("VPS_AGENT_OIDC_AUDIENCE")
 		if audience == "" {
@@ -76,7 +77,7 @@ func main() {
 			audience,
 		)
 		if err != nil {
-			log.Fatalf("configure OIDC: %v", err)
+			slog.Error("oidc_config_failed", "error", err); os.Exit(1)
 		}
 		authCfg.Verifier = verifier
 	}
@@ -90,8 +91,8 @@ func main() {
 		WriteTimeout:      0, // Streamable HTTP may legitimately outlive a normal request timeout.
 		IdleTimeout:       2 * time.Minute,
 	}
-	log.Printf("MCP gateway listening on %s/mcp auth=%s", listen, authCfg.Mode)
-	log.Fatal(srv.ListenAndServe())
+	slog.Info("gateway_start", "listen", listen, "auth_mode", authCfg.Mode, "instance_id", authCfg.InstanceID, "instance_name", authCfg.InstanceName)
+	if err := srv.ListenAndServe(); err != nil { slog.Error("gateway_exit", "error", err); os.Exit(1) }
 }
 
 func metadataURLForResource(raw string) string {
