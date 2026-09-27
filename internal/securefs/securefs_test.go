@@ -3,6 +3,7 @@ package securefs
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -110,5 +111,122 @@ func TestMkdirAllRejectsOutsideAndSymlink(t *testing.T) {
 	}
 	if err := m.MkdirAll(filepath.Join(root, "link", "child"), 0o750); err == nil {
 		t.Fatal("symlink directory component was followed")
+	}
+}
+
+
+func TestCompleteFilesystemToolbox(t *testing.T) {
+	root := t.TempDir()
+	m, err := New([]string{root}, []string{root}, 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dir := filepath.Join(root, "a", "b")
+	if err := m.MkdirAll(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "file.txt")
+	if err := m.WriteFileAtomic(file, []byte("alpha beta gamma")); err != nil {
+		t.Fatal(err)
+	}
+
+	entries, err := m.List(dir, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name != "file.txt" {
+		t.Fatalf("unexpected list: %+v", entries)
+	}
+
+	st, err := m.Stat(file, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Size != int64(len("alpha beta gamma")) || st.IsDir {
+		t.Fatalf("unexpected stat: %+v", st)
+	}
+
+	hash1, err := m.Hash(file)
+	if err != nil || len(hash1) != 64 {
+		t.Fatalf("hash=%q err=%v", hash1, err)
+	}
+
+	hash2, err := m.Patch(file, "beta", "BETA", hash1)
+	if err != nil || hash2 == hash1 {
+		t.Fatalf("patch hash=%q err=%v", hash2, err)
+	}
+	data, _ := m.ReadFile(file)
+	if string(data) != "alpha BETA gamma" {
+		t.Fatalf("patch result=%q", data)
+	}
+
+	copyPath := filepath.Join(dir, "copy.txt")
+	if err := m.CopyFile(file, copyPath); err != nil {
+		t.Fatal(err)
+	}
+	movePath := filepath.Join(dir, "moved.txt")
+	if err := m.Move(copyPath, movePath); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(copyPath); !os.IsNotExist(err) {
+		t.Fatalf("copy source still exists after move: %v", err)
+	}
+
+	if err := m.Chmod(movePath, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(movePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o777 {
+		t.Fatalf("chmod got %o", info.Mode().Perm())
+	}
+
+	if err := m.Remove(movePath, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Remove(filepath.Join(root, "a"), true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "a")); !os.IsNotExist(err) {
+		t.Fatalf("recursive removal failed: %v", err)
+	}
+}
+
+func TestPatchPreconditionAndAmbiguity(t *testing.T) {
+	root := t.TempDir()
+	m, _ := New([]string{root}, []string{root}, 4096)
+	file := filepath.Join(root, "x.txt")
+	_ = m.WriteFileAtomic(file, []byte("same same"))
+	if _, err := m.Patch(file, "same", "new", ""); err == nil {
+		t.Fatal("ambiguous patch was allowed")
+	}
+	if _, err := m.Patch(file, "same same", "new", strings.Repeat("0", 64)); err == nil {
+		t.Fatal("wrong sha precondition was allowed")
+	}
+}
+
+func TestRecursiveRemoveDoesNotFollowSymlink(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	m, _ := New([]string{root}, []string{root}, 4096)
+	tree := filepath.Join(root, "tree")
+	if err := os.MkdirAll(tree, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	secret := filepath.Join(outside, "secret.txt")
+	if err := os.WriteFile(secret, []byte("keep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(tree, "outside-link")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	if err := m.Remove(tree, true); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(secret); err != nil || string(got) != "keep" {
+		t.Fatalf("recursive delete escaped through symlink: got=%q err=%v", got, err)
 	}
 }
