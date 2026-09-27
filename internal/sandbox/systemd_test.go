@@ -28,7 +28,7 @@ func TestBuildSystemdRunArgsBlockedNetwork(t *testing.T) {
 			t.Errorf("missing %q in %v", w, args)
 		}
 	}
-	got := strings.Join(args[len(args)-3:], " ")
+	got := strings.Join(args[len(args)-4:], " ")
 	if got != "-- /bin/sh -lc echo ok" {
 		t.Fatalf("unexpected command tail %q", got)
 	}
