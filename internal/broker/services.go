@@ -3,9 +3,10 @@ package broker
 import (
 	"context"
 	"fmt"
-	"os/exec"
-	"strconv"
+		"strconv"
 	"strings"
+
+	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/hostexec"
 )
 
 type ServiceInfo struct {
@@ -31,7 +32,7 @@ type ServiceManager interface {
 type SystemdManager struct{}
 
 func (SystemdManager) List(ctx context.Context) ([]ServiceInfo, error) {
-	out, err := exec.CommandContext(ctx, "systemctl", "list-units", "--type=service", "--all", "--no-legend", "--no-pager", "--plain").CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "systemctl", "list-units", "--type=service", "--all", "--no-legend", "--no-pager", "--plain").CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("systemctl list-units: %s: %w", strings.TrimSpace(string(out)), err)
 	}
@@ -57,7 +58,7 @@ func (SystemdManager) List(ctx context.Context) ([]ServiceInfo, error) {
 }
 
 func (SystemdManager) Status(ctx context.Context, name string) (string, error) {
-	out, err := exec.CommandContext(ctx, "systemctl", "is-active", name).CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "systemctl", "is-active", name).CombinedOutput()
 	status := strings.TrimSpace(string(out))
 	if err != nil {
 		return status, fmt.Errorf("systemctl is-active %s: %w", name, err)
@@ -72,7 +73,7 @@ func (SystemdManager) Logs(ctx context.Context, name string, lines int) (string,
 	if lines > 1000 {
 		lines = 1000
 	}
-	out, err := exec.CommandContext(ctx, "journalctl", "-u", name, "-n", strconv.Itoa(lines), "--no-pager", "-o", "short-iso").CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "journalctl", "-u", name, "-n", strconv.Itoa(lines), "--no-pager", "-o", "short-iso").CombinedOutput()
 	if err != nil {
 		return strings.TrimSpace(string(out)), fmt.Errorf("journalctl %s: %w", name, err)
 	}
@@ -80,7 +81,7 @@ func (SystemdManager) Logs(ctx context.Context, name string, lines int) (string,
 }
 
 func systemctlAction(ctx context.Context, action, name string) (string, error) {
-	out, err := exec.CommandContext(ctx, "systemctl", action, name).CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "systemctl", action, name).CombinedOutput()
 	if err != nil {
 		return strings.TrimSpace(string(out)), fmt.Errorf("systemctl %s %s: %w", action, name, err)
 	}
@@ -98,7 +99,7 @@ func (SystemdManager) Stop(ctx context.Context, name string) (string, error) {
 	if _, err := systemctlAction(ctx, "stop", name); err != nil {
 		return "", err
 	}
-	out, err := exec.CommandContext(ctx, "systemctl", "is-active", name).CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "systemctl", "is-active", name).CombinedOutput()
 	status := strings.TrimSpace(string(out))
 	if status == "inactive" || status == "failed" {
 		return status, nil
@@ -127,7 +128,7 @@ func (SystemdManager) Enable(ctx context.Context, name string) (string, error) {
 	if _, err := systemctlAction(ctx, "enable", name); err != nil {
 		return "", err
 	}
-	out, err := exec.CommandContext(ctx, "systemctl", "is-enabled", name).CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "systemctl", "is-enabled", name).CombinedOutput()
 	if err != nil {
 		return strings.TrimSpace(string(out)), fmt.Errorf("systemctl is-enabled %s: %w", name, err)
 	}
@@ -138,7 +139,7 @@ func (SystemdManager) Disable(ctx context.Context, name string) (string, error) 
 	if _, err := systemctlAction(ctx, "disable", name); err != nil {
 		return "", err
 	}
-	out, err := exec.CommandContext(ctx, "systemctl", "is-enabled", name).CombinedOutput()
+	out, err := hostexec.CommandContext(ctx, "systemctl", "is-enabled", name).CombinedOutput()
 	status := strings.TrimSpace(string(out))
 	if status == "disabled" || status == "static" {
 		return status, nil
