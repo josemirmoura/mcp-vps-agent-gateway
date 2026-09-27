@@ -280,8 +280,9 @@ Therefore:
 The primary operator flow is intentionally terminal- and AI-friendly:
 
 ~~~bash
-bash scripts/init.sh
-# edit config/policy.yaml and .env
+sudo install -d -o "$USER" -g "$USER" -m 0750 /opt/vps-agent-sandbox
+bash scripts/init.sh --scope /opt/vps-agent-sandbox
+# optionally refine config/policy.yaml and .env
 docker compose up -d --build
 bash scripts/verify.sh
 bash scripts/connect-chatgpt.sh
