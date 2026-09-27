@@ -2,7 +2,7 @@
 
 Arquitetura de referência orientada a segurança para conectar ChatGPT ou outro cliente MCP a uma VPS Linux sem transformar o modelo em fronteira de segurança.
 
-> **Status: PRE-ALPHA / DOCS-FIRST.** Ainda não existe binário pronto para produção nem release estável.
+> **Status: PRE-ALPHA / IMPLEMENTAÇÃO DE REFERÊNCIA EXECUTÁVEL.** Já existe código Go validado em runners Ubuntu efêmeros do GitHub. Ainda não existe release estável de produção.
 
 ## O que é
 
@@ -39,7 +39,7 @@ Hoje este repositório não é:
 - shell root genérico para IA
 - garantia de que todo plano do ChatGPT aceite MCP privado com escrita
 
-A arquitetura completa é o norte. A implementação começa pequena.
+A arquitetura completa é o norte. O repositório agora contém uma implementação Go MVP-first, ainda não pronta para produção.
 
 ## Modos
 
@@ -90,9 +90,16 @@ Em 2026-09-26, a OpenAI documenta MCP privado completo com write/modify em Devel
 
 Veja [docs/chatgpt-integration.md](docs/chatgpt-integration.md).
 
-### 4. Implemente somente o Gate 0B
+### 4. Valide a implementação executável
 
-Exponha apenas:
+~~~bash
+go test -race ./...
+go build ./cmd/...
+~~~
+
+Os workflows do GitHub também validam Docker, systemd, vulnerabilidades e efeitos reais de MCP -> Broker -> Linux. Veja [docs/implementation-validation.md](docs/implementation-validation.md).
+
+A base do Gate 0B expõe:
 
 ~~~text
 system.info
@@ -108,14 +115,12 @@ Restrinja arquivos a:
 
 Ainda não adicione root, Docker, SQLite, Full, approval ou shell genérico.
 
-### 5. Entregue isto a um agente de código
+### 5. Avance gate por gate
 
 ~~~text
-Leia AGENTS.md, docs/README.md e docs/mvp-first.md.
-Implemente somente o Gate 0B usando Go e o SDK MCP oficial para Go.
-Não implemente execução privilegiada, Docker, Full, approval,
-SQLite ou shell genérico.
-Adicione testes de confinamento de caminhos, entradas inválidas e erros claros.
+Leia AGENTS.md, docs/README.md, docs/mvp-first.md e docs/implementation-validation.md.
+Inspecione a implementação e as evidências atuais.
+Avance somente o próximo gate ainda não provado; não habilite Full nem shell administrativo genérico antes da hora.
 ~~~
 
 ## Escada de implementação
