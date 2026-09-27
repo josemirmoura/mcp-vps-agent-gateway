@@ -429,6 +429,43 @@ func (s *Store) AppendAudit(ctx context.Context, ev AuditEvent) (string, error) 
 	return digest, nil
 }
 
+
+type AuditRecord struct {
+	Seq      int64      `json:"seq"`
+	Event    AuditEvent `json:"event"`
+	PrevHash string     `json:"prev_hash"`
+	Hash     string     `json:"hash"`
+}
+
+func (s *Store) ListAuditAfter(ctx context.Context, afterSeq int64, limit int) ([]AuditRecord, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT seq,event_json,prev_hash,hash FROM audit_events WHERE seq>? ORDER BY seq LIMIT ?`,
+		afterSeq, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []AuditRecord
+	for rows.Next() {
+		var rec AuditRecord
+		var raw string
+		if err := rows.Scan(&rec.Seq, &raw, &rec.PrevHash, &rec.Hash); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(raw), &rec.Event); err != nil {
+			return nil, err
+		}
+		out = append(out, rec)
+	}
+	return out, rows.Err()
+}
+
 type AuditStatus struct {
 	Valid    bool   `json:"valid"`
 	Events   int64  `json:"events"`
