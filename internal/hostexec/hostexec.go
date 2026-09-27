@@ -11,7 +11,7 @@ import (
 const envHostRoot = "VPS_AGENT_HOST_ROOT"
 
 var allowedCommands = map[string]struct{}{
-	"apt-get": {}, "df": {}, "docker": {}, "dpkg-query": {}, "getent": {},
+	"apt-get": {}, "cat": {}, "df": {}, "docker": {}, "dpkg-query": {}, "getent": {},
 	"groupadd": {}, "groupdel": {}, "hostname": {}, "journalctl": {}, "ps": {}, "ss": {},
 	"systemctl": {}, "systemd-run": {}, "ufw": {},
 	"useradd": {}, "userdel": {}, "usermod": {},
