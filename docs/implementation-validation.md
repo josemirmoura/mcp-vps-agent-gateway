@@ -75,6 +75,34 @@ d7f82e6fd0f69478544fb30fee4d034f9d69b8b0615d06a7643099d59b6ac21d
 
 Result: **PASS**.
 
+
+## Docker package end-to-end acceptance
+
+Workflow run:
+
+https://github.com/josemirmoura/mcp-vps-agent-gateway/actions/runs/36324349224
+
+Result: **PASS** on a clean Ubuntu 24.04 GitHub-hosted runner.
+
+The acceptance builds and starts the real `Dockerfile` + `compose.yaml`, then drives the public MCP surface through the Gateway and privileged Broker.
+
+Proven in one disposable machine:
+
+- both Broker and Gateway container health checks
+- complete scoped filesystem workflow: mkdir, write, read, hash, patch, copy, move, chmod 0777, stat, list, delete and recursive delete
+- `/etc/shadow` denied through filesystem policy
+- `shell.exec` creates a real file inside the delegated root
+- Scoped shell cannot read `/etc/shadow`
+- host systemd service status/restart through the Docker Broker
+- host Docker inspect/restart through the Docker Broker
+- host Docker Compose validate/up/down through the Docker Broker
+- disk, memory, process, listener, package, user and group diagnostics/inventory
+- Broker audit-chain integrity after the workload
+
+The Docker Broker uses host namespaces for host-native operations. The Scoped shell uses a systemd mount namespace starting from an empty read-only root and binds back only the required runtime/toolchain plus user-authorized filesystem roots.
+
+Docker is packaging, not the authorization boundary. The privileged Broker must be treated as host-root trusted code; server-side policy remains the effective authority boundary for MCP requests.
+
 ## CI evidence
 
 The reference implementation CI validates, on GitHub-hosted Linux runners:
@@ -134,9 +162,10 @@ It does not yet prove:
 - long-running production reliability
 - a real external OIDC provider in the target environment
 - remote audit anchoring
-- Full/admin shell in production
+- production use of Full/admin shell
+- long-running reliability and recovery behavior under real workloads
 
-Full remains disabled and `shell.exec_admin` intentionally returns not implemented until Gate 5.
+Full/admin capabilities exist in the code path but remain disabled by the default policy and are not claimed as production-ready.
 
 ## Reproducible interactive proof
 
