@@ -25,6 +25,14 @@ fi
 mkdir -p state
 chmod 700 state
 
+if [ ! -f config/policy.yaml ]; then
+  cp config/policy.example.yaml config/policy.yaml
+  chmod 600 config/policy.yaml
+  echo "Created config/policy.yaml from the versioned template."
+else
+  echo "config/policy.yaml already exists; leaving operator policy unchanged."
+fi
+
 if grep -q 'CHANGE_ME_' .env; then
   echo "ERROR: .env still contains CHANGE_ME values." >&2
   exit 1
