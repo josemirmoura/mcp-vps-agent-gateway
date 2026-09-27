@@ -1,0 +1,41 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          cache: true
+      - name: Test
+        run: |
+          go mod tidy
+          go test -race -count=1 ./...
+      - name: Build packages
+        run: |
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            mkdir -p "dist/linux-$arch"
+            for cmd in vps-agent-gateway vps-agent-broker vps-agent vps-agent-setup; do
+              CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags="-s -w" -o "dist/linux-$arch/$cmd" "./cmd/$cmd"
+            done
+            cp LICENSE README.md README.pt-BR.md "dist/linux-$arch/"
+            tar -C "dist/linux-$arch" -czf "dist/vps-agent-linux-$arch.tar.gz" .
+            sha256sum "dist/vps-agent-linux-$arch.tar.gz" > "dist/vps-agent-linux-$arch.tar.gz.sha256"
+          done
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}"             dist/vps-agent-linux-amd64.tar.gz             dist/vps-agent-linux-amd64.tar.gz.sha256             dist/vps-agent-linux-arm64.tar.gz             dist/vps-agent-linux-arm64.tar.gz.sha256             --generate-notes             --title "MCP VPS Agent Gateway ${GITHUB_REF_NAME}"
