@@ -1,7 +1,8 @@
 [Unit]
 Description=MCP VPS Agent Gateway
-After=network-online.target
+After=network-online.target vps-agent-broker.service
 Wants=network-online.target
+Requires=vps-agent-broker.service
 
 [Service]
 Type=simple
@@ -15,9 +16,10 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/tmp/vps-agent-poc /run/vps-agent
+ReadWritePaths=-/tmp/vps-agent-poc /run/vps-agent
 RestrictSUIDSGID=yes
 LockPersonality=yes
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target
