@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/gateway"
@@ -32,19 +34,43 @@ func main() {
 		log.Printf("using broker socket %s", socket)
 	}
 
-	handler := gateway.Handler(exec, gateway.AuthConfig{
-		Mode:          getenv("VPS_AGENT_AUTH_MODE", "none"),
-		StaticToken:   os.Getenv("VPS_AGENT_STATIC_TOKEN"),
-		StaticSubject: getenv("VPS_AGENT_STATIC_SUBJECT", "local-dev"),
-	})
+	authCfg := gateway.AuthConfig{
+		Mode:                getenv("VPS_AGENT_AUTH_MODE", "none"),
+		StaticToken:         os.Getenv("VPS_AGENT_STATIC_TOKEN"),
+		StaticSubject:       getenv("VPS_AGENT_STATIC_SUBJECT", "local-dev"),
+		RequiredScopes:      splitScopes(os.Getenv("VPS_AGENT_REQUIRED_SCOPES")),
+		ResourceMetadataURL: os.Getenv("VPS_AGENT_RESOURCE_METADATA_URL"),
+	}
+	if authCfg.Mode == "oidc" {
+		verifier, err := gateway.NewOIDCVerifier(
+			context.Background(),
+			os.Getenv("VPS_AGENT_OIDC_ISSUER"),
+			os.Getenv("VPS_AGENT_OIDC_AUDIENCE"),
+		)
+		if err != nil {
+			log.Fatalf("configure OIDC: %v", err)
+		}
+		authCfg.Verifier = verifier
+	}
 
+	handler := gateway.Handler(exec, authCfg)
 	srv := &http.Server{
 		Addr:              listen,
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      0, // Streamable HTTP may legitimately outlive a normal request timeout.
+		IdleTimeout:       2 * time.Minute,
 	}
-	log.Printf("MCP gateway listening on %s/mcp", listen)
+	log.Printf("MCP gateway listening on %s/mcp auth=%s", listen, authCfg.Mode)
 	log.Fatal(srv.ListenAndServe())
+}
+
+func splitScopes(raw string) []string {
+	return strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == ' ' || r == '	' || r == '
+'
+	})
 }
 
 func getenv(name, fallback string) string {
