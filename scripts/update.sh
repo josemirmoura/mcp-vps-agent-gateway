@@ -50,16 +50,33 @@ echo "Stopping package for a consistent state backup..."
 "${compose[@]}" stop
 
 tar -czf "$backup_dir/operator-state.tar.gz" .env config/policy.yaml state
+
+if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ]; then
+  echo "Snapshotting integrated identity volumes..."
+  docker run --rm     -v mcp-vps-agent_zitadel-postgres-data:/source:ro     -v "$PWD/$backup_dir:/backup"     alpine:3.22 sh -c 'cd /source && tar -czf /backup/zitadel-postgres-volume.tar.gz .'
+  docker run --rm     -v mcp-vps-agent_zitadel-bootstrap:/source:ro     -v "$PWD/$backup_dir:/backup"     alpine:3.22 sh -c 'cd /source && tar -czf /backup/zitadel-bootstrap-volume.tar.gz .'
+fi
 printf '%s\n' "$current" >"$backup_dir/previous-commit"
 printf '%s\n' "$target_sha" >"$backup_dir/target-commit"
 
 rollback() {
   echo "Update failed; rolling back to $current..." >&2
+  "${compose[@]}" stop >/dev/null 2>&1 || true
   git reset --hard "$current"
   rm -rf state
   tar -xzf "$backup_dir/operator-state.tar.gz"
+
+  if [ -f "$backup_dir/zitadel-postgres-volume.tar.gz" ]; then
+    echo "Restoring integrated identity volumes..." >&2
+    docker run --rm       -v mcp-vps-agent_zitadel-postgres-data:/target       -v "$PWD/$backup_dir:/backup:ro"       alpine:3.22 sh -c 'find /target -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +; tar -xzf /backup/zitadel-postgres-volume.tar.gz -C /target'
+    docker run --rm       -v mcp-vps-agent_zitadel-bootstrap:/target       -v "$PWD/$backup_dir:/backup:ro"       alpine:3.22 sh -c 'find /target -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +; tar -xzf /backup/zitadel-bootstrap-volume.tar.gz -C /target'
+  fi
+
   "${compose[@]}" up -d --build
   bash ./scripts/verify.sh
+  if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ]; then
+    bash ./scripts/verify-public.sh
+  fi
   printf '{"time":"%s","from":"%s","to":"%s","result":"rolled_back"}\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$current" "$target_sha" >> state/update.log
 }
@@ -70,7 +87,7 @@ if [ "$(git rev-parse HEAD)" != "$target_sha" ]; then
   echo "Update did not land on the requested target SHA." >&2
   false
 fi
-docker compose config -q
+"${compose[@]}" config -q
 
 echo "Building target images before touching the real state database..."
 "${compose[@]}" build
@@ -91,6 +108,9 @@ docker run --rm \
 
 "${compose[@]}" up -d
 bash ./scripts/verify.sh
+if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ]; then
+  bash ./scripts/verify-public.sh
+fi
 
 trap - ERR
 printf '{"time":"%s","from":"%s","to":"%s","result":"success"}\n' \
