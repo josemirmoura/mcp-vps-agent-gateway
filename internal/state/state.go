@@ -381,12 +381,14 @@ func (s *Store) RevokeAll(ctx context.Context) error {
 }
 
 type AuditEvent struct {
-	Time     string `json:"time"`
-	Subject  string `json:"subject"`
-	Tool     string `json:"tool"`
-	Resource string `json:"resource,omitempty"`
-	Decision string `json:"decision"`
-	ActionID string `json:"action_id,omitempty"`
+	Time         string `json:"time"`
+	InstanceID   string `json:"instance_id,omitempty"`
+	InstanceName string `json:"instance_name,omitempty"`
+	Subject      string `json:"subject"`
+	Tool         string `json:"tool"`
+	Resource     string `json:"resource,omitempty"`
+	Decision     string `json:"decision"`
+	ActionID     string `json:"action_id,omitempty"`
 }
 
 func auditDigest(seq int64, prev, eventJSON string) string {
