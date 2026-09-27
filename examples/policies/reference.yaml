@@ -1,0 +1,46 @@
+version: 1
+mode: scoped
+
+features:
+  full_mode_enabled: false
+
+filesystem:
+  read:
+    - /tmp/vps-agent-poc
+  write:
+    - /tmp/vps-agent-poc
+
+network:
+  mode: blocked
+  destinations: []
+
+services:
+  inspect:
+    - vps-agent-test.service
+  manage:
+    - vps-agent-test.service
+  actions:
+    - status
+    - restart
+
+docker:
+  inspect: []
+  manage: []
+  actions: []
+
+shell:
+  enabled: false
+  cwd_roots: []
+  max_runtime_seconds: 300
+  max_output_bytes: 1048576
+
+privilege:
+  admin: broker-only
+
+replay:
+  require_idempotency_for_safe_writes: true
+  blind_retry_non_replay_safe: false
+
+grant:
+  required: true
+  max_ttl_minutes: 60
