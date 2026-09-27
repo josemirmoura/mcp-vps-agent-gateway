@@ -27,7 +27,7 @@ jobs:
           mkdir -p dist
           for arch in amd64 arm64; do
             mkdir -p "dist/linux-$arch"
-            for cmd in vps-agent-gateway vps-agent-broker vps-agent vps-agent-setup; do
+            for cmd in vps-agent-gateway vps-agent-broker vps-agent vps-agent-mcp-call; do
               CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags="-s -w" -o "dist/linux-$arch/$cmd" "./cmd/$cmd"
             done
             cp LICENSE README.md README.pt-BR.md "dist/linux-$arch/"
