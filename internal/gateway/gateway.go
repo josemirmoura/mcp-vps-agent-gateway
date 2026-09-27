@@ -83,6 +83,7 @@ func SubjectFromContext(ctx context.Context) string {
 
 type Server struct {
 	Executor Executor
+	Metrics  *runtimeMetrics
 }
 
 type systemInfoOutput struct {
@@ -275,7 +276,11 @@ type elevationInput struct {
 }
 
 func NewMCPServer(exec Executor) *mcp.Server {
-	s := &Server{Executor: exec}
+	return newMCPServer(exec, nil)
+}
+
+func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
+	s := &Server{Executor: exec, Metrics: metrics}
 	server := mcp.NewServer(&mcp.Implementation{Name: "mcp-vps-agent-gateway", Version: "v0.1.0"}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "system.info", Description: "Return non-sensitive host/runtime information."},
@@ -777,7 +782,9 @@ func NewMCPServer(exec Executor) *mcp.Server {
 }
 
 
-func (s *Server) callWithGrant(ctx context.Context, tool, resource, action string, args []byte, out any, operationID, grantID string) error {
+func (s *Server) callWithGrant(ctx context.Context, tool, resource, action string, args []byte, out any, operationID, grantID string) (err error) {
+	started := time.Now()
+	if s.Metrics != nil { defer func() { s.Metrics.observeTool(tool, started, err) }() }
 	id, err := randomID()
 	if err != nil {
 		return err
@@ -807,7 +814,9 @@ func (s *Server) callWithGrant(ctx context.Context, tool, resource, action strin
 	return nil
 }
 
-func (s *Server) call(ctx context.Context, tool, resource, action string, args []byte, out any, write bool, operationID string) error {
+func (s *Server) call(ctx context.Context, tool, resource, action string, args []byte, out any, write bool, operationID string) (err error) {
+	started := time.Now()
+	if s.Metrics != nil { defer func() { s.Metrics.observeTool(tool, started, err) }() }
 	id, err := randomID()
 	if err != nil {
 		return err
@@ -849,7 +858,8 @@ func randomID() (string, error) {
 }
 
 func Handler(exec Executor, auth AuthConfig) http.Handler {
-	server := NewMCPServer(exec)
+	metrics := newRuntimeMetrics()
+	server := newMCPServer(exec, metrics)
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return server
 	}, &mcp.StreamableHTTPOptions{
@@ -863,7 +873,8 @@ func Handler(exec Executor, auth AuthConfig) http.Handler {
 	if metadataHandler := auth.ProtectedResourceMetadataHandler(); metadataHandler != nil {
 		mux.Handle("/.well-known/oauth-protected-resource", metadataHandler)
 	}
-	mux.Handle("/mcp", auth.Wrap(mcpHandler))
+	mux.Handle("/mcp", metrics.wrapHTTP(auth.InstanceID, auth.InstanceName, auth.Wrap(mcpHandler)))
+	mux.Handle("/metrics", auth.Wrap(metrics.handler(auth.InstanceID, auth.InstanceName)))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":true}`))
