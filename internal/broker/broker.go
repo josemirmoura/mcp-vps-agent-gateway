@@ -221,6 +221,15 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "permission_denied", "operator authentication failed")
 		}
 		return b.decideApproval(ctx, req, "denied")
+	case "admin.audit.status":
+		if !b.adminOK(req.AdminToken) {
+			return deny(req.ID, "permission_denied", "operator authentication failed")
+		}
+		status, err := b.State.AuditStatus(ctx)
+		if err != nil {
+			return deny(req.ID, "audit_error", err.Error())
+		}
+		return ok(req.ID, status)
 	case "admin.revoke_all":
 		if !b.adminOK(req.AdminToken) {
 			return deny(req.ID, "permission_denied", "operator authentication failed")
