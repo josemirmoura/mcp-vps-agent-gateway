@@ -22,34 +22,41 @@ jobs:
           cp config/policy.example.yaml config/policy.yaml
           docker network create ci-edge
 
-          cat > .env <<'EOF'
-          VPS_AGENT_ADMIN_TOKEN=ci-admin-token
-          VPS_AGENT_STATIC_TOKEN=ci-static-token
-          VPS_AGENT_SUBJECT=ci-placeholder
-          VPS_AGENT_INSTANCE_ID=ci-integrated-auth
-          VPS_AGENT_INSTANCE_NAME=ci-integrated-auth
-          VPS_AGENT_SCOPE_ROOT=/tmp/vps-agent-auth-ci
-          VPS_AGENT_WHOLE_HOST=0
-          VPS_AGENT_AUTH_MODE=integrated
-          VPS_AGENT_DOMAIN=mcp.example.invalid
-          VPS_AGENT_PUBLIC_URL=https://mcp.example.invalid/mcp
-          VPS_AGENT_OIDC_ISSUER=https://mcp.example.invalid
-          VPS_AGENT_OIDC_AUDIENCE=
-          VPS_AGENT_OAUTH_RESOURCE=https://mcp.example.invalid/mcp
-          VPS_AGENT_RESOURCE_METADATA_URL=https://mcp.example.invalid/.well-known/oauth-protected-resource
-          VPS_AGENT_REQUIRED_SCOPES=openid
-          VPS_AGENT_EDGE_NETWORK=ci-edge
-          VPS_AGENT_TRAEFIK_CERTRESOLVER=letsencrypt
-          VPS_AGENT_BUNDLED_PROXY=0
-          ZITADEL_VERSION=v4.19.1
-          ZITADEL_MASTERKEY=0123456789abcdef0123456789abcdef
-          ZITADEL_POSTGRES_DB=zitadel
-          ZITADEL_POSTGRES_USER=zitadel
-          ZITADEL_POSTGRES_PASSWORD=CiPostgresPassword123
-          ZITADEL_BOOTSTRAP_ADMIN_PASSWORD=CiBootstrapPassword123!
-          ZITADEL_BOOTSTRAP_PAT_EXPIRATION=2099-01-01T00:00:00Z
-          ZITADEL_LOGIN_PAT_EXPIRATION=2099-01-01T00:00:00Z
-          EOF
+          ADMIN_TOKEN="$(openssl rand -hex 32)"
+          STATIC_TOKEN="$(openssl rand -hex 32)"
+          MASTER_KEY="$(openssl rand -hex 16)"
+          DB_SECRET="$(openssl rand -hex 24)"
+          BOOTSTRAP_SECRET="T1!$(openssl rand -hex 18)"
+          OPERATOR_SECRET="T2!$(openssl rand -hex 18)"
+          {
+            echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN"
+            echo "VPS_AGENT_STATIC_TOKEN=$STATIC_TOKEN"
+            echo "VPS_AGENT_SUBJECT=ci-placeholder"
+            echo "VPS_AGENT_INSTANCE_ID=ci-integrated-auth"
+            echo "VPS_AGENT_INSTANCE_NAME=ci-integrated-auth"
+            echo "VPS_AGENT_SCOPE_ROOT=/tmp/vps-agent-auth-ci"
+            echo "VPS_AGENT_WHOLE_HOST=0"
+            echo "VPS_AGENT_AUTH_MODE=integrated"
+            echo "VPS_AGENT_DOMAIN=mcp.example.invalid"
+            echo "VPS_AGENT_PUBLIC_URL=https://mcp.example.invalid/mcp"
+            echo "VPS_AGENT_OIDC_ISSUER=https://mcp.example.invalid"
+            echo "VPS_AGENT_OIDC_AUDIENCE="
+            echo "VPS_AGENT_OAUTH_RESOURCE=https://mcp.example.invalid/mcp"
+            echo "VPS_AGENT_RESOURCE_METADATA_URL=https://mcp.example.invalid/.well-known/oauth-protected-resource"
+            echo "VPS_AGENT_REQUIRED_SCOPES=openid"
+            echo "VPS_AGENT_EDGE_NETWORK=ci-edge"
+            echo "VPS_AGENT_TRAEFIK_CERTRESOLVER=letsencrypt"
+            echo "VPS_AGENT_BUNDLED_PROXY=0"
+            echo "ZITADEL_VERSION=v4.19.1"
+            echo "ZITADEL_MASTERKEY=$MASTER_KEY"
+            echo "ZITADEL_POSTGRES_DB=zitadel"
+            echo "ZITADEL_POSTGRES_USER=zitadel"
+            echo "ZITADEL_POSTGRES_PASSWORD=$DB_SECRET"
+            echo "ZITADEL_BOOTSTRAP_ADMIN_PASSWORD=$BOOTSTRAP_SECRET"
+            echo "ZITADEL_BOOTSTRAP_PAT_EXPIRATION=2099-01-01T00:00:00Z"
+            echo "ZITADEL_LOGIN_PAT_EXPIRATION=2099-01-01T00:00:00Z"
+            echo "CI_OPERATOR_SECRET=$OPERATOR_SECRET"
+          } > .env
           chmod 600 .env config/policy.yaml
 
       - name: Start ZITADEL and PostgreSQL
@@ -73,8 +80,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          COMPOSE=(docker compose -f compose.yaml -f compose.integrated-auth.yaml)
-          PAT="$("${COMPOSE[@]}" exec -T zitadel-api cat /zitadel/bootstrap/bootstrap-admin.pat)"
+          set -a
+          . ./.env
+          set +a
+          PAT="$(docker run --rm -v mcp-vps-agent_zitadel-bootstrap:/zitadel/bootstrap:ro alpine:3.22 cat /zitadel/bootstrap/bootstrap-admin.pat)"
           test -n "$PAT"
           echo "::add-mask::$PAT"
 
@@ -92,26 +101,16 @@ jobs:
 
           curl_ci             -X PUT http://zitadel-api:8080/v2/settings/security             -H "Authorization: Bearer $PAT"             -H 'Content-Type: application/json'             --data '{"dynamicClientRegistration":{"enabled":true,"allowUnauthenticated":true}}'             > /tmp/security.json
 
-          cat > /tmp/operator.json <<'JSON'
-          {
-            "userId": "ci-operator-001",
-            "username": "ci-operator",
-            "profile": {
-              "givenName": "CI",
-              "familyName": "Operator",
-              "displayName": "CI Operator",
-              "preferredLanguage": "en"
-            },
-            "email": {
-              "email": "ci-operator@example.invalid",
-              "isVerified": true
-            },
-            "password": {
-              "password": "CiOperatorPassword123!",
-              "changeRequired": false
-            }
-          }
-          JSON
+          python3 - "$CI_OPERATOR_SECRET" <<'PY' > /tmp/operator.json
+          import json,sys
+          print(json.dumps({
+            "userId":"ci-operator-001",
+            "username":"ci-operator",
+            "profile":{"givenName":"CI","familyName":"Operator","displayName":"CI Operator","preferredLanguage":"en"},
+            "email":{"email":"ci-operator@example.invalid","isVerified":True},
+            "password":{"password":sys.argv[1],"changeRequired":False},
+          }))
+          PY
 
           curl_ci             -X POST http://zitadel-api:8080/v2/users/human             -H "Authorization: Bearer $PAT"             -H 'Content-Type: application/json'             --data-binary @/tmp/operator.json             > /tmp/operator-response.json
           python3 - <<'PY'
@@ -125,19 +124,12 @@ jobs:
           python3 - <<'PY'
           import json
           x=json.load(open('/tmp/oidc-after.json'))
-          endpoint=x.get('registration_endpoint','')
-          assert endpoint, x
+          assert x.get('registration_endpoint'), x
           assert 'S256' in x.get('code_challenge_methods_supported',[]), x
           print('DCR + PKCE DISCOVERY: PASS')
           PY
 
-          curl_ci             -X POST http://zitadel-api:8080/oauth/v2/register             -H 'Content-Type: application/json'             --data '{
-              "client_name":"CI MCP Client",
-              "redirect_uris":["https://example.com/callback"],
-              "grant_types":["authorization_code","refresh_token"],
-              "response_types":["code"],
-              "token_endpoint_auth_method":"none"
-            }'             > /tmp/dcr-client.json
+          curl_ci             -X POST http://zitadel-api:8080/oauth/v2/register             -H 'Content-Type: application/json'             --data '{"client_name":"CI MCP Client","redirect_uris":["https://example.com/callback"],"grant_types":["authorization_code","refresh_token"],"response_types":["code"],"token_endpoint_auth_method":"none"}'             > /tmp/dcr-client.json
           python3 - <<'PY'
           import json
           x=json.load(open('/tmp/dcr-client.json'))
