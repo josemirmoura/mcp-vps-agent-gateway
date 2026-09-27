@@ -76,7 +76,7 @@ fi
 set -a
 . ./.env
 set +a
-OLD_SCOPE_ROOT="\${VPS_AGENT_SCOPE_ROOT:-}"
+OLD_SCOPE_ROOT="${VPS_AGENT_SCOPE_ROOT:-}"
 
 if [ -n "$SCOPE_OVERRIDE" ]; then
   if [[ "$SCOPE_OVERRIDE" != /* ]]; then
@@ -139,7 +139,7 @@ PY
   VPS_AGENT_SCOPE_ROOT="$SCOPE_OVERRIDE"
 fi
 
-SCOPE_ROOT="\${VPS_AGENT_SCOPE_ROOT:-}"
+SCOPE_ROOT="${VPS_AGENT_SCOPE_ROOT:-}"
 if [ -z "$SCOPE_ROOT" ]; then
   echo "ERROR: set VPS_AGENT_SCOPE_ROOT in .env or pass --scope /absolute/path." >&2
   exit 1
