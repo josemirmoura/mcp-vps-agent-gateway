@@ -45,11 +45,13 @@ func main() {
 		Jobs:       &jobs.Manager{State: store, Runner: jobs.SystemdRunner{}},
 		AdminToken: os.Getenv("VPS_AGENT_ADMIN_TOKEN"),
 		ExpectedSubject: os.Getenv("VPS_AGENT_EXPECTED_SUBJECT"),
+		InstanceID: os.Getenv("VPS_AGENT_INSTANCE_ID"),
+		InstanceName: getenv("VPS_AGENT_INSTANCE_NAME", "vps-agent"),
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-	log.Printf("broker listening on unix://%s", socket)
+	log.Printf("broker listening on unix://%s instance_id=%s instance_name=%q", socket, b.InstanceID, b.InstanceName)
 	if err := ipc.NewServer(socket, b).Serve(ctx); err != nil && ctx.Err() == nil {
 		log.Fatal(err)
 	}
