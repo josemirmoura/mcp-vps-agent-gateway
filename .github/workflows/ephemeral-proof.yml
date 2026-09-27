@@ -7,7 +7,7 @@ on:
       - '.github/workflows/ephemeral-proof.yml'
       - 'cmd/**'
       - 'internal/**'
-      - 'deploy/systemd/**'
+      - 'tests/fixtures/systemd/**'
       - 'examples/policies/**'
   workflow_dispatch:
 
@@ -130,8 +130,8 @@ jobs:
           echo "VPS_AGENT_PROOF_TOKEN=$PROOF_TOKEN" >> "$GITHUB_ENV"
           echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN" >> "$GITHUB_ENV"
 
-          sudo install -m 0644 deploy/systemd/vps-agent-broker.service /etc/systemd/system/vps-agent-broker.service
-          sudo install -m 0644 deploy/systemd/vps-agent-gateway.service /etc/systemd/system/vps-agent-gateway.service
+          sudo install -m 0644 tests/fixtures/systemd/vps-agent-broker.service /etc/systemd/system/vps-agent-broker.service
+          sudo install -m 0644 tests/fixtures/systemd/vps-agent-gateway.service /etc/systemd/system/vps-agent-gateway.service
           sudo install -d -m 0755 /etc/systemd/system/vps-agent-broker.service.d
           cat > /tmp/proof-opt.conf <<'DROPIN'
           [Service]
