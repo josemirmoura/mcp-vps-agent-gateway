@@ -71,7 +71,7 @@ docker compose -f compose.yaml -f compose.host.yaml up -d --build
 `compose.host.yaml` é a chave deliberada de whole-host e define `/` como teto físico do Broker. A policy server-side continua controlando quais operações MCP são permitidas.
 ### Terminar a instalação: OAuth integrado + ChatGPT
 
-O caminho público suportado é OAuth/OIDC auto-hospedado dentro deste pacote. Não é necessário criar conta no Auth0, Okta, Entra ou usar túnel da OpenAI.
+O caminho público suportado é OAuth/OIDC auto-hospedado dentro deste pacote. Não é necessário contratar um provedor de identidade externo nem usar um túnel separado.
 
 Antes do próximo comando, crie um registro DNS A/AAAA para um domínio ou subdomínio seu apontando para a VPS. Depois rode:
 
