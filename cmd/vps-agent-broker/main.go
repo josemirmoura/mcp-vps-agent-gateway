@@ -25,6 +25,13 @@ func main() {
 	if err != nil {
 		slog.Error("fatal", "error", err); os.Exit(1)
 	}
+	if physicalRoot := os.Getenv("VPS_AGENT_PHYSICAL_SCOPE_ROOT"); physicalRoot != "" {
+		wholeHost := os.Getenv("VPS_AGENT_WHOLE_HOST") == "1"
+		if err := cfg.ValidatePhysicalScope(physicalRoot, wholeHost); err != nil {
+			slog.Error("physical_scope_invalid", "root", physicalRoot, "whole_host", wholeHost, "error", err)
+			os.Exit(1)
+		}
+	}
 	fs, err := securefs.NewWithHostRoot(
 		cfg.FileRoots(false),
 		cfg.FileRoots(true),
