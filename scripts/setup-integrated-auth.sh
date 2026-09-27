@@ -241,8 +241,18 @@ if [ -z "$BOOTSTRAP_PAT" ]; then
   exit 1
 fi
 
-echo "Enabling MCP-compatible Dynamic Client Registration..."
-curl -fsS --request PUT   --url "https://$DOMAIN/v2/settings/security"   --header "Authorization: Bearer $BOOTSTRAP_PAT"   --header 'Content-Type: application/json'   --data '{"dynamicClientRegistration":{"enabled":true,"allowUnauthenticated":true}}'   >/tmp/vps-agent-dcr-settings.json
+ZITADEL_CID="$("${compose[@]}" ps -q zitadel-api)"
+if [ -z "$ZITADEL_CID" ]; then
+  echo "ERROR: ZITADEL API container is not running." >&2
+  exit 1
+fi
+
+curl_zitadel_internal() {
+  docker run --rm -i --network "container:$ZITADEL_CID" curlimages/curl:8.16.0 -fsS -H "Host: $DOMAIN" -H 'X-Forwarded-Proto: https' "$@"
+}
+
+echo "Enabling MCP-compatible Dynamic Client Registration over the private container namespace..."
+curl_zitadel_internal --request PUT --url "http://127.0.0.1:8080/v2/settings/security" --header "Authorization: Bearer $BOOTSTRAP_PAT" --header 'Content-Type: application/json' --data '{"dynamicClientRegistration":{"enabled":true,"allowUnauthenticated":true}}' >/tmp/vps-agent-dcr-settings.json
 
 CURRENT_SUBJECT="$(env_value VPS_AGENT_SUBJECT || true)"
 MARKER="state/integrated-auth.json"
@@ -299,7 +309,7 @@ PY
   unset PASSWORD PASSWORD2 2>/dev/null || true
 
   echo "Creating the dedicated non-admin VPS operator identity..."
-  HTTP_CODE="$(curl -sS --output /tmp/vps-agent-create-operator.json --write-out '%{http_code}'     --request POST     --url "https://$DOMAIN/v2/users/human"     --header "Authorization: Bearer $BOOTSTRAP_PAT"     --header 'Content-Type: application/json'     --data-binary "@$REQUEST_FILE")"
+  HTTP_CODE="$(curl_zitadel_internal --silent --show-error --output /tmp/vps-agent-create-operator.json --write-out '%{http_code}' --request POST --url "http://127.0.0.1:8080/v2/users/human" --header "Authorization: Bearer $BOOTSTRAP_PAT" --header 'Content-Type: application/json' --data-binary @- < "$REQUEST_FILE")"
   if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
     echo "ERROR: operator creation returned HTTP $HTTP_CODE" >&2
     cat /tmp/vps-agent-create-operator.json >&2
