@@ -247,29 +247,47 @@ The policy remains editable later without reinstalling the binaries.
 
 ## Packaging
 
-The desired product experience is one-command installation.
-
-However, the runtime should preserve the privilege boundary:
+The official product packaging is Docker Compose.
 
 ~~~text
-Gateway: containerized or native, non-root
-Broker: native host service, privileged, local-only
+Gateway container
+  non-root
+  no /host
+  no Docker socket
+        |
+        | Unix socket
+        v
+Broker container
+  privileged host-control boundary
+  host mounted at /host
+        |
+        v
+VPS
 ~~~
 
-Running the Broker inside a highly privileged container by default would require host filesystem/systemd/Docker access and would weaken the clean host privilege boundary.
+The Broker container is **not** a security sandbox around host administration. It is the privileged server-side security boundary packaged in Docker.
 
-Recommended production packaging:
+Therefore:
 
-- native Broker binary + systemd unit
-- Gateway either native or containerized
-- one installer/bootstrap command that installs both
-- generated server-side policy
-- optional Docker/Compose assets for environments where that is appropriate
+- Docker provides reproducible packaging and lifecycle.
+- the Gateway remains separated and unprivileged;
+- the Broker receives the host root only because it must implement the operator-authorized host actions;
+- the Broker exposes no remote TCP control API;
+- server-side policy decides what part/resources of the VPS the MCP may use;
+- mounting /host does not grant the LLM authority by itself;
+- the same package supports one project, several resources, or the whole host through policy.
 
-A fully privileged all-Docker mode may exist for disposable labs, but should not be the production default.
+The primary operator flow is intentionally terminal- and AI-friendly:
 
-The product goal is **one-command installation**, not "everything must execute inside one container".
+~~~bash
+bash scripts/init.sh
+# edit config/policy.yaml and .env
+docker compose up -d --build
+bash scripts/verify.sh
+bash scripts/connect-chatgpt.sh
+~~~
 
+There is no separate interactive installer or alternate native-install product flow.
 
 ## Installation is not complete until ChatGPT connectivity is verified
 
