@@ -104,7 +104,17 @@ That command validates the public HTTPS certificate/route, OAuth/OIDC discovery,
 
 The script refuses to replace an unknown service already occupying 80/443.
 
-## Phase 6 — Show the current ChatGPT Web tutorial
+## Phase 6 — Confirm ChatGPT product eligibility
+
+Before starting the ChatGPT-side connection, confirm that the account/workspace exposes the required custom-MCP surface. As checked against official OpenAI documentation on 2026-09-28:
+
+- Business, Enterprise and Edu support full custom MCP, including write/modify actions;
+- Pro can connect custom MCP with read/fetch permissions only, so it cannot certify this project's full write-capable product surface;
+- if Developer Mode and Apps -> Create are not available, the VPS/public OAuth side may still be healthy, but installation cannot reach the final ChatGPT completion gate on that account.
+
+This is an unavoidable external platform requirement, not something the VPS package can automate.
+
+## Phase 7 — Show the current ChatGPT Web tutorial
 
 ~~~bash
 bash scripts/connect-chatgpt.sh
@@ -119,7 +129,7 @@ Tutorial shown.
 Installation is NOT complete.
 ~~~
 
-## Phase 7 — Verify the real ChatGPT connection
+## Phase 8 — Verify the real ChatGPT connection
 
 The connection script waits for an audited call from the configured subject.
 
