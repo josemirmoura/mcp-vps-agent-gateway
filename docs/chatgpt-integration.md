@@ -1,6 +1,6 @@
 # ChatGPT integration
 
-Checked: 2026-09-27.
+Checked: 2026-09-28.
 
 ## Target
 
@@ -16,11 +16,18 @@ ChatGPT Web
 
 The installation completion rule is deliberately stricter than "containers are healthy."
 
+## ChatGPT product prerequisite
+
+As of 2026-09-28, OpenAI documents full custom MCP support, including write/modify actions, for ChatGPT Business, Enterprise and Edu. ChatGPT Pro can connect custom MCP with read/fetch permissions, which is useful for limited interoperability testing but does **not** validate this project's full write-capable toolbox. Accounts/workspaces that do not expose Developer Mode and Apps -> Create cannot complete the ChatGPT-side installation gate.
+
+This is an external ChatGPT product-surface requirement, not a VPS/MCP server failure. The package must keep this requirement versioned and recheck it against current official OpenAI documentation before release.
+
 ## Prerequisites
 
-1. Local installation has already passed `bash scripts/verify.sh`.
-2. A DNS hostname points to the VPS.
-3. Integrated auth has passed:
+1. The target ChatGPT account/workspace is eligible for the intended MCP capability level.
+2. Local installation has already passed `bash scripts/verify.sh`.
+3. A DNS hostname points to the VPS.
+4. Integrated auth has passed:
 
 ~~~bash
 bash scripts/setup-integrated-auth.sh
