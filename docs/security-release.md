@@ -2,7 +2,7 @@
 
 Reviewed for `0.1.0-rc.3` on 2026-09-28.
 
-This matrix records concrete pre-release controls. A checked item means the control exists in code/tests or is intentionally documented. Final release readiness still depends on PR CI and the owner's clean-install human gate.
+This matrix records concrete pre-release controls. A checked item means the control exists in code/tests or is intentionally documented. Final release readiness still depends on PR CI and the owner's clean-install operator acceptance gate.
 
 ## Public transport and identity
 
@@ -78,4 +78,4 @@ This matrix records concrete pre-release controls. A checked item means the cont
 - [x] real ChatGPT Web + integrated OAuth completion gate has been exercised.
 - [x] Full/R5 is not presented as production-ready.
 - [ ] long-running real-workload reliability remains a later R4 maturity requirement.
-- [ ] final clean-install human gate remains owner-operated and must pass before `v0.1.0` is frozen.
+- [ ] final clean-install operator acceptance gate remains owner-operated and must pass before `v0.1.0` is frozen.
