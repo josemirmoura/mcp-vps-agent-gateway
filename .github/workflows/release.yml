@@ -30,21 +30,6 @@ jobs:
             exit 1
           }
       - name: Validate source and installation contract
-        env:
-          VPS_AGENT_ADMIN_TOKEN: release-validation-admin-token
-          VPS_AGENT_STATIC_TOKEN: release-validation-static-token
-          VPS_AGENT_SUBJECT: release-validation-operator
-          VPS_AGENT_SCOPE_ROOT: /tmp/vps-agent-release-validation
-          VPS_AGENT_AUTH_MODE: integrated
-          VPS_AGENT_DOMAIN: mcp.example.invalid
-          VPS_AGENT_PUBLIC_URL: https://mcp.example.invalid/mcp
-          VPS_AGENT_OIDC_ISSUER: https://mcp.example.invalid
-          VPS_AGENT_OAUTH_RESOURCE: https://mcp.example.invalid/mcp
-          VPS_AGENT_EDGE_NETWORK: release-validation-edge
-          VPS_AGENT_TRAEFIK_CERTRESOLVER: letsencrypt
-          VPS_AGENT_LETSENCRYPT_EMAIL: ops@example.invalid
-          ZITADEL_BOOTSTRAP_PAT_EXPIRATION: 2099-01-01T00:00:00Z
-          ZITADEL_LOGIN_PAT_EXPIRATION: 2099-01-01T00:00:00Z
         run: |
           set -euo pipefail
           go mod tidy
@@ -54,10 +39,8 @@ jobs:
           python3 scripts/check-installation-contract.py
           python3 scripts/check-doc-links.py
           bash scripts/version.sh
-          export ZITADEL_MASTERKEY="$(openssl rand -hex 16)"
-          export ZITADEL_POSTGRES_PASSWORD="$(openssl rand -hex 24)"
-          export ZITADEL_BOOTSTRAP_ADMIN_PASSWORD="T1!$(openssl rand -hex 18)"
-          docker compose -f compose.yaml -f compose.integrated-auth.yaml -f compose.integrated-auth.proxy.yaml config -q
+          bash scripts/validate-compose-model.sh
+
 
   images:
     needs: validate
