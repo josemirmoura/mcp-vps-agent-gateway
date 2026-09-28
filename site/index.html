@@ -3,9 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Scoped, auditable MCP control for a Linux VPS with a non-root Gateway, privileged local Broker and operator-defined authority.">
-  <title>MCP VPS Agent Gateway</title>
+  <meta name="description" content="Connect ChatGPT Web directly to a Linux VPS through MCP with self-hosted OAuth, operator-defined policy, privileged Broker authorization and audit.">
+  <link rel="canonical" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/">
+  <meta property="og:title" content="Connect ChatGPT Web to your Linux VPS | MCP VPS Agent Gateway">
+  <meta property="og:description" content="A self-hosted, auditable MCP bridge from ChatGPT Web to your Linux VPS. You choose the perimeter and capabilities; the Broker enforces policy on every privileged operation.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://josemirmoura.github.io/mcp-vps-agent-gateway/">
+  <title>Connect ChatGPT Web to your Linux VPS | MCP VPS Agent Gateway</title>
   <link rel="stylesheet" href="styles.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "name": "MCP VPS Agent Gateway",
+    "description": "Open-source, self-hosted bridge that connects ChatGPT Web to a Linux VPS through Model Context Protocol (MCP), with OAuth, operator-defined policy, privileged Broker authorization and audit.",
+    "codeRepository": "https://github.com/josemirmoura/mcp-vps-agent-gateway",
+    "programmingLanguage": ["Go", "Shell"],
+    "runtimePlatform": "Linux with Docker Engine and Docker Compose v2",
+    "license": "https://www.apache.org/licenses/LICENSE-2.0"
+  }
+  </script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -19,17 +36,62 @@
       </div>
     </nav>
     <div class="hero-copy">
-      <p class="eyebrow">v0.1.0-rc.3 · Docker-first · policy-enforced · auditable</p>
-      <h1>Give ChatGPT useful VPS authority without turning the model into root.</h1>
-      <p class="lede">A non-root MCP Gateway authenticates the client. A privileged local Broker re-authorizes each host operation against policy chosen by the VPS owner.</p>
+      <p class="eyebrow">v0.1.0-rc.3 · self-hosted MCP · policy-enforced · auditable</p>
+      <h1>Connect ChatGPT Web directly to your Linux VPS.</h1>
+      <p class="lede">MCP VPS Agent Gateway gives ChatGPT a secure path to inspect and operate your VPS inside authority you define. OAuth authenticates the client. A privileged local Broker re-authorizes every host operation and records audit evidence.</p>
       <div class="actions">
         <a class="button" href="#quick-start">Quick Start</a>
-        <a class="button secondary" href="https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/architecture.md">Architecture</a>
+        <a class="button secondary" href="#problem-solution">See how it works</a>
       </div>
     </div>
   </header>
 
   <main>
+    <section id="problem-solution" class="solution-section">
+      <p class="eyebrow">Problem → Solution</p>
+      <h2>Stop copying commands between ChatGPT and your terminal.</h2>
+      <p class="section-lede">ChatGPT can reason about a server, but without a trusted execution path it cannot see the real state, run the authorized action, inspect the result and continue from the same conversation. MCP VPS Agent Gateway closes that loop.</p>
+
+      <div class="grid two problem-solution-grid">
+        <article>
+          <p class="eyebrow">The friction</p>
+          <h3>Manual server work breaks the conversation into pieces.</h3>
+          <ul class="feature-list">
+            <li>ChatGPT suggests a command, but cannot see what happened next.</li>
+            <li>You switch windows, copy commands, paste logs back and rebuild context.</li>
+            <li>Troubleshooting becomes a relay between chat, terminal and dashboards.</li>
+            <li>Giving an AI broad SSH-style access creates a much larger trust problem.</li>
+          </ul>
+        </article>
+        <article class="solution-card">
+          <p class="eyebrow">The bridge</p>
+          <h3>Let ChatGPT work on the VPS inside rules you own.</h3>
+          <p>From the conversation, ChatGPT can inspect files, diagnose services, analyze logs, work with Docker and perform other operations you explicitly enable.</p>
+          <p><strong>Project, Custom or Whole Host</strong> sets the physical perimeter. Filesystem, shell, systemd, Docker, network and administrative capabilities remain separate policy decisions.</p>
+        </article>
+      </div>
+
+      <div class="runtime-strip" aria-label="Runtime path">
+        <span>ChatGPT Web</span><b>→</b><span>OAuth</span><b>→</b><span>MCP Gateway</span><b>→</b><span>Policy Broker</span><b>→</b><span>Your VPS</span>
+      </div>
+
+      <div class="grid two trust-grid">
+        <div class="trust-copy">
+          <p class="eyebrow">GitHub's role</p>
+          <h3>Distribution and source, not a runtime relay.</h3>
+          <p>GitHub hosts the open-source project, documentation, releases and update source. After installation, GitHub is not in the operational path between ChatGPT Web and your VPS.</p>
+        </div>
+        <ul class="assurance-list">
+          <li>No VPS password handed to ChatGPT.</li>
+          <li>No SSH private key handed to ChatGPT.</li>
+          <li>No Docker socket exposed to the model.</li>
+          <li>Privileged operations are re-authorized by the Broker and auditable.</li>
+        </ul>
+      </div>
+
+      <p class="closing-line">Connect. Ask. Inspect. Operate. Audit.</p>
+    </section>
+
     <section class="grid three">
       <article>
         <p class="eyebrow">Authority</p>
@@ -52,7 +114,7 @@
       <p class="eyebrow">Architecture</p>
       <h2>Small public surface, explicit trust boundaries.</h2>
       <div class="architecture">
-        <div class="node"><strong>ChatGPT</strong><span>OAuth + HTTPS MCP</span></div>
+        <div class="node"><strong>ChatGPT Web</strong><span>OAuth + HTTPS MCP</span></div>
         <div class="arrow">→</div>
         <div class="node"><strong>Gateway</strong><span>non-root</span></div>
         <div class="arrow">→</div>
