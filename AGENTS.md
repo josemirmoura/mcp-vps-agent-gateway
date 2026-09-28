@@ -7,15 +7,16 @@ Instructions for AI coding agents working in this repository.
 Read in this order:
 
 1. README.md
-2. docs/README.md
-3. docs/project-status.md
-4. docs/mvp-first.md
-5. docs/architecture.md
-6. docs/policy-schema.md
-7. docs/chatgpt-integration.md
-8. docs/security-hardening-v2.md
-9. docs/runtime-semantics-and-recovery.md
-10. docs/threat-model.md
+2. docs/installation-contract.md
+3. docs/README.md
+4. docs/project-status.md
+5. docs/mvp-first.md
+6. docs/architecture.md
+7. docs/policy-schema.md
+8. docs/chatgpt-integration.md
+9. docs/security-hardening-v2.md
+10. docs/runtime-semantics-and-recovery.md
+11. docs/threat-model.md
 
 Use the precedence rules in docs/README.md if documents appear to conflict.
 
@@ -73,6 +74,11 @@ Do not add a second runtime without a concrete reason.
 18. MCP transport is Streamable HTTP; do not invent custom WebSocket/session machinery.
 19. Existing workloads must not depend on the Gateway to keep running.
 20. Before building a large component, evaluate adopt/adapt first.
+21. Development-session access limitations are never user installation requirements.
+22. User-facing installation docs never request VPS passwords, private SSH keys, unrestricted remote admin access, or unrelated secrets.
+23. Automate deterministic installation checks before documenting manual investigation steps.
+24. Docker/Compose + transparent scripts remain the supported packaging/install path unless a native platform requirement proves insufficient.
+25. Installation completion requires a real authenticated ChatGPT MCP call plus matching Broker audit evidence.
 
 ## Gate-specific restraint
 
