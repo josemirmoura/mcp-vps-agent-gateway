@@ -34,7 +34,7 @@ else
     echo "No stable SemVer release tag is available yet." >&2
     echo "main is intentionally not an automatic production update channel." >&2
     echo "For release-candidate testing, select a target explicitly, for example:" >&2
-    echo "  VPS_AGENT_UPDATE_REF=v0.1.0-rc.2 bash scripts/update.sh" >&2
+    echo "  VPS_AGENT_UPDATE_REF=v0.1.0-rc.3 bash scripts/update.sh" >&2
     exit 2
   fi
 fi
