@@ -27,6 +27,8 @@ jobs:
         run: go mod download
       - name: Validate shell scripts
         run: bash -n scripts/*.sh
+      - name: Validate supported installation documentation
+        run: python3 scripts/check-installation-contract.py
       - name: Validate integrated-auth Compose model
         env:
           VPS_AGENT_ADMIN_TOKEN: ci-admin-token
