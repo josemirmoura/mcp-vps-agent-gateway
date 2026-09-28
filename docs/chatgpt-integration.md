@@ -28,6 +28,12 @@ bash scripts/setup-integrated-auth.sh
 
 That command must finish with `INTEGRATED AUTH: READY`.
 
+To rerun only the public boundary checks after any DNS, proxy or OAuth change:
+
+~~~bash
+bash scripts/verify-public.sh
+~~~
+
 ## Connection
 
 Run:
