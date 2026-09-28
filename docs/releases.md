@@ -26,6 +26,20 @@ The productization branch identifies itself as `0.1.0-rc.1`.
 
 The stable `v0.1.0` tag is created only after the owner's final clean-install human gate succeeds.
 
+## Publishing a release
+
+The native GitHub Actions path can be started from **Actions -> release -> Run workflow** on `main`.
+
+Enter the exact SemVer tag required by the repository `VERSION` file, for example:
+
+~~~text
+v0.1.0-rc.1
+~~~
+
+The workflow validates source/tests first, creates the tag only after validation, builds the multi-architecture images, and publishes the GitHub Release. Tags containing a SemVer pre-release suffix such as `-rc.1` are marked as GitHub pre-releases.
+
+A normal external tag push remains supported and enters the same validated pipeline.
+
 ## Release artifacts
 
 The tag workflow builds:
