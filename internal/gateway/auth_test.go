@@ -223,6 +223,36 @@ func TestIntegratedOIDCVerifierRejectsWrongAudienceOrIssuer(t *testing.T) {
 	}
 }
 
+func TestIntegratedOIDCVerifierRejectsExpiredToken(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"active":true,
+			"sub":"operator-123",
+			"scope":"openid",
+			"exp":` + strconv.FormatInt(time.Now().Add(-time.Minute).Unix(), 10) + `,
+			"iss":"https://mcp.example.com",
+			"aud":["resource-project-123"]
+		}`))
+	}))
+	defer server.Close()
+
+	verifier, err := NewIntegratedOIDCVerifier(
+		server.URL,
+		"",
+		"introspector",
+		"introspection-secret",
+		"https://mcp.example.com",
+		"resource-project-123",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := verifier(context.Background(), "expired-token", httptest.NewRequest(http.MethodPost, "/mcp", nil)); err == nil {
+		t.Fatal("expected expired token rejection")
+	}
+}
+
 func TestIntegratedOIDCVerifierRejectsInvalidConfiguration(t *testing.T) {
 	tests := []struct {
 		name, endpoint, clientID, clientSecret, issuer, audience string
