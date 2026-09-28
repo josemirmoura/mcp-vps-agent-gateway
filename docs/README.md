@@ -1,6 +1,6 @@
 # Documentation map
 
-The repository keeps documentation in `docs/` as the canonical source. It is intentionally split by audience rather than duplicated into a separate Wiki.
+The repository keeps documentation in `docs/` as the canonical source. The native GitHub Wiki, when published, is intentionally only a navigation layer; it must link here rather than duplicate procedures or create a second source of truth. Its versioned navigation source lives in [`wiki/`](../wiki/).
 
 ## Operator / user
 
