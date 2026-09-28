@@ -45,7 +45,7 @@ Current OpenAI flow (checked 2026-09-27):
 3. Open Settings / Workspace Settings -> Apps -> Create.
 4. Enter the remote HTTPS MCP endpoint above.
 5. Choose OAuth authentication. ChatGPT discovers the Authorization Server and registers its client automatically.
-6. Sign in with the VPS operator account created by setup-integrated-auth.sh and approve access.
+6. Sign in with the dedicated OAuth operator account created by setup-integrated-auth.sh and approve access. Do not enter VPS/SSH credentials into ChatGPT.
 7. Click Scan Tools, review the discovered tools, then Create the draft app.
 8. Start a new chat and select or @mention the draft app.
 9. Ask ChatGPT exactly:
