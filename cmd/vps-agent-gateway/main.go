@@ -73,9 +73,19 @@ func main() {
 		if resource == "" || issuer == "" {
 			slog.Error("integrated_auth_config_invalid", "reason", "OAuth resource/public URL and issuer required"); os.Exit(1)
 		}
-		userInfoURL := os.Getenv("VPS_AGENT_INTEGRATED_USERINFO_URL")
-		userInfoHost := os.Getenv("VPS_AGENT_INTEGRATED_USERINFO_HOST")
-		verifier, err := gateway.NewIntegratedOIDCVerifier(userInfoURL, userInfoHost)
+		introspectionURL := os.Getenv("VPS_AGENT_INTEGRATED_INTROSPECTION_URL")
+		introspectionHost := os.Getenv("VPS_AGENT_INTEGRATED_INTROSPECTION_HOST")
+		introspectionClientID := os.Getenv("VPS_AGENT_INTEGRATED_INTROSPECTION_CLIENT_ID")
+		introspectionClientSecret := os.Getenv("VPS_AGENT_INTEGRATED_INTROSPECTION_CLIENT_SECRET")
+		expectedAudience := os.Getenv("VPS_AGENT_INTEGRATED_AUDIENCE_PROJECT_ID")
+		verifier, err := gateway.NewIntegratedOIDCVerifier(
+			introspectionURL,
+			introspectionHost,
+			introspectionClientID,
+			introspectionClientSecret,
+			issuer,
+			expectedAudience,
+		)
 		if err != nil {
 			slog.Error("integrated_auth_config_failed", "error", err); os.Exit(1)
 		}
