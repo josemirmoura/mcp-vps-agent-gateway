@@ -1,0 +1,56 @@
+name: publish-wiki
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'wiki/Home.md'
+      - 'wiki/Inicio.md'
+      - 'wiki/_Sidebar.md'
+      - '.github/workflows/publish-wiki.yml'
+
+concurrency:
+  group: publish-wiki
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@v7
+        with:
+          path: source
+
+      - name: Check out native GitHub Wiki
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki-target
+          token: ${{ github.token }}
+
+      - name: Sync managed navigation pages only
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp source/wiki/Home.md wiki-target/Home.md
+          cp source/wiki/Inicio.md wiki-target/Inicio.md
+          cp source/wiki/_Sidebar.md wiki-target/_Sidebar.md
+
+          cd wiki-target
+          git add -- Home.md Inicio.md _Sidebar.md
+
+          if git diff --cached --quiet; then
+            echo 'Wiki navigation is already in sync.'
+            exit 0
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'docs: sync Wiki navigation'
+          git push origin HEAD
