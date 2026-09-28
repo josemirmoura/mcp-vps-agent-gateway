@@ -40,8 +40,8 @@ Expected authenticated subject:
   ${VPS_AGENT_SUBJECT:-operator}
 
 Current OpenAI flow (checked 2026-09-27):
-1. Use ChatGPT on the web in an eligible Business, Enterprise or Edu workspace.
-2. Enable Developer Mode for your account/workspace as permitted by your role.
+1. Open ChatGPT on the web.
+2. If custom MCP apps are available on your account/workspace, enable Developer Mode as permitted by your role.
 3. Open Settings / Workspace Settings -> Apps -> Create.
 4. Enter the remote HTTPS MCP endpoint above.
 5. Choose OAuth authentication. ChatGPT discovers the Authorization Server and registers its client automatically.
