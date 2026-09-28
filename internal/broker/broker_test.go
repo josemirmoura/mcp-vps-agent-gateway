@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/policy"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/securefs"
@@ -63,6 +64,44 @@ func testBroker(t *testing.T) (*Broker, *fakeServices, *state.Store, string) {
 		t.Fatal(err)
 	}
 	return &Broker{Policy: cfg, FS: fs, State: store, Services: svc, AdminToken: "operator-secret"}, svc, store, root
+}
+
+func TestAdminHealthReportsActiveJobsAndRequiresOperatorToken(t *testing.T) {
+	b, _, store, _ := testBroker(t)
+	ctx := context.Background()
+
+	denied := b.Handle(ctx, wire.Request{
+		ID: "health-denied", Tool: "admin.health", AdminToken: "wrong",
+	})
+	if denied.OK || denied.Error == nil || denied.Error.Code != "permission_denied" {
+		t.Fatalf("invalid operator token was accepted: %+v", denied)
+	}
+
+	if err := store.CreateJob(ctx, state.JobRecord{
+		ID: "job-active", Subject: "alice", Tool: "shell.exec",
+		State: "running", Deadline: time.Now().Add(time.Minute),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	resp := b.Handle(ctx, wire.Request{
+		ID: "health-ok", Tool: "admin.health", AdminToken: "operator-secret",
+	})
+	if !resp.OK {
+		t.Fatalf("admin health failed: %+v", resp)
+	}
+	var out struct {
+		OK             bool `json:"ok"`
+		AuditChainOK   bool `json:"audit_chain_ok"`
+		StateConfigured bool `json:"state_configured"`
+		ActiveJobs     int  `json:"active_jobs"`
+	}
+	if err := json.Unmarshal(resp.Result, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !out.OK || !out.AuditChainOK || !out.StateConfigured || out.ActiveJobs != 1 {
+		t.Fatalf("unexpected health snapshot: %+v", out)
+	}
 }
 
 func TestConfusedDeputyDenied(t *testing.T) {
