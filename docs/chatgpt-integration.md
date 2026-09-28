@@ -49,7 +49,7 @@ The intended standards flow is:
 1. ChatGPT reads RFC 9728 protected-resource metadata from the MCP host.
 2. ChatGPT discovers the ZITADEL authorization server.
 3. ChatGPT dynamically registers an OAuth public client.
-4. The operator signs in with the dedicated VPS operator account.
+4. The operator signs in with the dedicated OAuth operator account. VPS passwords and SSH keys are never entered into ChatGPT.
 5. Authorization Code + PKCE completes.
 6. ChatGPT discovers the MCP tools.
 7. The operator invokes `system.info`.
@@ -58,6 +58,12 @@ The intended standards flow is:
 10. The audit chain records the successful tool invocation.
 
 The ChatGPT product UI is version-sensitive, so button names and workspace eligibility must be rechecked against current official OpenAI documentation at release/setup time.
+
+## Credential boundary
+
+ChatGPT receives the public MCP endpoint and completes the standards-based OAuth flow. It does not need the VPS login password, a private SSH key, root credentials, unrestricted remote shell access, or unrelated infrastructure secrets.
+
+The dedicated OAuth operator password is entered only into the integrated identity provider login flow. Development-only remote access used by maintainers to validate a build is not part of this supported connection procedure.
 
 ## Completion gate
 
