@@ -16,16 +16,22 @@ This document distinguishes validated support from build coverage and untested e
 
 ### Runtime
 
-Required commands:
+Required runtime floor for the bundled OAuth path:
 
-- Docker Engine
-- Docker Compose v2 plugin exposed as `docker compose`
-- Git
-- OpenSSL
-- Python 3
-- curl
+- Docker Engine 24 or newer;
+- Docker Compose v2 plugin exposed as `docker compose`;
+- at least 2 GB RAM for the machine hosting the bundled ZITADEL Compose path;
+- Git;
+- OpenSSL;
+- Python 3;
+- curl.
 
-The current release candidate does not claim a lower Docker Engine or Compose version floor that has not been explicitly exercised in CI. The installer checks required functionality rather than publishing an unverified minimum version.
+The Docker/RAM floor follows the current official ZITADEL Docker Compose prerequisites because integrated OAuth is part of the supported public installation. It is a functional minimum, not a production-sizing recommendation.
+
+References:
+
+- https://zitadel.com/docs/self-hosting/deploy/compose
+- https://zitadel.com/docs/self-hosting/manage/requirements
 
 ## Public ChatGPT path
 
@@ -61,4 +67,6 @@ Other Linux distributions may work but are untested until explicit acceptance ev
 
 ## Resource sizing
 
-No minimum CPU/RAM claim is published yet because the integrated identity stack and workload mix materially affect consumption. Operators should use `scripts/diagnose.sh health` and host metrics during the release-candidate period; a sizing floor should be published only after measured real-VPS evidence.
+The 2 GB RAM figure above is only the dependency floor for the bundled identity stack. ZITADEL notes that password hashing can create CPU spikes and publishes substantially higher production/HA guidance.
+
+MCP workload size, Docker workloads already present on the VPS and audit/log retention materially affect real requirements. Operators should use `scripts/diagnose.sh health` and host metrics; production sizing should be based on measured workload evidence rather than the minimum installation floor.
