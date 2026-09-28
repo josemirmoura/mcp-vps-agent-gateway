@@ -1,8 +1,28 @@
 # MCP VPS Agent Gateway
 
-Plano de controle MCP orientado a segurança para permitir que ChatGPT ou outro cliente MCP trabalhe numa VPS Linux com a autoridade escolhida explicitamente pelo dono da VPS.
+**Conecte o ChatGPT Web diretamente à sua VPS Linux via MCP, com a autoridade definida por você e aplicada pelo servidor.**
+
+O MCP VPS Agent Gateway é uma ponte open source e auto-hospedada para permitir que o ChatGPT Web ou outro cliente MCP inspecione e opere uma VPS Linux pelo Model Context Protocol. O OAuth autentica o cliente, um Gateway sem root expõe a superfície MCP e um Broker local privilegiado reautoriza as operações no host conforme a policy definida pelo operador, registrando evidências de auditoria.
 
 > **Status: candidato em productização pré-release.** Os workflows em Ubuntu 24.04 validam o pacote de ponta a ponta, e o caminho OAuth integrado e auto-hospedado foi verificado por uma chamada real auditada de `system.info` feita pelo ChatGPT Web em 28/09/2026. Ainda faltam a primeira release pública estável, uma promessa formal de compatibilidade e evidência de confiabilidade prolongada em produção.
+
+## O problema que resolve
+
+Sem um caminho confiável de execução, trabalhar com uma VPS usando IA vira um revezamento manual: o ChatGPT sugere um comando, você troca para o terminal, executa, copia os logs de volta, reconstrói o contexto e repete. Dar acesso amplo no estilo SSH reduz parte dessa fricção, mas cria um problema de confiança muito maior.
+
+O MCP VPS Agent Gateway fecha esse ciclo mantendo a autorização dentro da VPS. Pela própria conversa, o ChatGPT pode inspecionar arquivos, diagnosticar serviços, analisar logs, trabalhar com Docker e executar outras operações que o dono da VPS habilitar explicitamente.
+
+~~~text
+ChatGPT Web
+    -> OAuth
+    -> MCP Gateway
+    -> Policy Broker
+    -> Sua VPS Linux
+~~~
+
+O GitHub hospeda o código-fonte, a documentação, as releases e o canal de atualização. **Depois da instalação, o GitHub não fica no caminho operacional entre o ChatGPT Web e a VPS.**
+
+O fluxo suportado não exige entregar ao ChatGPT a senha da VPS, chave SSH privada ou Docker socket.
 
 ## A ideia
 
