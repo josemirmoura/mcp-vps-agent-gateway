@@ -74,7 +74,7 @@ This intentionally stops before public OAuth and ChatGPT. It must not be describ
 After `v0.1.0` is frozen, production-oriented installs should use a tagged Git checkout rather than `main`:
 
 ~~~bash
-git clone --branch v0.1.0 --depth 1 \
+git clone --branch v0.1.0 \
   https://github.com/josemirmoura/mcp-vps-agent-gateway.git
 cd mcp-vps-agent-gateway
 bash scripts/install.sh
