@@ -18,13 +18,20 @@ The installation completion rule is deliberately stricter than "containers are h
 
 ## ChatGPT product prerequisite
 
-As of 2026-09-28, OpenAI documents full custom MCP support, including write/modify actions, for ChatGPT Business, Enterprise and Edu. ChatGPT Pro can connect custom MCP with read/fetch permissions, which is useful for limited interoperability testing but does **not** validate this project's full write-capable toolbox. Accounts/workspaces that do not expose Developer Mode and Apps -> Create cannot complete the ChatGPT-side installation gate.
+ChatGPT product surfaces and plan rollouts change independently from this project. Do **not** hard-block installation based only on a subscription name.
 
-This is an external ChatGPT product-surface requirement, not a VPS/MCP server failure. The package must keep this requirement versioned and recheck it against current official OpenAI documentation before release.
+The supported rule is feature detection:
+
+1. open the target ChatGPT account/workspace;
+2. confirm Developer Mode / Plugins exposes the option to create a custom MCP app;
+3. if the option exists, continue with the connection test;
+4. if it does not, recheck current official OpenAI documentation for that account/workspace.
+
+As of 2026-09-28, OpenAI documentation is in transition: one Help Center article describes full MCP write/modify support as a Business/Enterprise/Edu rollout, while newer Plugins documentation describes the developer-mode MCP registration flow more generally. The actual feature surface exposed to the account is therefore the installation-time authority for availability.
 
 ## Prerequisites
 
-1. The target ChatGPT account/workspace is eligible for the intended MCP capability level.
+1. The target ChatGPT account/workspace actually exposes custom MCP app creation in Developer Mode / Plugins.
 2. Local installation has already passed `bash scripts/verify.sh`.
 3. A DNS hostname points to the VPS.
 4. Integrated auth has passed:
