@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. ./scripts/lib/oauth-scopes.sh
 
 if [ ! -f .env ]; then
   echo "Missing .env. Run ./scripts/init.sh first." >&2
@@ -44,17 +45,7 @@ if [ -z "$AUDIENCE_PROJECT_ID" ]; then
   exit 1
 fi
 AUDIENCE_SCOPE="urn:zitadel:iam:org:project:id:$AUDIENCE_PROJECT_ID:aud"
-scope_present() {
-  local wanted="$1"
-  local scope
-  for scope in $REQUIRED_SCOPES; do
-    if [ "$scope" = "$wanted" ]; then
-      return 0
-    fi
-  done
-  return 1
-}
-if ! scope_present openid || ! scope_present "$AUDIENCE_SCOPE"; then
+if ! vps_agent_scope_list_contains "$REQUIRED_SCOPES" openid || ! vps_agent_scope_list_contains "$REQUIRED_SCOPES" "$AUDIENCE_SCOPE"; then
   echo "Integrated OAuth must require both openid and the dedicated resource audience scope." >&2
   echo "Configured scopes: ${REQUIRED_SCOPES:-<empty>}" >&2
   exit 1
