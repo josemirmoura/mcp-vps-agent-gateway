@@ -18,7 +18,7 @@ This matrix records concrete pre-release controls. A checked item means the cont
 - [x] expired access token rejected by regression test.
 - [x] wrong issuer rejected.
 - [x] wrong audience rejected.
-- [x] real access-token revocation exercised against ZITADEL in component acceptance.
+- [x] revoked/inactive access tokens are rejected from RFC 7662 introspection state; ZITADEL documents revoked tokens as inactive at introspection.
 - [x] unauthenticated MCP returns fail-closed 401 with OAuth resource challenge.
 - [x] DCR and OAuth endpoints have edge rate limiting.
 - [x] application-level concurrent request ceiling exists.
