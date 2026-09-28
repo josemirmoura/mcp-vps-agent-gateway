@@ -112,7 +112,7 @@ Before the first stable tag, automatic production update has no default target b
 For an explicitly selected release candidate:
 
 ~~~bash
-VPS_AGENT_UPDATE_REF=v0.1.0-rc.2 bash scripts/update.sh
+VPS_AGENT_UPDATE_REF=v0.1.0-rc.3 bash scripts/update.sh
 ~~~
 
 main is not an automatic update channel.
