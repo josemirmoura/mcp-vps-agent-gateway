@@ -4,15 +4,16 @@ This repository separates normative design from supporting material.
 
 ## Read in this order
 
-1. [installation-contract.md](installation-contract.md) — normative supported-installation boundary and development/user separation.
-2. [project-status.md](project-status.md) — maturity and what is actually usable.
-3. [build-vs-adopt.md](build-vs-adopt.md) — Gate -1: adopt, adapt, or build.
-4. [mvp-first.md](mvp-first.md) — implementation sequence and stop/go gates.
-5. [architecture.md](architecture.md) — primary technical source of truth.
-6. [policy-schema.md](policy-schema.md) — authorization model and policy shape.
-7. [chatgpt-integration.md](chatgpt-integration.md) — ChatGPT product-surface constraints.
-8. [threat-model.md](threat-model.md), [security-hardening-v2.md](security-hardening-v2.md), [runtime-semantics-and-recovery.md](runtime-semantics-and-recovery.md), [tool-trust-and-confused-deputy.md](tool-trust-and-confused-deputy.md), and [transport-and-aggregation.md](transport-and-aggregation.md) — deeper security/runtime material.
-9. [implementation-runbook.md](implementation-runbook.md) — detailed build checklist.
+1. [quick-start.md](quick-start.md) — shortest supported path into the guided terminal flow.
+2. [installation-contract.md](installation-contract.md) — normative supported-installation boundary and development/user separation.
+3. [project-status.md](project-status.md) — maturity and what is actually usable.
+4. [build-vs-adopt.md](build-vs-adopt.md) — Gate -1: adopt, adapt, or build.
+5. [mvp-first.md](mvp-first.md) — implementation sequence and stop/go gates.
+6. [architecture.md](architecture.md) — primary technical source of truth.
+7. [policy-schema.md](policy-schema.md) — authorization model and policy shape.
+8. [chatgpt-integration.md](chatgpt-integration.md) — ChatGPT product-surface constraints.
+9. [threat-model.md](threat-model.md), [security-hardening-v2.md](security-hardening-v2.md), [runtime-semantics-and-recovery.md](runtime-semantics-and-recovery.md), [tool-trust-and-confused-deputy.md](tool-trust-and-confused-deputy.md), and [transport-and-aggregation.md](transport-and-aggregation.md) — deeper security/runtime material.
+10. [implementation-runbook.md](implementation-runbook.md) — detailed build checklist.
 
 ## Precedence
 
@@ -36,3 +37,11 @@ Two Go processes: one unprivileged MCP Gateway and one privileged local Broker, 
 ## Implementation strategy in one sentence
 
 The real ChatGPT product path and the broad Scoped runtime are now implemented and validated; current work productizes that path without widening authority or promoting Full/R5 before its maturity requirements are met.
+
+
+## Product and operator references
+
+- [compatibility.md](compatibility.md)
+- [privacy.md](privacy.md)
+- [releases.md](releases.md)
+- [support.md](support.md)
