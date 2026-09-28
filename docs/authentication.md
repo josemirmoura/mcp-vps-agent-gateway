@@ -38,7 +38,7 @@ The same public hostname can serve both roles. Router priority sends `/mcp`, `/h
 Run:
 
 ~~~bash
-bash scripts/setup-integrated-auth.sh --domain mcp.example.com
+bash scripts/setup-integrated-auth.sh
 ~~~
 
 The script generates the identity-stack secrets, reuses an existing Traefik when possible, starts the bundled edge only on a clean host, starts ZITADEL/PostgreSQL, enables open Dynamic Client Registration required by MCP clients, creates a dedicated non-admin operator identity, records its stable subject in `.env`, then recreates Gateway/Broker in integrated mode.
