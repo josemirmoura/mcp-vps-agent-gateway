@@ -35,4 +35,4 @@ Two Go processes: one unprivileged MCP Gateway and one privileged local Broker, 
 
 ## Implementation strategy in one sentence
 
-Prove the real ChatGPT product path first, then one typed privileged action, then one Scoped real stack, and only then add durable jobs, OAuth, elevation, Full or generic admin shell.
+The real ChatGPT product path and the broad Scoped runtime are now implemented and validated; current work productizes that path without widening authority or promoting Full/R5 before its maturity requirements are met.
