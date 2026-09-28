@@ -11,6 +11,17 @@ The project follows Semantic Versioning. Pre-release versions may change while t
 - final clean-install human gate before the first stable release
 - freeze `v0.1.0` after the human gate passes
 
+## [0.1.0-rc.3] - 2026-09-28
+
+### Fixed
+
+- restored the two missing clauses from the canonical Apache License 2.0 text
+- GitHub now detects the repository license as `Apache-2.0`
+
+### Scope
+
+No runtime, authorization, installation or security-boundary behavior changed from RC2. RC3 exists so the human acceptance gate tests the exact source tree intended for stable promotion.
+
 ## [0.1.0-rc.2] - 2026-09-28
 
 ### Fixed
@@ -51,6 +62,7 @@ The `v0.1.0-rc.1` tag was created, but its release workflow stopped before image
 - Full remains disabled by default and is not claimed as production-ready
 - unrestricted networking remains a separate capability
 
-[Unreleased]: https://github.com/josemirmoura/mcp-vps-agent-gateway/compare/v0.1.0-rc.2...HEAD
+[Unreleased]: https://github.com/josemirmoura/mcp-vps-agent-gateway/compare/v0.1.0-rc.3...HEAD
+[0.1.0-rc.3]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.3
 [0.1.0-rc.2]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.2
 [0.1.0-rc.1]: https://github.com/josemirmoura/mcp-vps-agent-gateway/tree/v0.1.0-rc.1

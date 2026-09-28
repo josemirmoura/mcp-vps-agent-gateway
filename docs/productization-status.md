@@ -1,4 +1,4 @@
-# Productization status — v0.1.0-rc.2
+# Productization status — v0.1.0-rc.3
 
 This document tracks the public-productization checklist against the current release-candidate branch. It is evidence/status, not a replacement for the canonical architecture or security documents.
 

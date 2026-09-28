@@ -103,7 +103,7 @@ The updater:
 To deliberately test a release candidate:
 
 ~~~bash
-VPS_AGENT_UPDATE_REF=v0.1.0-rc.2 bash scripts/update.sh
+VPS_AGENT_UPDATE_REF=v0.1.0-rc.3 bash scripts/update.sh
 ~~~
 
 ## Safe remove
