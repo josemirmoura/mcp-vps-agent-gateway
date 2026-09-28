@@ -1,8 +1,28 @@
 # MCP VPS Agent Gateway
 
-Security-first MCP control plane for letting ChatGPT or another MCP client work on a Linux VPS with authority explicitly chosen by the VPS owner.
+**Connect ChatGPT Web directly to your Linux VPS through MCP, with authority you define and the server enforces.**
+
+MCP VPS Agent Gateway is an open-source, self-hosted bridge for letting ChatGPT Web or another MCP client inspect and operate a Linux VPS through the Model Context Protocol. OAuth authenticates the client, a non-root Gateway exposes the MCP surface, and a privileged local Broker re-authorizes host operations against operator-defined policy and records audit evidence.
 
 > **Status: pre-release productization candidate.** Clean Ubuntu 24.04 workflows validate the package end to end, and the integrated self-hosted OAuth path has been verified through a real audited ChatGPT Web `system.info` call on 2026-09-28. A stable public release, compatibility promise, and long-running production reliability claim are still pending.
+
+## What it solves
+
+Without a trusted execution path, server work with an AI becomes a manual relay: ChatGPT suggests a command, you switch to a terminal, run it, copy logs back, rebuild context and repeat. Broad SSH-style access would remove some friction while creating a much larger trust problem.
+
+MCP VPS Agent Gateway closes that loop while keeping authorization on the VPS. From the conversation, ChatGPT can inspect files, diagnose services, analyze logs, work with Docker and perform other operations that the VPS owner explicitly enables.
+
+~~~text
+ChatGPT Web
+    -> OAuth
+    -> MCP Gateway
+    -> Policy Broker
+    -> Your Linux VPS
+~~~
+
+GitHub hosts the source, documentation, releases and update channel. **GitHub is not a runtime relay between ChatGPT Web and the VPS after installation.**
+
+The supported flow does not require handing ChatGPT a VPS password, SSH private key or Docker socket.
 
 ## The idea
 

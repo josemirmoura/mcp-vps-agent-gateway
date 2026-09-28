@@ -18,9 +18,15 @@ The project follows Semantic Versioning. Pre-release versions may change while t
 - restored the two missing clauses from the canonical Apache License 2.0 text
 - GitHub now detects the repository license as `Apache-2.0`
 
+### Documentation
+
+- repositioned the public landing page and READMEs around the direct ChatGPT Web -> Linux VPS use case and the manual terminal-copying problem it solves
+- clarified that GitHub is the source, distribution and update channel, not a runtime relay between ChatGPT Web and the VPS
+- added explicit public-page metadata and structured software-source description for clearer search and machine discovery
+
 ### Scope
 
-No runtime, authorization, installation or security-boundary behavior changed from RC2. RC3 exists so the human acceptance gate tests the exact source tree intended for stable promotion.
+No runtime, authorization, installation or security-boundary behavior changed from RC2. RC3 exists so the human acceptance gate tests the exact source tree intended for stable promotion, including the canonical license correction and final public product presentation.
 
 ## [0.1.0-rc.2] - 2026-09-28
 
