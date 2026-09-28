@@ -113,6 +113,7 @@ services:
       - traefik.http.routers.vps-agent-auth.entrypoints=websecure
       - traefik.http.routers.vps-agent-auth.tls=true
       - traefik.http.routers.vps-agent-auth.tls.certresolver=${VPS_AGENT_TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.vps-agent-auth.middlewares=vps-agent-auth-ratelimit
       - traefik.http.routers.vps-agent-auth.service=vps-agent-zitadel-api
       - traefik.http.routers.vps-agent-auth.priority=100
 
