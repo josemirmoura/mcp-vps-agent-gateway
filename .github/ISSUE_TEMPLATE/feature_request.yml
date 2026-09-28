@@ -1,0 +1,31 @@
+name: Feature request
+description: Propose a focused product capability or workflow improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What concrete operator problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome
+      description: Describe behavior, not an implementation mandate.
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Authority and security impact
+      description: Does this widen filesystem, shell, systemd, Docker, network or admin authority?
+    validations:
+      required: true
+  - type: textarea
+    id: native
+    attributes:
+      label: Native-first check
+      description: Which official or native mechanism was considered first?
