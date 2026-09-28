@@ -85,6 +85,7 @@ The script:
 - otherwise starts the package Traefik automatically when ports 80/443 are free;
 - starts a pinned ZITADEL + PostgreSQL identity stack;
 - creates a dedicated non-admin VPS operator identity;
+- creates a dedicated OAuth resource audience plus private introspection client;
 - enables MCP-compatible Dynamic Client Registration (DCR) and PKCE discovery;
 - configures the Gateway as the OAuth protected resource;
 - binds the Broker to that exact operator subject;
