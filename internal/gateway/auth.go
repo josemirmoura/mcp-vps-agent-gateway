@@ -4,14 +4,15 @@ import (
 	"context"
 	"crypto/subtle"
 	"errors"
+	"encoding/json"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
-	"golang.org/x/oauth2"
 )
 
 type AuthConfig struct {
@@ -96,31 +97,55 @@ func staticVerifier(token, subject string) mcpauth.TokenVerifier {
 }
 
 // NewIntegratedOIDCVerifier is deliberately specific to the bundled ZITADEL
-// deployment. ZITADEL DCR currently issues opaque bearer access tokens and
-// accepts RFC 8707 resource values without narrowing the token audience. The
-// resource server therefore validates each bearer token online at the issuer's
-// OIDC UserInfo endpoint and binds the resulting stable subject again at the
-// Broker. This exception is not exposed as a generic "skip audience" switch.
-func NewIntegratedOIDCVerifier(ctx context.Context, issuer string) (mcpauth.TokenVerifier, error) {
-	if issuer == "" {
-		return nil, errors.New("issuer is required")
+// deployment. ZITADEL DCR issues opaque bearer access tokens for this flow,
+// so the resource server validates each token online through ZITADEL UserInfo.
+// The backchannel URL is private to the Docker identity network; the public
+// issuer is still advertised through protected-resource/OIDC metadata.
+func NewIntegratedOIDCVerifier(userInfoURL, forwardedHost string) (mcpauth.TokenVerifier, error) {
+	if strings.TrimSpace(userInfoURL) == "" {
+		return nil, errors.New("integrated userinfo URL is required")
 	}
-	provider, err := oidc.NewProvider(ctx, issuer)
-	if err != nil {
-		return nil, err
+	u, err := url.Parse(userInfoURL)
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return nil, errors.New("integrated userinfo URL must be http(s)")
 	}
+	client := &http.Client{Timeout: 5 * time.Second}
+
 	return func(ctx context.Context, raw string, _ *http.Request) (*mcpauth.TokenInfo, error) {
 		if strings.TrimSpace(raw) == "" {
 			return nil, mcpauth.ErrInvalidToken
 		}
-		info, err := provider.UserInfo(ctx, oauth2.StaticTokenSource(&oauth2.Token{AccessToken: raw}))
-		if err != nil || info.Subject == "" {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, userInfoURL, nil)
+		if err != nil {
 			return nil, mcpauth.ErrInvalidToken
 		}
-		// RequireBearerToken needs a non-expired TokenInfo. UserInfo has just
-		// validated this opaque token online, so this short local validity
-		// window only covers the current request and never outlives revocation
-		// checks performed on the next request.
+		req.Header.Set("Authorization", "Bearer "+raw)
+		if forwardedHost != "" {
+			req.Host = forwardedHost
+			req.Header.Set("X-Forwarded-Proto", "https")
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, mcpauth.ErrInvalidToken
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+			return nil, mcpauth.ErrInvalidToken
+		}
+
+		var info struct {
+			Subject string `json:"sub"`
+		}
+		dec := json.NewDecoder(io.LimitReader(resp.Body, 64<<10))
+		if err := dec.Decode(&info); err != nil || strings.TrimSpace(info.Subject) == "" {
+			return nil, mcpauth.ErrInvalidToken
+		}
+
+		// RequireBearerToken needs a non-expired TokenInfo. UserInfo validates
+		// the opaque token online for every request, so this local expiration is
+		// intentionally short and never replaces issuer-side revocation checks.
 		return &mcpauth.TokenInfo{
 			UserID:     info.Subject,
 			Scopes:     []string{"openid"},
