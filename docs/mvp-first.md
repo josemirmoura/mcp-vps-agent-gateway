@@ -25,7 +25,9 @@ ChatGPT Web
 
 ## Gate 0A — Prove the ChatGPT product surface
 
-This happens before privileged code.
+**Status: completed on 2026-09-28 for the supported integrated OAuth + ChatGPT Web path.**
+
+This gate was required before the privileged product path could be considered validated.
 
 Primary target: ChatGPT Web.
 
@@ -53,7 +55,7 @@ private_or_published:
 tested_date:
 ~~~
 
-If strict Plus Web is required and no supported write route exists yet, stop at protocol development or change only the distribution route. Do not weaken the server.
+The supported route must continue to be revalidated when ChatGPT product surfaces change. If a future target account does not expose custom MCP registration, stop at that product boundary or change only the distribution route. Do not weaken the server.
 
 ## Gate 0B — Safe MCP POC
 
