@@ -82,36 +82,26 @@ func TestProtectedResourceMetadata(t *testing.T) {
 }
 
 
-func TestIntegratedOIDCVerifierUsesIssuerUserInfo(t *testing.T) {
-	var server *httptest.Server
-	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/.well-known/openid-configuration":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{
-				"issuer": "` + server.URL + `",
-				"authorization_endpoint": "` + server.URL + `/authorize",
-				"token_endpoint": "` + server.URL + `/token",
-				"userinfo_endpoint": "` + server.URL + `/userinfo",
-				"jwks_uri": "` + server.URL + `/keys",
-				"response_types_supported": ["code"],
-				"subject_types_supported": ["public"],
-				"id_token_signing_alg_values_supported": ["RS256"]
-			}`))
-		case "/userinfo":
-			if r.Header.Get("Authorization") != "Bearer good-token" {
-				http.Error(w, "bad token", http.StatusUnauthorized)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"sub":"operator-123"}`))
-		default:
+func TestIntegratedOIDCVerifierUsesPrivateUserInfoBackchannel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/oidc/v1/userinfo" {
 			http.NotFound(w, r)
+			return
 		}
+		if r.Host != "mcp.example.com" || r.Header.Get("X-Forwarded-Proto") != "https" {
+			http.Error(w, "bad forwarded identity", http.StatusBadRequest)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer good-token" {
+			http.Error(w, "bad token", http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"sub":"operator-123"}`))
 	}))
 	defer server.Close()
 
-	verifier, err := NewIntegratedOIDCVerifier(context.Background(), server.URL)
+	verifier, err := NewIntegratedOIDCVerifier(server.URL+"/oidc/v1/userinfo", "mcp.example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,5 +119,13 @@ func TestIntegratedOIDCVerifierUsesIssuerUserInfo(t *testing.T) {
 
 	if _, err := verifier(context.Background(), "bad-token", httptest.NewRequest(http.MethodPost, "/mcp", nil)); err == nil {
 		t.Fatal("expected invalid token rejection")
+	}
+}
+
+func TestIntegratedOIDCVerifierRejectsInvalidBackchannelURL(t *testing.T) {
+	for _, raw := range []string{"", "not-a-url", "ftp://zitadel-auth-internal/userinfo"} {
+		if _, err := NewIntegratedOIDCVerifier(raw, "mcp.example.com"); err == nil {
+			t.Fatalf("expected invalid URL rejection for %q", raw)
+		}
 	}
 }
