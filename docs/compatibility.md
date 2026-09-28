@@ -40,7 +40,7 @@ A completed public installation requires:
 - a DNS A/AAAA record controlled by the operator;
 - public TCP 80/443 availability through an existing compatible Traefik edge or the bundled Traefik path;
 - a valid HTTPS certificate;
-- a ChatGPT account/workspace whose current product surface exposes custom MCP app registration.
+- for the supported write-capable product path, a ChatGPT Business or Enterprise/Edu workspace whose current web product surface exposes Developer Mode / custom MCP app registration; read-only MCP availability on other plans is not equivalent to the full product path.
 
 The package uses one public hostname for MCP protected-resource metadata and the integrated OAuth/OIDC issuer.
 
