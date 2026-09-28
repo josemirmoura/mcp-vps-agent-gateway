@@ -44,13 +44,21 @@ if [ -z "$AUDIENCE_PROJECT_ID" ]; then
   exit 1
 fi
 AUDIENCE_SCOPE="urn:zitadel:iam:org:project:id:$AUDIENCE_PROJECT_ID:aud"
-case " $REQUIRED_SCOPES " in
-  *" openid "*" $AUDIENCE_SCOPE "*) ;;
-  *)
-    echo "Integrated OAuth must require both openid and the dedicated resource audience scope." >&2
-    exit 1
-    ;;
-esac
+scope_present() {
+  local wanted="$1"
+  local scope
+  for scope in $REQUIRED_SCOPES; do
+    if [ "$scope" = "$wanted" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+if ! scope_present openid || ! scope_present "$AUDIENCE_SCOPE"; then
+  echo "Integrated OAuth must require both openid and the dedicated resource audience scope." >&2
+  echo "Configured scopes: ${REQUIRED_SCOPES:-<empty>}" >&2
+  exit 1
+fi
 
 ORIGIN="$(printf '%s' "$PUBLIC_URL" | sed -E 's#^(https://[^/]+).*$#\1#')"
 METADATA_URL="${VPS_AGENT_RESOURCE_METADATA_URL:-$ORIGIN/.well-known/oauth-protected-resource}"
