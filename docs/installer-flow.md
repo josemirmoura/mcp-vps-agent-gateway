@@ -104,15 +104,13 @@ That command validates the public HTTPS certificate/route, OAuth/OIDC discovery,
 
 The script refuses to replace an unknown service already occupying 80/443.
 
-## Phase 6 — Confirm ChatGPT product eligibility
+## Phase 6 — Confirm ChatGPT MCP capability
 
-Before starting the ChatGPT-side connection, confirm that the account/workspace exposes the required custom-MCP surface. As checked against official OpenAI documentation on 2026-09-28:
+Before starting the ChatGPT-side connection, inspect the actual feature surface of the target account/workspace.
 
-- Business, Enterprise and Edu support full custom MCP, including write/modify actions;
-- Pro can connect custom MCP with read/fetch permissions only, so it cannot certify this project's full write-capable product surface;
-- if Developer Mode and Apps -> Create are not available, the VPS/public OAuth side may still be healthy, but installation cannot reach the final ChatGPT completion gate on that account.
+Continue when ChatGPT exposes Developer Mode / Plugins with an option to create a custom MCP app. Do not reject an account solely from its plan name, because OpenAI product rollouts and documentation can change independently.
 
-This is an unavoidable external platform requirement, not something the VPS package can automate.
+If custom MCP creation is absent, the VPS/public OAuth side may still be healthy, but the ChatGPT-side completion gate cannot run on that account until the feature becomes available.
 
 ## Phase 7 — Show the current ChatGPT Web tutorial
 
