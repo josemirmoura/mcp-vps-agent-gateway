@@ -23,7 +23,7 @@ The installation completion rule is deliberately stricter than "containers are h
 3. Integrated auth has passed:
 
 ~~~bash
-bash scripts/setup-integrated-auth.sh --domain mcp.example.com
+bash scripts/setup-integrated-auth.sh
 ~~~
 
 That command must finish with `INTEGRATED AUTH: READY`.
