@@ -29,13 +29,13 @@ DANGEROUS_PATTERNS = [
     re.compile(r"\bsshpass\b", re.I),
     re.compile(r"\bssh\s+-i\s+", re.I),
     re.compile(
-        r"(give|send|share|provide|paste).{0,80}"
+        r"\b(give|send|share|provide|paste)\b.{0,80}"
         r"(chatgpt|maintainer|developer).{0,80}"
         r"(vps password|ssh password|private ssh key|ssh private key|root password|private key)",
         re.I | re.S,
     ),
     re.compile(
-        r"(d[eê]|envie|mande|compartilhe|forne[cç]a|cole).{0,80}"
+        r"\b(d[eê]|envie|mande|compartilhe|forne[cç]a|cole)\b.{0,80}"
         r"(chatgpt|mantenedor|desenvolvedor).{0,80}"
         r"(senha da vps|senha ssh|chave ssh privada|chave privada|senha root)",
         re.I | re.S,
