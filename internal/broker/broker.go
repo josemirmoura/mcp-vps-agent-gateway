@@ -86,19 +86,7 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			"whole_host": os.Getenv("VPS_AGENT_WHOLE_HOST") == "1",
 		})
 	case "system.health":
-		auditOK := true
-		activeJobs := 0
-		if b.State != nil {
-			auditOK = b.State.VerifyAudit(ctx) == nil
-			if jobs, err := b.State.ListActiveJobs(ctx); err == nil { activeJobs = len(jobs) }
-		}
-		return ok(req.ID, map[string]any{
-			"ok": true, "audit_chain_ok": auditOK,
-			"state_configured":  b.State != nil,
-			"docker_configured": b.Docker != nil,
-			"jobs_configured":   b.Jobs != nil,
-			"active_jobs":       activeJobs,
-		})
+		return ok(req.ID, b.healthSnapshot(ctx))
 	case "system.disk":
 		if !b.Policy.CanDiagnostic("system.disk") {
 			return deny(req.ID, "permission_denied", "disk diagnostics are disabled by policy")
@@ -776,6 +764,11 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "audit_error", err.Error())
 		}
 		return ok(req.ID, map[string]any{"events": records})
+	case "admin.health":
+		if !b.adminOK(req.AdminToken) {
+			return deny(req.ID, "permission_denied", "operator authentication failed")
+		}
+		return ok(req.ID, b.healthSnapshot(ctx))
 	case "admin.audit.status":
 		if !b.adminOK(req.AdminToken) {
 			return deny(req.ID, "permission_denied", "operator authentication failed")
@@ -815,6 +808,25 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		return b.startShellJob(ctx, req, true)
 	default:
 		return deny(req.ID, "unknown_tool", "unknown broker tool")
+	}
+}
+
+func (b *Broker) healthSnapshot(ctx context.Context) map[string]any {
+	auditOK := true
+	activeJobs := 0
+	if b.State != nil {
+		auditOK = b.State.VerifyAudit(ctx) == nil
+		if jobs, err := b.State.ListActiveJobs(ctx); err == nil {
+			activeJobs = len(jobs)
+		}
+	}
+	return map[string]any{
+		"ok":               true,
+		"audit_chain_ok":   auditOK,
+		"state_configured": b.State != nil,
+		"docker_configured": b.Docker != nil,
+		"jobs_configured":  b.Jobs != nil,
+		"active_jobs":      activeJobs,
 	}
 }
 

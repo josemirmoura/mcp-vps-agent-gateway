@@ -19,6 +19,8 @@ func main() {
 		os.Exit(2)
 	}
 	switch os.Args[1] {
+	case "health":
+		health(os.Args[2:])
 	case "approvals":
 		listApprovals(os.Args[2:])
 	case "approve":
@@ -183,6 +185,14 @@ func decideApproval(args []string, approve bool) {
 	})
 }
 
+func health(args []string) {
+	fs := flag.NewFlagSet("health", flag.ExitOnError)
+	socket, token := common(fs)
+	_ = fs.Parse(args)
+	requireToken(*token)
+	call(*socket, wire.Request{ID: "operator-health", Tool: "admin.health", AdminToken: *token})
+}
+
 func auditStatus(args []string) {
 	fs := flag.NewFlagSet("audit-status", flag.ExitOnError)
 	socket, token := common(fs)
@@ -235,7 +245,7 @@ func call(socket string, req wire.Request) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: vps-agent <approvals|approve|deny|revoke-all|audit-status|audit-tail|wait-tool|state-check> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: vps-agent <health|approvals|approve|deny|revoke-all|audit-status|audit-tail|wait-tool|state-check> [flags]")
 }
 
 func getenv(name, fallback string) string {

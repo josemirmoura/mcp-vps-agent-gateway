@@ -126,7 +126,7 @@ The bootstrap IAM owner exists only during first-instance setup and is removed b
 - integrated OIDC discovery must advertise DCR, S256 PKCE and refresh-token support.
 - protected-resource metadata must advertise the dedicated ZITADEL resource-audience scope.
 - every accepted access token must be active, unexpired, from the expected issuer and bound to the dedicated resource project audience.
-- unauthenticated `/mcp` must return HTTP 401.
+- unauthenticated `/mcp` must return HTTP 401 with a `WWW-Authenticate: Bearer` challenge pointing to the protected-resource metadata.
 - the Broker rechecks the exact expected subject and policy after Gateway authentication.
 - the Gateway still has no host root and no Docker socket.
 

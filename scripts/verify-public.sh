@@ -36,6 +36,9 @@ if [ -z "$ISSUER" ]; then
   echo "VPS_AGENT_OIDC_ISSUER is required in integrated mode." >&2
   exit 1
 fi
+while [ "$ISSUER" != "/" ] && [ "${ISSUER%/}" != "$ISSUER" ]; do
+  ISSUER="${ISSUER%/}"
+done
 if [ -z "$AUDIENCE_PROJECT_ID" ]; then
   echo "VPS_AGENT_INTEGRATED_AUDIENCE_PROJECT_ID is required in integrated mode." >&2
   exit 1
@@ -81,11 +84,17 @@ echo "Checking integrated Authorization Server discovery..."
 curl --fail --silent --show-error "$ISSUER/.well-known/openid-configuration" >/tmp/vps-agent-oidc-discovery.json
 python3 - "$ISSUER" <<'PY'
 import json,sys
+from urllib.parse import urlparse
 issuer=sys.argv[1].rstrip("/")
 data=json.load(open("/tmp/vps-agent-oidc-discovery.json"))
 assert data.get("issuer","").rstrip("/") == issuer, data
+for field in ("authorization_endpoint", "token_endpoint"):
+    value=data.get(field,"")
+    parsed=urlparse(value)
+    assert parsed.scheme == "https" and parsed.netloc, {"missing_or_insecure": field, "value": value}
 registration=data.get("registration_endpoint","")
-assert registration.startswith("https://"), data
+parsed=urlparse(registration)
+assert parsed.scheme == "https" and parsed.netloc, data
 methods=data.get("code_challenge_methods_supported", [])
 assert "S256" in methods, data
 scopes=data.get("scopes_supported", [])
@@ -94,6 +103,7 @@ grants=data.get("grant_types_supported", [])
 assert "authorization_code" in grants, data
 assert "refresh_token" in grants, data
 token_auth=data.get("token_endpoint_auth_methods_supported", [])
+assert token_auth, "token_endpoint_auth_methods_supported must be published"
 assert "none" in token_auth, data
 print("INTEGRATED OAUTH DISCOVERY + DCR + PKCE + REFRESH: PASS")
 PY
@@ -111,14 +121,35 @@ print("PRIVATE AUDIENCE-BOUND INTROSPECTION: PASS")
 PY
 
 echo
-echo "Checking that unauthenticated MCP access fails closed..."
-code="$(curl --silent --show-error --output /tmp/vps-agent-public-unauth.txt --write-out '%{http_code}' "$PUBLIC_URL" || true)"
+echo "Checking that unauthenticated MCP access fails closed with OAuth discovery challenge..."
+code="$(curl --silent --show-error \
+  --dump-header /tmp/vps-agent-public-unauth-headers.txt \
+  --output /tmp/vps-agent-public-unauth.txt \
+  --write-out '%{http_code}' \
+  "$PUBLIC_URL" || true)"
 if [ "$code" != "401" ]; then
   echo "Expected HTTP 401 from unauthenticated MCP request, got $code." >&2
   cat /tmp/vps-agent-public-unauth.txt >&2 || true
   exit 1
 fi
-echo "UNAUTHENTICATED MCP DENIAL: PASS"
+python3 - "$METADATA_URL" <<'PY'
+import sys
+metadata_url=sys.argv[1]
+raw=open("/tmp/vps-agent-public-unauth-headers.txt", errors="replace").read()
+headers={}
+for line in raw.splitlines():
+    if ":" not in line:
+        continue
+    name,value=line.split(":",1)
+    headers.setdefault(name.strip().lower(), []).append(value.strip())
+challenges=headers.get("www-authenticate", [])
+assert challenges, "401 response is missing WWW-Authenticate"
+joined=", ".join(challenges)
+assert "bearer" in joined.lower(), joined
+needle=f'resource_metadata="{metadata_url}"'
+assert needle in joined, {"expected": needle, "www_authenticate": joined}
+print("UNAUTHENTICATED MCP DENIAL + OAUTH CHALLENGE: PASS")
+PY
 
 if [ -n "${VPS_AGENT_TEST_ACCESS_TOKEN:-}" ]; then
   echo
@@ -138,5 +169,6 @@ PY
 else
   echo
   echo "No VPS_AGENT_TEST_ACCESS_TOKEN set; token-authenticated public call not executed."
-  echo "OAuth discovery and fail-closed behavior are valid. The ChatGPT authorization flow remains the final client-side gate."
+  echo "OAuth discovery, DCR/PKCE, private introspection and fail-closed challenge behavior are valid."
+  echo "The real ChatGPT authorization flow remains the final client-side gate."
 fi

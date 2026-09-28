@@ -37,6 +37,35 @@ func TestStaticAuthUsesNativeMCPMiddleware(t *testing.T) {
 	}
 }
 
+func TestOAuthChallengeAdvertisesResourceMetadata(t *testing.T) {
+	metadataURL := "https://mcp.example.com/.well-known/oauth-protected-resource"
+	verifier := mcpauth.TokenVerifier(func(context.Context, string, *http.Request) (*mcpauth.TokenInfo, error) {
+		return nil, mcpauth.ErrInvalidToken
+	})
+	h := (AuthConfig{
+		Mode:                "integrated",
+		Verifier:            verifier,
+		ResourceMetadataURL: metadataURL,
+	}).Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status=%d want=%d", w.Code, http.StatusUnauthorized)
+	}
+	challenge := w.Header().Get("WWW-Authenticate")
+	if !strings.Contains(strings.ToLower(challenge), "bearer") {
+		t.Fatalf("WWW-Authenticate missing Bearer challenge: %q", challenge)
+	}
+	if !strings.Contains(challenge, `resource_metadata="`+metadataURL+`"`) {
+		t.Fatalf("WWW-Authenticate missing resource metadata URL: %q", challenge)
+	}
+}
+
 func TestConfiguredVerifierSubject(t *testing.T) {
 	verifier := mcpauth.TokenVerifier(func(context.Context, string, *http.Request) (*mcpauth.TokenInfo, error) {
 		return &mcpauth.TokenInfo{UserID: "subject-123"}, nil

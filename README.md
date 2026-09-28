@@ -150,6 +150,7 @@ See [implementation validation](docs/implementation-validation.md).
 
 ~~~bash
 bash scripts/diagnose.sh status
+bash scripts/diagnose.sh health
 bash scripts/diagnose.sh logs 200
 bash scripts/diagnose.sh audit 100
 
