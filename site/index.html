@@ -45,7 +45,7 @@
 
     <section class="grid two">
       <article><p class="eyebrow">Security</p><h2>The LLM is not the authorization engine.</h2><p>Deny-by-default policy, scoped filesystem resolution, isolated shell/jobs, bounded requests, expected-subject checks, operation journals, locks/fencing and a Broker-owned audit hash chain keep authority in code the operator controls.</p></article>
-      <article><p class="eyebrow">Identity</p><h2>OAuth without an OAuth homework assignment.</h2><p>The supported public path self-hosts ZITADEL beside the Gateway. The setup script creates the operator identity, enables MCP dynamic client registration and reuses the VPS edge proxy when possible.</p></article>
+      <article><p class="eyebrow">Identity</p><h2>OAuth without an OAuth homework assignment.</h2><p>The supported public path self-hosts ZITADEL beside the Gateway. The setup script creates the operator identity, a dedicated MCP audience, private token introspection, dynamic client registration and reuses the VPS edge proxy when possible.</p></article>
     </section>
 
     <section id="quick-start" class="quick">
@@ -79,7 +79,7 @@ bash scripts/verify.sh</code></pre>
         <pre><code id="integrated-auth-code">bash scripts/setup-integrated-auth.sh &&
 bash scripts/connect-chatgpt.sh</code></pre>
       </div>
-      <p>The setup script asks for the operator email and password, then handles the rest: existing Traefik detection or bundled edge on a clean VPS, TLS, ZITADEL + PostgreSQL, dedicated operator identity, DCR, PKCE discovery, Gateway/Broker identity binding and public verification.</p>
+      <p>The setup script asks for the operator email and password, then handles the rest: existing Traefik detection or bundled edge on a clean VPS, TLS, ZITADEL + PostgreSQL, dedicated operator identity, MCP-only resource audience, private token introspection, DCR, PKCE discovery, Gateway/Broker identity binding and public verification.</p>
       <p><code>connect-chatgpt.sh</code> does not declare victory when it merely prints instructions. It waits until ChatGPT actually calls <code>system.info</code> and the Broker audit confirms the authenticated request.</p>
     </section>
 
