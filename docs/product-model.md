@@ -285,7 +285,7 @@ bash scripts/init.sh --scope /opt/vps-agent-sandbox
 # optionally refine config/policy.yaml and .env
 docker compose up -d --build
 bash scripts/verify.sh
-bash scripts/setup-integrated-auth.sh --domain mcp.example.com
+bash scripts/setup-integrated-auth.sh
 bash scripts/connect-chatgpt.sh
 ~~~
 
