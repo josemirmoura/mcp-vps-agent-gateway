@@ -2,6 +2,19 @@
 
 The supported installation is terminal-first and uses the repository's transparent Docker Compose and shell scripts.
 
+## Requirements
+
+Before running the guided flow:
+
+- Linux VPS; Ubuntu 24.04 LTS is the release-candidate validated target;
+- Docker Engine 24+ and Docker Compose v2;
+- at least 2 GB RAM for the bundled ZITADEL path;
+- Git, OpenSSL, Python 3 and curl;
+- public DNS for the MCP hostname, TCP 80/443 available and valid HTTPS;
+- **ChatGPT Plus or higher**, with Developer Mode and custom MCP app creation actually exposed in ChatGPT Web for that account.
+
+OpenAI controls plan availability and rollout. Its current documentation describes full MCP write/modify support for Business, Enterprise and Edu. Accounts that expose only read/fetch MCP permissions remain limited to those ChatGPT-side capabilities. Recheck the current OpenAI product surface before public setup.
+
 ## Release candidate
 
 Until the first stable tag is frozen after the final operator acceptance gate:
