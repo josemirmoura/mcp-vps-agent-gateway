@@ -116,15 +116,19 @@ VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge
 Safe removal preserves configuration and audit state. Purge requires explicit confirmation and removes only MCP-owned artifacts. Updates back up operator configuration/state, use fast-forward Git updates, verify the new runtime, and roll back code/state on verification failure.
 ## Documentation
 
+- [Quick Start](docs/quick-start.md)
 - [Installation contract](docs/installation-contract.md)
 - [Product model](docs/product-model.md)
-- [Docker first-run flow](docs/installer-flow.md)
+- [Operations](docs/operations.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Compatibility](docs/compatibility.md)
+- [Privacy and telemetry](docs/privacy.md)
+- [Release policy](docs/releases.md)
+- [Support](docs/support.md)
 - [Architecture](docs/architecture.md)
 - [Authentication](docs/authentication.md)
-- [Multi-instance](docs/multi-instance.md)
 - [ChatGPT integration](docs/chatgpt-integration.md)
-- [Threat model](docs/threat-model.md)
-- [Security hardening](docs/security-hardening-v2.md)
+- [Security release matrix](docs/security-release.md)
 
 ## License
 
