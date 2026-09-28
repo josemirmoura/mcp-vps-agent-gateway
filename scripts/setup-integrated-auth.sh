@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 
 usage() {
   cat <<'EOF'
-usage: bash scripts/setup-integrated-auth.sh --domain mcp.example.com [options]
+usage: bash scripts/setup-integrated-auth.sh [--domain mcp.example.com] [options]
 
 Configure the supported public ChatGPT path: self-hosted OAuth/OIDC with
 ZITADEL, PostgreSQL and the existing package Gateway/Broker.
@@ -60,8 +60,13 @@ if [ ! -f .env ] || [ ! -f config/policy.yaml ]; then
 fi
 
 if [ -z "$DOMAIN" ]; then
-  echo "ERROR: --domain is required." >&2
-  exit 2
+  if [ -t 0 ]; then
+    printf 'Public MCP domain (for example mcp.example.com): '
+    read -r DOMAIN
+  else
+    echo "ERROR: --domain is required in non-interactive mode." >&2
+    exit 2
+  fi
 fi
 if [[ "$DOMAIN" == *"://"* || "$DOMAIN" == */* || "$DOMAIN" == *" "* || "$DOMAIN" == .* || "$DOMAIN" == *. ]]; then
   echo "ERROR: --domain must be a hostname only, for example mcp.example.com." >&2
