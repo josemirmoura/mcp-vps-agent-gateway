@@ -83,11 +83,15 @@ done
 docker compose version >/dev/null
 
 upsert_env() {
-  python3 - .env "$1" "$2" <<'PY'
-import pathlib, shlex, sys
+  local key="$1"
+  local value="$2"
+  python3 - .env "$key" 3<<<"$value" <<'PY'
+import os, pathlib, shlex, sys
 path=pathlib.Path(sys.argv[1])
 key=sys.argv[2]
-value=sys.argv[3]
+value=os.fdopen(3).read()
+if value.endswith("\n"):
+    value=value[:-1]
 lines=path.read_text().splitlines()
 replacement=f"{key}={shlex.quote(value)}"
 out=[]
@@ -268,8 +272,6 @@ upsert_env VPS_AGENT_DOMAIN "$DOMAIN"
 upsert_env VPS_AGENT_PUBLIC_URL "https://$DOMAIN/mcp"
 upsert_env VPS_AGENT_AUTH_MODE integrated
 upsert_env VPS_AGENT_OIDC_ISSUER "https://$DOMAIN"
-upsert_env VPS_AGENT_INTEGRATED_USERINFO_URL "http://zitadel-auth-internal:8080/oidc/v1/userinfo"
-upsert_env VPS_AGENT_INTEGRATED_USERINFO_HOST "$DOMAIN"
 upsert_env VPS_AGENT_OAUTH_RESOURCE "https://$DOMAIN/mcp"
 upsert_env VPS_AGENT_RESOURCE_METADATA_URL "https://$DOMAIN/.well-known/oauth-protected-resource"
 upsert_env VPS_AGENT_REQUIRED_SCOPES openid
@@ -332,13 +334,43 @@ assert issuer == f"https://{domain}", issuer
 print("OIDC DISCOVERY: PASS")
 PY
 
-if [ "$NEEDS_OPERATOR" -eq 1 ]; then
+DCR_READY="$(python3 - <<'PY'
+import json
+x=json.load(open("/tmp/vps-agent-oidc.json"))
+print("1" if x.get("registration_endpoint") else "0")
+PY
+)"
+
+RESOURCE_PROJECT_ID="$(env_value VPS_AGENT_INTEGRATED_AUDIENCE_PROJECT_ID || true)"
+INTROSPECTION_APP_ID="$(env_value VPS_AGENT_INTEGRATED_INTROSPECTION_APP_ID || true)"
+INTROSPECTION_CLIENT_ID="$(env_value VPS_AGENT_INTEGRATED_INTROSPECTION_CLIENT_ID || true)"
+INTROSPECTION_CLIENT_SECRET="$(env_value VPS_AGENT_INTEGRATED_INTROSPECTION_CLIENT_SECRET || true)"
+
+NEEDS_RESOURCE=0
+if [ -z "$RESOURCE_PROJECT_ID" ] || [ -z "$INTROSPECTION_CLIENT_ID" ] || [ -z "$INTROSPECTION_CLIENT_SECRET" ]; then
+  NEEDS_RESOURCE=1
+fi
+
+NEEDS_BOOTSTRAP=0
+if [ "$NEEDS_OPERATOR" -eq 1 ] || [ "$NEEDS_RESOURCE" -eq 1 ] || [ "$DCR_READY" != "1" ]; then
+  NEEDS_BOOTSTRAP=1
+fi
+
+BOOTSTRAP_PAT=""
+ZITADEL_CID=""
+if [ "$NEEDS_BOOTSTRAP" -eq 1 ]; then
+  # ZITADEL writes this short-lived IAM-owner PAT into a private package volume.
+  # Read it through an ephemeral container because the production ZITADEL image
+  # intentionally contains almost no shell utilities.
   BOOTSTRAP_PAT="$(
-    docker run --rm       -v mcp-vps-agent_zitadel-bootstrap:/zitadel/bootstrap:ro       alpine:3.22       cat /zitadel/bootstrap/bootstrap-admin.pat 2>/dev/null || true
+    docker run --rm \
+      -v mcp-vps-agent_zitadel-bootstrap:/zitadel/bootstrap:ro \
+      alpine:3.22 \
+      cat /zitadel/bootstrap/bootstrap-admin.pat 2>/dev/null || true
   )"
   if [ -z "$BOOTSTRAP_PAT" ]; then
-    echo "ERROR: ZITADEL bootstrap PAT was not produced." >&2
-    echo "If this is a partially initialized install, restore the identity backup or purge and retry." >&2
+    echo "ERROR: integrated OAuth bootstrap is incomplete but its short-lived admin PAT is unavailable." >&2
+    echo "Restore the identity backup or purge this incomplete identity stack and rerun setup." >&2
     exit 1
   fi
 
@@ -349,12 +381,34 @@ if [ "$NEEDS_OPERATOR" -eq 1 ]; then
   fi
 
   curl_zitadel_internal() {
-    docker run --rm -i       --network "container:$ZITADEL_CID"       curlimages/curl:8.16.0       -sS       -H "Host: $DOMAIN"       -H 'X-Forwarded-Proto: https'       "$@"
+    docker run --rm -i \
+      --network "container:$ZITADEL_CID" \
+      curlimages/curl:8.16.0 \
+      -sS \
+      -H "Host: $DOMAIN" \
+      -H 'X-Forwarded-Proto: https' \
+      "$@"
   }
 
-  echo "Enabling MCP-compatible Dynamic Client Registration privately..."
-  curl_zitadel_internal --fail     --request PUT     --url "http://127.0.0.1:8080/v2/settings/security"     --header "Authorization: Bearer $BOOTSTRAP_PAT"     --header 'Content-Type: application/json'     --data '{"dynamicClientRegistration":{"enabled":true,"allowUnauthenticated":true}}'     >/tmp/vps-agent-dcr-settings.json
+  # Tighten bootstrap-volume permissions before any credential is consumed.
+  docker run --rm \
+    -v mcp-vps-agent_zitadel-bootstrap:/zitadel/bootstrap \
+    alpine:3.22 \
+    sh -c 'chmod 600 /zitadel/bootstrap/*.pat 2>/dev/null || true'
 
+  if [ "$DCR_READY" != "1" ]; then
+    echo "Enabling MCP-compatible Dynamic Client Registration privately..."
+    curl_zitadel_internal --fail \
+      --request PUT \
+      --url "http://127.0.0.1:8080/v2/settings/security" \
+      --header "Authorization: Bearer $BOOTSTRAP_PAT" \
+      --header 'Content-Type: application/json' \
+      --data '{"dynamicClientRegistration":{"enabled":true,"allowUnauthenticated":true}}' \
+      >/tmp/vps-agent-dcr-settings.json
+  fi
+fi
+
+if [ "$NEEDS_OPERATOR" -eq 1 ]; then
   PASSWORD="${VPS_AGENT_OPERATOR_PASSWORD:-}"
   if [ -z "$PASSWORD" ]; then
     if [ ! -t 0 ]; then
@@ -387,9 +441,14 @@ if [ "$NEEDS_OPERATOR" -eq 1 ]; then
   REQUEST_FILE="$(mktemp)"
   chmod 600 "$REQUEST_FILE"
   trap 'rm -f "$REQUEST_FILE"' EXIT
-  python3 - "$REQUEST_FILE" "$OPERATOR_ID" "$OPERATOR_USERNAME" "$OPERATOR_EMAIL" "$PASSWORD" <<'PY'
-import json,sys
-path,user_id,username,email,password=sys.argv[1:]
+
+  # Password travels on a private inherited file descriptor, never argv.
+  python3 - "$REQUEST_FILE" "$OPERATOR_ID" "$OPERATOR_USERNAME" "$OPERATOR_EMAIL" 3<<<"$PASSWORD" <<'PY'
+import json,os,sys
+path,user_id,username,email=sys.argv[1:]
+password=os.fdopen(3).read()
+if password.endswith("\n"):
+    password=password[:-1]
 payload={
   "userId": user_id,
   "username": username,
@@ -410,7 +469,15 @@ PY
   echo "Creating the dedicated non-admin VPS operator identity..."
   set +e
   HTTP_CODE="$(
-    curl_zitadel_internal       --output /tmp/vps-agent-create-operator.json       --write-out '%{http_code}'       --request POST       --url "http://127.0.0.1:8080/v2/users/human"       --header "Authorization: Bearer $BOOTSTRAP_PAT"       --header 'Content-Type: application/json'       --data-binary @-       < "$REQUEST_FILE"
+    curl_zitadel_internal \
+      --output /tmp/vps-agent-create-operator.json \
+      --write-out '%{http_code}' \
+      --request POST \
+      --url "http://127.0.0.1:8080/v2/users/human" \
+      --header "Authorization: Bearer $BOOTSTRAP_PAT" \
+      --header 'Content-Type: application/json' \
+      --data-binary @- \
+      < "$REQUEST_FILE"
   )"
   CURL_STATUS=$?
   set -e
@@ -435,6 +502,7 @@ payload={
   "subject":subject,
   "username":username,
   "email":email,
+  "bootstrap_complete":False,
   "created_at":datetime.datetime.now(datetime.timezone.utc).isoformat()
 }
 with open(path,"w") as f:
@@ -442,35 +510,165 @@ with open(path,"w") as f:
     f.write("\n")
 PY
   chmod 600 "$MARKER"
+fi
 
-  # Remove the bootstrap human IAM owner before discarding the short-lived PAT.
-  curl_zitadel_internal --fail --request POST --url "http://127.0.0.1:8080/v2/users" --header "Authorization: Bearer $BOOTSTRAP_PAT" --header 'Content-Type: application/json' --data '{}' >/tmp/vps-agent-users.json
-
-  BOOTSTRAP_USER_ID="$(python3 - "$DOMAIN" <<'PY'
+if [ "$NEEDS_RESOURCE" -eq 1 ]; then
+  if [ -z "$RESOURCE_PROJECT_ID" ]; then
+    echo "Creating the dedicated OAuth resource/audience project..."
+    RESOURCE_RESPONSE="$(mktemp)"
+    chmod 600 "$RESOURCE_RESPONSE"
+    curl_zitadel_internal --fail \
+      --request POST \
+      --url "http://127.0.0.1:8080/management/v1/projects" \
+      --header "Authorization: Bearer $BOOTSTRAP_PAT" \
+      --header 'Content-Type: application/json' \
+      --data '{"name":"MCP VPS Agent Resource"}' \
+      >"$RESOURCE_RESPONSE"
+    RESOURCE_PROJECT_ID="$(python3 - "$RESOURCE_RESPONSE" <<'PY'
 import json,sys
-domain=sys.argv[1]
-data=json.load(open("/tmp/vps-agent-users.json"))
-target=f"bootstrap-admin@{domain}".lower()
-matches=[]
-for user in data.get("result", []):
-    human=user.get("human") or {}
-    email=(human.get("email") or {}).get("email","").lower()
-    username=user.get("username","").lower()
-    if email == target or username == target or username.startswith("bootstrap-admin@"):
-        uid=user.get("userId","")
-        if uid:
-            matches.append(uid)
-if len(matches) != 1:
-    raise SystemExit(f"expected exactly one bootstrap human user, found {len(matches)}")
-print(matches[0])
+x=json.load(open(sys.argv[1]))
+value=x.get("id","")
+assert value, x
+print(value)
 PY
-  )"
+    )"
+    rm -f "$RESOURCE_RESPONSE"
+    upsert_env VPS_AGENT_INTEGRATED_AUDIENCE_PROJECT_ID "$RESOURCE_PROJECT_ID"
+  fi
 
-  curl_zitadel_internal --fail --request DELETE --url "http://127.0.0.1:8080/v2/users/$BOOTSTRAP_USER_ID" --header "Authorization: Bearer $BOOTSTRAP_PAT" >/tmp/vps-agent-delete-bootstrap-user.json
-  echo "Bootstrap human IAM owner removed."
+  if [ -z "$INTROSPECTION_CLIENT_ID" ] || [ -z "$INTROSPECTION_CLIENT_SECRET" ]; then
+    echo "Creating the private token-introspection API client..."
+    APP_RESPONSE="$(mktemp)"
+    chmod 600 "$APP_RESPONSE"
+    curl_zitadel_internal --fail \
+      --request POST \
+      --url "http://127.0.0.1:8080/management/v1/projects/$RESOURCE_PROJECT_ID/apps/api" \
+      --header "Authorization: Bearer $BOOTSTRAP_PAT" \
+      --header 'Content-Type: application/json' \
+      --data '{"name":"MCP VPS Agent Introspector","authMethodType":"API_AUTH_METHOD_TYPE_BASIC"}' \
+      >"$APP_RESPONSE"
 
-  # The short-lived bootstrap machine PAT is no longer needed.
-  docker run --rm -v mcp-vps-agent_zitadel-bootstrap:/zitadel/bootstrap alpine:3.22 rm -f /zitadel/bootstrap/bootstrap-admin.pat >/dev/null 2>&1 || true
+    read -r INTROSPECTION_APP_ID INTROSPECTION_CLIENT_ID INTROSPECTION_CLIENT_SECRET < <(
+      python3 - "$APP_RESPONSE" <<'PY'
+import json,shlex,sys
+x=json.load(open(sys.argv[1]))
+app=x.get("appId","")
+client=x.get("clientId","")
+secret=x.get("clientSecret","")
+assert app and client and secret, x
+print(shlex.quote(app), shlex.quote(client), shlex.quote(secret))
+PY
+    )
+    # The generated identifiers/secrets contain no shell whitespace; reject
+    # anything surprising instead of silently mangling credentials.
+    for value in "$INTROSPECTION_APP_ID" "$INTROSPECTION_CLIENT_ID" "$INTROSPECTION_CLIENT_SECRET"; do
+      [[ "$value" != *[[:space:]]* ]] || { echo "ERROR: unexpected whitespace in generated OAuth credential." >&2; exit 1; }
+    done
+    rm -f "$APP_RESPONSE"
+
+    upsert_env VPS_AGENT_INTEGRATED_INTROSPECTION_APP_ID "$INTROSPECTION_APP_ID"
+    upsert_env VPS_AGENT_INTEGRATED_INTROSPECTION_CLIENT_ID "$INTROSPECTION_CLIENT_ID"
+    upsert_env VPS_AGENT_INTEGRATED_INTROSPECTION_CLIENT_SECRET "$INTROSPECTION_CLIENT_SECRET"
+  fi
+fi
+
+AUDIENCE_SCOPE="urn:zitadel:iam:org:project:id:$RESOURCE_PROJECT_ID:aud"
+upsert_env VPS_AGENT_INTEGRATED_INTROSPECTION_URL "http://zitadel-auth-internal:8080/oauth/v2/introspect"
+upsert_env VPS_AGENT_INTEGRATED_INTROSPECTION_HOST "$DOMAIN"
+upsert_env VPS_AGENT_INTEGRATED_AUDIENCE_PROJECT_ID "$RESOURCE_PROJECT_ID"
+upsert_env VPS_AGENT_REQUIRED_SCOPES "openid $AUDIENCE_SCOPE"
+chmod 600 .env
+
+if [ "$NEEDS_BOOTSTRAP" -eq 1 ]; then
+  echo "Verifying the private introspection client..."
+  curl_zitadel_internal --fail \
+    --request POST \
+    --url "http://127.0.0.1:8080/oauth/v2/introspect" \
+    --user "$INTROSPECTION_CLIENT_ID:$INTROSPECTION_CLIENT_SECRET" \
+    --header 'Content-Type: application/x-www-form-urlencoded' \
+    --data 'token=deliberately-invalid-bootstrap-probe' \
+    >/tmp/vps-agent-introspection-probe.json
+  python3 - <<'PY'
+import json
+x=json.load(open("/tmp/vps-agent-introspection-probe.json"))
+assert x.get("active") is False, x
+print("PRIVATE TOKEN INTROSPECTION CLIENT: PASS")
+PY
+
+  # Re-read bootstrap identities while the PAT still works. Remove the human
+  # IAM owner first, then the machine IAM owner that issued this PAT. Deleting
+  # the machine last revokes the bootstrap credential at the authority itself.
+  curl_zitadel_internal --fail \
+    --request POST \
+    --url "http://127.0.0.1:8080/v2/users" \
+    --header "Authorization: Bearer $BOOTSTRAP_PAT" \
+    --header 'Content-Type: application/json' \
+    --data '{}' \
+    >/tmp/vps-agent-users.json
+
+  readarray -t BOOTSTRAP_IDS < <(python3 - "$DOMAIN" <<'PY'
+import json,sys
+domain=sys.argv[1].lower()
+data=json.load(open("/tmp/vps-agent-users.json"))
+human=[]
+machine=[]
+for user in data.get("result", []):
+    uid=user.get("userId","")
+    username=user.get("username","").lower()
+    h=user.get("human")
+    m=user.get("machine")
+    if h is not None:
+        email=(h.get("email") or {}).get("email","").lower()
+        if email == f"bootstrap-admin@{domain}" or username.startswith("bootstrap-admin@"):
+            human.append(uid)
+    if m is not None and (username.startswith("vps-agent-bootstrap") or (m.get("name","").lower() == "vps agent bootstrap")):
+        machine.append(uid)
+if len(human) > 1 or len(machine) > 1:
+    raise SystemExit("ambiguous bootstrap identity set")
+print(human[0] if human else "")
+print(machine[0] if machine else "")
+PY
+  )
+  BOOTSTRAP_HUMAN_ID="${BOOTSTRAP_IDS[0]:-}"
+  BOOTSTRAP_MACHINE_ID="${BOOTSTRAP_IDS[1]:-}"
+
+  if [ -n "$BOOTSTRAP_HUMAN_ID" ]; then
+    curl_zitadel_internal --fail \
+      --request DELETE \
+      --url "http://127.0.0.1:8080/v2/users/$BOOTSTRAP_HUMAN_ID" \
+      --header "Authorization: Bearer $BOOTSTRAP_PAT" \
+      >/tmp/vps-agent-delete-bootstrap-human.json
+    echo "Bootstrap human IAM owner removed."
+  fi
+
+  if [ -n "$BOOTSTRAP_MACHINE_ID" ]; then
+    curl_zitadel_internal --fail \
+      --request DELETE \
+      --url "http://127.0.0.1:8080/v2/users/$BOOTSTRAP_MACHINE_ID" \
+      --header "Authorization: Bearer $BOOTSTRAP_PAT" \
+      >/tmp/vps-agent-delete-bootstrap-machine.json
+    echo "Bootstrap machine IAM owner removed and its PAT revoked."
+  fi
+
+  docker run --rm \
+    -v mcp-vps-agent_zitadel-bootstrap:/zitadel/bootstrap \
+    alpine:3.22 \
+    rm -f /zitadel/bootstrap/bootstrap-admin.pat \
+    >/dev/null 2>&1 || true
+
+  python3 - "$MARKER" "$RESOURCE_PROJECT_ID" "$INTROSPECTION_APP_ID" <<'PY'
+import datetime,json,pathlib,sys
+path=pathlib.Path(sys.argv[1])
+project_id=sys.argv[2]
+app_id=sys.argv[3]
+data=json.loads(path.read_text())
+data["resource_project_id"]=project_id
+data["introspection_app_id"]=app_id
+data["bootstrap_complete"]=True
+data["bootstrap_completed_at"]=datetime.datetime.now(datetime.timezone.utc).isoformat()
+path.write_text(json.dumps(data,indent=2)+"\n")
+PY
+  chmod 600 "$MARKER"
 fi
 
 echo "Confirming OAuth dynamic-client discovery..."
