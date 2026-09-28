@@ -2,6 +2,7 @@ services:
   gateway:
     networks:
       - default
+      - integrated-auth
       - public-edge
     labels:
       - traefik.enable=true
@@ -74,8 +75,10 @@ services:
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap
     networks:
-      - integrated-auth
-      - public-edge
+      integrated-auth:
+        aliases:
+          - zitadel-auth-internal
+      public-edge:
     depends_on:
       zitadel-postgres:
         condition: service_healthy
