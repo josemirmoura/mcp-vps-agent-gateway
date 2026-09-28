@@ -60,9 +60,22 @@ Linux / systemd / Docker / files
 
 Docker is the packaging mechanism. The Broker is still a privileged component and must be treated like root on the delegated host. Server-side policy is authoritative.
 
-## Quick start
+## Requirements
 
-Requirements: a supported Linux VPS, Docker Engine + Docker Compose v2, Git, OpenSSL, Python 3 and curl. See [compatibility](docs/compatibility.md).
+Before starting the guided installation, have:
+
+- a Linux VPS; Ubuntu 24.04 LTS is the release-candidate validated target;
+- Docker Engine 24+ with Docker Compose v2;
+- at least 2 GB RAM for the bundled ZITADEL OAuth path;
+- Git, OpenSSL, Python 3 and curl;
+- a public DNS hostname pointing to the VPS, TCP 80/443 available and valid HTTPS;
+- **ChatGPT Plus or higher**, with Developer Mode and custom MCP app creation actually available in ChatGPT Web for the account.
+
+ChatGPT plan capabilities are controlled by OpenAI and can change by plan, account and rollout. Current OpenAI documentation describes full MCP support, including write/modify actions, for Business, Enterprise and Edu. If an account exposes only narrower read/fetch MCP capabilities, MCP VPS Agent Gateway cannot elevate that ChatGPT-side permission.
+
+See [compatibility](docs/compatibility.md) for the supported/tested matrix.
+
+## Quick start
 
 ~~~bash
 git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
