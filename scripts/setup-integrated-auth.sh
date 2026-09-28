@@ -18,9 +18,10 @@ Options:
   --bundled-proxy          Force the package Traefik instead of reusing one.
   -h, --help               Show this help.
 
-The operator password is requested without terminal echo. For CI/automation,
-VPS_AGENT_OPERATOR_PASSWORD may be supplied in the environment; do not put a
-real password on a shared command line.
+The dedicated OAuth operator password is requested locally without terminal
+echo. It is not the VPS/SSH password and must not be supplied to ChatGPT.
+For CI/automation, VPS_AGENT_OPERATOR_PASSWORD may be supplied in the
+environment; do not put a real password on a shared command line.
 EOF
 }
 
@@ -718,7 +719,8 @@ OAuth/OIDC issuer:
 Operator login:
   $OPERATOR_EMAIL
 
-The operator password was not written to this installer state.
+The dedicated OAuth operator password was not written to this installer state
+and was never requested by ChatGPT.
 
 Next:
   bash scripts/connect-chatgpt.sh
