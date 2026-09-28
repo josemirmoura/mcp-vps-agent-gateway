@@ -24,7 +24,7 @@ They are intended for final acceptance and may receive fixes before the correspo
 
 The current acceptance candidate identifies itself as `0.1.0-rc.3`. The earlier `v0.1.0-rc.1` tag is retained as immutable history after its release workflow failed before publication.
 
-The stable `v0.1.0` tag is created only after the owner's final clean-install human gate succeeds.
+The stable `v0.1.0` tag is created only after the owner's final clean-install operator acceptance gate succeeds.
 
 ## Release artifacts
 
