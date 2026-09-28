@@ -67,17 +67,39 @@ bearer_methods_supported:
   - header
 ~~~
 
-`scripts/verify-public.sh` verifies that metadata, OIDC discovery, DCR advertisement, S256 PKCE support, HTTPS and unauthenticated MCP denial.
+`scripts/verify-public.sh` verifies that metadata, required resource scopes, OIDC discovery, DCR advertisement, S256 PKCE, refresh-token support, private introspection credentials, HTTPS and unauthenticated MCP denial.
 
-## Why integrated token verification is different
+## Resource binding and private token introspection
 
-ZITADEL's MCP-oriented Dynamic Client Registration currently creates public OAuth clients that receive opaque bearer access tokens. Its DCR implementation accepts the RFC 8707 `resource` parameter but does not narrow the access-token audience to that resource.
+The integrated Authorization Server uses a dedicated ZITADEL project as the MCP resource audience.
 
-For that reason the integrated Gateway does **not** disable validation globally and does not add a generic "skip audience" switch.
+During bootstrap the package creates:
 
-Instead, integrated mode validates each bearer token online against the dedicated ZITADEL issuer's UserInfo endpoint. The resulting stable `sub` becomes the MCP subject. The Broker independently checks that subject against `VPS_AGENT_SUBJECT` before any non-admin operation.
+~~~text
+MCP VPS Agent Resource
+  └── API application: MCP VPS Agent Introspector
+~~~
 
-This model is intentionally scoped to the dedicated identity instance installed for this MCP. It should not be reused as a generic verifier for unrelated OAuth issuers.
+The project ID becomes a required OAuth scope:
+
+~~~text
+urn:zitadel:iam:org:project:id:<resource-project-id>:aud
+~~~
+
+ZITADEL adds that project ID to the access-token audience when the scope is granted. The Gateway then validates every opaque bearer token over the private Docker identity network using ZITADEL's RFC 7662 introspection endpoint.
+
+A token is accepted only when all of these are true:
+
+- introspection returns `active: true`;
+- `sub` is present;
+- `iss` exactly matches the public integrated issuer;
+- `exp` is still in the future;
+- `aud` contains the dedicated MCP resource project;
+- the token scopes include every scope advertised as required by the MCP protected resource.
+
+The introspection API client belongs to that same resource project. ZITADEL independently rejects introspection when the token audience does not contain that API client's client ID or project ID. The Gateway performs its own audience check as a second boundary.
+
+The introspection endpoint itself is not exposed as a management surface by the package. Gateway reaches it through the private `integrated-auth` Docker network. The introspection client secret is stored only in the local root-readable operator configuration and is redacted from diagnostic bundles.
 
 ## Dynamic Client Registration
 
@@ -101,7 +123,9 @@ The bootstrap IAM owner exists only during first-instance setup and is removed b
 - A public MCP URL is rejected unless the Gateway runs in integrated mode.
 - `verify-public.sh` rejects non-HTTPS public URLs.
 - public metadata must identify the expected resource and issuer.
-- integrated OIDC discovery must advertise DCR and S256 PKCE.
+- integrated OIDC discovery must advertise DCR, S256 PKCE and refresh-token support.
+- protected-resource metadata must advertise the dedicated ZITADEL resource-audience scope.
+- every accepted access token must be active, unexpired, from the expected issuer and bound to the dedicated resource project audience.
 - unauthenticated `/mcp` must return HTTP 401.
 - the Broker rechecks the exact expected subject and policy after Gateway authentication.
 - the Gateway still has no host root and no Docker socket.
