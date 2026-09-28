@@ -94,6 +94,14 @@ A successful phase ends with:
 INTEGRATED AUTH: READY
 ~~~
 
+The setup already runs the public verification. It can be rerun independently after any DNS, proxy or OAuth change:
+
+~~~bash
+bash scripts/verify-public.sh
+~~~
+
+That command validates the public HTTPS certificate/route, OAuth/OIDC discovery, protected-resource metadata, DCR/PKCE expectations, private token introspection and fail-closed unauthenticated MCP behavior.
+
 The script refuses to replace an unknown service already occupying 80/443.
 
 ## Phase 6 — Show the current ChatGPT Web tutorial
