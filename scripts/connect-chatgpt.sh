@@ -39,7 +39,12 @@ Authentication:
 Expected authenticated subject:
   ${VPS_AGENT_SUBJECT:-operator}
 
-Current OpenAI flow (checked 2026-09-27):
+Current OpenAI product gate (checked 2026-09-28):
+- Full custom MCP, including write/modify actions: ChatGPT Business, Enterprise and Edu.
+- ChatGPT Pro: custom MCP is limited to read/fetch and does not certify this project's full write-capable surface.
+- If your current account/workspace does not expose Developer Mode + Apps -> Create, stop here. The VPS/public OAuth side remains ready; installation cannot be marked complete on that account.
+
+Current OpenAI connection flow:
 1. Open ChatGPT on the web.
 2. If custom MCP apps are available on your account/workspace, enable Developer Mode as permitted by your role.
 3. Open Settings / Workspace Settings -> Apps -> Create.
