@@ -13,6 +13,8 @@ set +a
 PUBLIC_URL="${VPS_AGENT_PUBLIC_URL:-}"
 AUTH_MODE="${VPS_AGENT_AUTH_MODE:-static}"
 ISSUER="${VPS_AGENT_OIDC_ISSUER:-}"
+AUDIENCE_PROJECT_ID="${VPS_AGENT_INTEGRATED_AUDIENCE_PROJECT_ID:-}"
+REQUIRED_SCOPES="${VPS_AGENT_REQUIRED_SCOPES:-}"
 
 if [ -z "$PUBLIC_URL" ]; then
   echo "VPS_AGENT_PUBLIC_URL is required." >&2
@@ -34,6 +36,18 @@ if [ -z "$ISSUER" ]; then
   echo "VPS_AGENT_OIDC_ISSUER is required in integrated mode." >&2
   exit 1
 fi
+if [ -z "$AUDIENCE_PROJECT_ID" ]; then
+  echo "VPS_AGENT_INTEGRATED_AUDIENCE_PROJECT_ID is required in integrated mode." >&2
+  exit 1
+fi
+AUDIENCE_SCOPE="urn:zitadel:iam:org:project:id:$AUDIENCE_PROJECT_ID:aud"
+case " $REQUIRED_SCOPES " in
+  *" openid "*" $AUDIENCE_SCOPE "*) ;;
+  *)
+    echo "Integrated OAuth must require both openid and the dedicated resource audience scope." >&2
+    exit 1
+    ;;
+esac
 
 ORIGIN="$(printf '%s' "$PUBLIC_URL" | sed -E 's#^(https://[^/]+).*$#\1#')"
 METADATA_URL="${VPS_AGENT_RESOURCE_METADATA_URL:-$ORIGIN/.well-known/oauth-protected-resource}"
@@ -48,15 +62,18 @@ echo "Checking OAuth Protected Resource Metadata..."
 curl --fail --silent --show-error "$METADATA_URL" >/tmp/vps-agent-prm.json
 cat /tmp/vps-agent-prm.json
 
-python3 - "$RESOURCE" "$ISSUER" <<'PY'
+python3 - "$RESOURCE" "$ISSUER" "$REQUIRED_SCOPES" <<'PY'
 import json, sys
-resource, issuer = sys.argv[1:]
+resource, issuer, required_raw = sys.argv[1:]
 data = json.load(open("/tmp/vps-agent-prm.json"))
 assert data.get("resource") == resource, (data, resource)
 servers = [x.rstrip("/") for x in data.get("authorization_servers", [])]
 assert issuer.rstrip("/") in servers, (data, issuer)
 assert "header" in data.get("bearer_methods_supported", []), data
-print("OAUTH DISCOVERY: PASS")
+required=set(required_raw.split())
+advertised=set(data.get("scopes_supported", []))
+assert required <= advertised, (required, advertised)
+print("OAUTH PROTECTED RESOURCE + SCOPES: PASS")
 PY
 
 echo
@@ -79,6 +96,18 @@ assert "refresh_token" in grants, data
 token_auth=data.get("token_endpoint_auth_methods_supported", [])
 assert "none" in token_auth, data
 print("INTEGRATED OAUTH DISCOVERY + DCR + PKCE + REFRESH: PASS")
+PY
+
+echo
+echo "Checking private audience-bound token introspection..."
+docker compose exec -T gateway sh -c '
+  curl --fail --silent --show-error     --request POST     --url "$VPS_AGENT_INTEGRATED_INTROSPECTION_URL"     --user "$VPS_AGENT_INTEGRATED_INTROSPECTION_CLIENT_ID:$VPS_AGENT_INTEGRATED_INTROSPECTION_CLIENT_SECRET"     --header "Host: $VPS_AGENT_INTEGRATED_INTROSPECTION_HOST"     --header "X-Forwarded-Proto: https"     --header "Content-Type: application/x-www-form-urlencoded"     --data "token=deliberately-invalid-verification-probe"
+' >/tmp/vps-agent-introspection-probe.json
+python3 - <<'PY'
+import json
+x=json.load(open("/tmp/vps-agent-introspection-probe.json"))
+assert x.get("active") is False, x
+print("PRIVATE AUDIENCE-BOUND INTROSPECTION: PASS")
 PY
 
 echo
