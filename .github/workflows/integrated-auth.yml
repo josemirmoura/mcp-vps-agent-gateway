@@ -222,7 +222,9 @@ jobs:
             -X POST http://zitadel-api:8080/oauth/v2/revoke \
             -u "$PROBE_CLIENT_ID:$PROBE_CLIENT_SECRET" \
             -H 'Content-Type: application/x-www-form-urlencoded' \
+            --data-urlencode "client_id=$PROBE_CLIENT_ID" \
             --data-urlencode "token=$ACCESS_TOKEN" \
+            --data-urlencode "token_type_hint=access_token" \
             >/tmp/revoke-response.txt
 
           curl_ci \
