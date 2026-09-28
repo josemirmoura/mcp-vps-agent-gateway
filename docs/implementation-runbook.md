@@ -1,6 +1,8 @@
 # Implementation runbook
 
-This is the detailed build path. The canonical architecture is docs/architecture.md and the gate sequence is docs/mvp-first.md.
+> Historical build path. The broad Scoped runtime, durable state/jobs, integrated OAuth and optional elevation code now exist. Use this document to understand implementation sequencing, not as the current project status. Current status lives in [project-status.md](project-status.md); current productization work must not reopen completed gates without concrete evidence.
+
+This is the detailed build path that guided implementation. The canonical architecture is docs/architecture.md and the gate sequence is docs/mvp-first.md.
 
 ## 0. Ground rules
 
@@ -319,15 +321,15 @@ Landlock is optional defense-in-depth.
 
 ## 9. ChatGPT authentication/distribution
 
-Follow docs/chatgpt-integration.md.
+This stage is implemented for the supported integrated self-hosted OAuth path. Follow docs/chatgpt-integration.md and docs/authentication.md.
 
-Do not add OAuth merely because the north-star architecture mentions it. Add the authentication required by the chosen deployment route.
-
-For OAuth/OIDC validate issuer, audience/resource, signature, expiration, subject and scopes.
+The implementation validates active token state, issuer, dedicated audience/resource, expiration, subject and required scopes through private introspection, while the Broker rechecks the expected subject and policy.
 
 ## 10. Gate 5 elevation
 
-Only after Scoped proves insufficient.
+Optional elevation machinery exists and is acceptance-tested, but it does not constitute a Full/R5 production claim. Full remains disabled by default and Scoped remains the supported product path.
+
+Historical gate rule: only add elevation after Scoped proves insufficient.
 
 Enable feature:
 
