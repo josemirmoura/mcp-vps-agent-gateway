@@ -85,6 +85,7 @@ O script:
 - se não houver Traefik, sobe o Traefik do pacote automaticamente quando 80/443 estiverem livres;
 - sobe ZITADEL + PostgreSQL com versões fixadas;
 - cria uma identidade dedicada e não administrativa para o operador da VPS;
+- cria uma audiência OAuth exclusiva para o MCP e um cliente privado de introspecção;
 - habilita Dynamic Client Registration (DCR) compatível com MCP e discovery de PKCE;
 - configura o Gateway como protected resource OAuth;
 - prende o Broker exatamente ao subject desse operador;
