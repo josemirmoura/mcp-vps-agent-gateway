@@ -81,7 +81,7 @@ bash scripts/connect-chatgpt.sh</code></pre>
       </div>
       <p>The setup script asks locally for the dedicated OAuth operator email and password, then handles the rest: existing Traefik detection or bundled edge on a clean VPS, TLS, ZITADEL + PostgreSQL, dedicated operator identity, MCP-only resource audience, private token introspection, DCR, PKCE discovery, Gateway/Broker identity binding and public verification.</p>
       <p><strong>No VPS or SSH credentials are given to ChatGPT.</strong> The supported installation never requires a VPS password, private SSH key or unrestricted remote admin access to be shared with ChatGPT or a maintainer.</p>
-      <p><code>connect-chatgpt.sh</code> does not declare victory when it merely prints instructions. It waits until ChatGPT actually calls <code>system.info</code> and the Broker audit confirms the authenticated request.</p>
+      <p><code>connect-chatgpt.sh</code> does not declare victory when it merely prints instructions. It waits until ChatGPT actually calls <code>system.info</code> and the Broker audit confirms the authenticated request. Only then does it print <code>INSTALLATION COMPLETE</code>.</p>
     </section>
 
     <section class="grid two">
