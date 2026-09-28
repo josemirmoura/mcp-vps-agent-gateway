@@ -20,10 +20,17 @@ case "$cmd" in
       if [ -n "$cid" ]; then
         printf "%s health: " "$service"
         docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid"
+        printf "%s restarts: " "$service"
+        docker inspect -f '{{.RestartCount}}' "$cid"
       fi
     done
     echo
+    docker compose exec -T broker /usr/local/bin/vps-agent health
+    echo
     docker compose exec -T broker /usr/local/bin/vps-agent audit-status
+    ;;
+  health)
+    docker compose exec -T broker /usr/local/bin/vps-agent health
     ;;
   logs)
     tail="${2:-200}"
@@ -53,6 +60,17 @@ PY
     trap 'rm -rf "$tmp"' EXIT
 
     docker compose ps >"$tmp/compose-ps.txt" 2>&1 || true
+    {
+      for service in broker gateway; do
+        cid="$(docker compose ps -q "$service" 2>/dev/null || true)"
+        if [ -n "$cid" ]; then
+          printf "%s health=" "$service"
+          docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid" || true
+          printf "%s restarts=" "$service"
+          docker inspect -f '{{.RestartCount}}' "$cid" || true
+        fi
+      done
+    } >"$tmp/container-runtime.txt" 2>&1
     docker version >"$tmp/docker-version.txt" 2>&1 || true
     docker compose version >"$tmp/compose-version.txt" 2>&1 || true
     uname -a >"$tmp/uname.txt" 2>&1 || true
@@ -66,6 +84,7 @@ PY
       printf "oidc_issuer=%s\n" "${VPS_AGENT_OIDC_ISSUER:-}"
     } >"$tmp/runtime.txt"
 
+    docker compose exec -T broker /usr/local/bin/vps-agent health >"$tmp/health.json" 2>&1 || true
     docker compose exec -T broker /usr/local/bin/vps-agent audit-status >"$tmp/audit-status.json" 2>&1 || true
     docker compose exec -T broker /usr/local/bin/vps-agent audit-tail --limit 200 >"$tmp/audit-tail.json" 2>&1 || true
     docker compose logs --no-color --tail 500 >"$tmp/logs.raw" 2>&1 || true
@@ -74,7 +93,7 @@ PY
 import pathlib, re, sys
 root=pathlib.Path(sys.argv[1])
 secrets=[x for x in sys.argv[2:] if x]
-for name in ("logs.raw","audit-tail.json","audit-status.json"):
+for name in ("logs.raw","health.json","audit-tail.json","audit-status.json"):
     p=root/name
     if not p.exists():
         continue
@@ -97,7 +116,7 @@ PY
     echo "$output"
     ;;
   *)
-    echo "usage: $0 [status|logs [lines]|audit [limit]|bundle [output.tar.gz]]" >&2
+    echo "usage: $0 [status|health|logs [lines]|audit [limit]|bundle [output.tar.gz]]" >&2
     exit 2
     ;;
 esac
