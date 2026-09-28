@@ -19,6 +19,7 @@ This document tracks the public-productization checklist against the current rel
 - [x] status/health/log/audit/diagnostic-bundle operator workflows;
 - [x] diagnostic bundle redaction retained;
 - [x] stable-by-default update channel;
+- [x] explicit update-availability check via `scripts/version.sh --check`;
 - [x] backup, migration validation and automatic rollback preserved;
 - [x] safe remove and purge behavior preserved;
 - [x] landing page productized;
@@ -37,15 +38,15 @@ This document tracks the public-productization checklist against the current rel
 
 ## Validation gates for this branch
 
-- [ ] pull request opened;
-- [ ] reference implementation CI green;
-- [ ] integrated-auth component acceptance green;
-- [ ] Docker package acceptance green;
-- [ ] lifecycle acceptance including guided install green;
-- [ ] full ephemeral Scoped acceptance green;
-- [ ] ephemeral VPS proof green;
-- [ ] simultaneous independent-instance acceptance green;
-- [ ] final cross-review after CI evidence.
+- [x] pull request opened;
+- [x] reference implementation CI green;
+- [x] integrated-auth component acceptance green;
+- [x] Docker package acceptance green;
+- [x] lifecycle acceptance including guided install green;
+- [x] full ephemeral Scoped acceptance green;
+- [x] ephemeral VPS proof green;
+- [x] simultaneous independent-instance acceptance green;
+- [x] final cross-review after CI evidence.
 
 ## Deliberately not completed here
 
