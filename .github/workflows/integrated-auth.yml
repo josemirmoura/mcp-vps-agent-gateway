@@ -126,6 +126,43 @@ jobs:
           print('DEDICATED OPERATOR: PASS')
           PY
 
+          curl_ci             -X POST http://zitadel-api:8080/management/v1/projects             -H "Authorization: Bearer $PAT"             -H 'Content-Type: application/json'             --data '{"name":"MCP VPS Agent Resource CI"}'             > /tmp/resource-project.json
+          RESOURCE_PROJECT_ID="$(python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/resource-project.json'))
+          value=x.get('id','')
+          assert value, x
+          print(value)
+          PY
+          )"
+          test -n "$RESOURCE_PROJECT_ID"
+
+          curl_ci             -X POST "http://zitadel-api:8080/management/v1/projects/$RESOURCE_PROJECT_ID/apps/api"             -H "Authorization: Bearer $PAT"             -H 'Content-Type: application/json'             --data '{"name":"MCP VPS Agent Introspector CI","authMethodType":"API_AUTH_METHOD_TYPE_BASIC"}'             > /tmp/introspection-app.json
+          readarray -t INTROSPECTION_VALUES < <(python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/introspection-app.json'))
+          for key in ('appId','clientId','clientSecret'):
+              value=x.get(key,'')
+              assert value, x
+              print(value)
+          PY
+          )
+          test "${#INTROSPECTION_VALUES[@]}" -eq 3
+          INTROSPECTION_CLIENT_ID="${INTROSPECTION_VALUES[1]}"
+          INTROSPECTION_CLIENT_SECRET="${INTROSPECTION_VALUES[2]}"
+          echo "::add-mask::$INTROSPECTION_CLIENT_SECRET"
+
+          curl_ci             -X POST http://zitadel-api:8080/oauth/v2/introspect             -u "$INTROSPECTION_CLIENT_ID:$INTROSPECTION_CLIENT_SECRET"             -H 'Content-Type: application/x-www-form-urlencoded'             --data 'token=deliberately-invalid-component-probe'             > /tmp/introspection-probe.json
+          python3 - "$RESOURCE_PROJECT_ID" <<'PY'
+          import json,sys
+          project=sys.argv[1]
+          x=json.load(open('/tmp/introspection-probe.json'))
+          assert x.get('active') is False, x
+          scope=f"urn:zitadel:iam:org:project:id:{project}:aud"
+          assert scope.endswith(':aud')
+          print('AUDIENCE RESOURCE + PRIVATE INTROSPECTION CLIENT: PASS')
+          PY
+
           curl_ci http://zitadel-api:8080/.well-known/openid-configuration > /tmp/oidc-after.json
           python3 - <<'PY'
           import json
