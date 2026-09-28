@@ -165,12 +165,15 @@ Do not include plaintext secrets unless intentionally encrypted.
 ### Scoped production
 Require:
 
-- Gate 0A/0B passed
-- Gate 1 passed
-- Gate 2 real-stack pilot passed
-- recovery tested for enabled state/jobs
-- secret path tested if secrets are used
-- Gateway/Broker removal leaves workloads running
+- Gate 0A/0B and the typed privileged path passed;
+- Scoped real-stack behavior proven for the documented use case;
+- recovery tested for enabled state/jobs;
+- secret path tested if secrets are used;
+- Gateway/Broker removal leaves workloads running;
+- release compatibility/support boundaries documented;
+- long-running reliability evidence appropriate to the production claim.
+
+The release candidate satisfies the implementation/E2E gates but does not yet claim the long-running R4 reliability history.
 
 ### Full production
 Additionally require:

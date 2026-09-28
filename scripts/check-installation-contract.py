@@ -7,6 +7,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 SUPPORTED = [
     "README.md",
     "README.pt-BR.md",
+    "docs/quick-start.md",
     "docs/installer-flow.md",
     "docs/chatgpt-integration.md",
     "site/index.html",
@@ -22,6 +23,10 @@ DEVELOPMENT_ONLY_LITERALS = [
     "public-endpoint-probe",
     "real-vps-preflight",
     "TRAEFIK DEFAULT CERT",
+    "josemir-proof",
+    "josemir-human-proof",
+    "/opt/josemir-agradece-seu-gpt",
+    "Josemir agradece seu GPT",
 ]
 
 DANGEROUS_PATTERNS = [
@@ -61,9 +66,32 @@ for rel in SUPPORTED:
         if pattern.search(text):
             errors.append(f"{rel}: prohibited credential/remote-access instruction matched: {pattern.pattern}")
 
+
+# Repository-wide public sanitization guard. The literal definitions above live
+# in this file by design, so this checker excludes itself from the scan.
+for path in ROOT.rglob("*"):
+    if not path.is_file():
+        continue
+    rel = path.relative_to(ROOT).as_posix()
+    if rel == "scripts/check-installation-contract.py":
+        continue
+    if rel.startswith((".git/", "state/", "backups/", "diagnostics/", "dist/", "evidence/")):
+        continue
+    try:
+        text = path.read_text(errors="replace")
+    except OSError:
+        continue
+    for literal in DEVELOPMENT_ONLY_LITERALS:
+        if literal.lower() in text.lower():
+            errors.append(f"{rel}: development-only literal leaked into repository: {literal}")
+    for pattern in DANGEROUS_PATTERNS[:3]:
+        if pattern.search(text):
+            errors.append(f"{rel}: sensitive credential material matched repository guard")
+
 required_flow = {
-    "README.md": ["scripts/setup-integrated-auth.sh", "scripts/connect-chatgpt.sh"],
-    "README.pt-BR.md": ["scripts/setup-integrated-auth.sh", "scripts/connect-chatgpt.sh"],
+    "docs/quick-start.md": ["scripts/install.sh", "INSTALLATION COMPLETE"],
+    "README.md": ["scripts/install.sh"],
+    "README.pt-BR.md": ["scripts/install.sh"],
     "docs/installer-flow.md": [
         "scripts/setup-integrated-auth.sh",
         "scripts/verify-public.sh",
@@ -81,6 +109,7 @@ for rel, markers in required_flow.items():
             errors.append(f"{rel}: required supported-flow marker missing: {marker}")
 
 completion_files = [
+    "docs/quick-start.md",
     "README.md",
     "README.pt-BR.md",
     "docs/installer-flow.md",

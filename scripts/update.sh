@@ -2,6 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=scripts/lib/product.sh
+source scripts/lib/product.sh
+
 if [ ! -f .env ] || [ ! -f config/policy.yaml ]; then
   echo "Missing .env or config/policy.yaml. Run ./scripts/init.sh first." >&2
   exit 1
@@ -16,7 +19,26 @@ set -a
 set +a
 
 current="$(git rev-parse HEAD)"
-target="${VPS_AGENT_UPDATE_REF:-origin/main}"
+current_label="$(git describe --tags --exact-match 2>/dev/null || true)"
+[ -n "$current_label" ] || current_label="$(vps_agent_version)+${current:0:12}"
+
+git fetch --tags origin
+
+if [ -n "${VPS_AGENT_UPDATE_REF:-}" ]; then
+  target="$VPS_AGENT_UPDATE_REF"
+  channel="explicit"
+else
+  target="$(git tag -l 'v[0-9]*' --sort=-v:refname | grep -Ev -- '-' | head -n 1 || true)"
+  channel="stable"
+  if [ -z "$target" ]; then
+    echo "No stable SemVer release tag is available yet." >&2
+    echo "main is intentionally not an automatic production update channel." >&2
+    echo "For release-candidate testing, select a target explicitly, for example:" >&2
+    echo "  VPS_AGENT_UPDATE_REF=v0.1.0-rc.2 bash scripts/update.sh" >&2
+    exit 2
+  fi
+fi
+
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 backup_dir="backups/$stamp"
 mkdir -p "$backup_dir"
@@ -33,10 +55,19 @@ if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ] && [ -f compose.integrated-auth
   fi
 fi
 
-echo "Current version: $current"
-git fetch --tags origin
+vps_agent_banner
+echo "Update channel:  $channel"
+echo "Current version: $current_label"
+echo "Current commit:  $current"
 target_sha="$(git rev-parse "$target")"
-echo "Target version:  $target_sha"
+target_label="$target"
+target_product_version="$(git show "$target_sha:VERSION" 2>/dev/null | tr -d '[:space:]' || true)"
+[ -n "$target_product_version" ] && target_label="$target_product_version ($target)"
+echo "Target version:  $target_label"
+echo "Target commit:   $target_sha"
+echo
+echo "Changes:"
+git log --oneline --no-decorate "$current..$target_sha" | head -n 12 || true
 if [ "$current" = "$target_sha" ]; then
   echo "Already at target version."
   exit 0

@@ -2,6 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=scripts/lib/product.sh
+source scripts/lib/product.sh
+
 if [ ! -f .env ]; then
   echo "Missing .env. Run ./scripts/init.sh first." >&2
   exit 1
@@ -33,6 +36,7 @@ redaction_secrets=(
 cmd="${1:-status}"
 case "$cmd" in
   status)
+    printf "%s %s\n\n" "$VPS_AGENT_PRODUCT_NAME" "$(vps_agent_version)"
     "${compose[@]}" ps
     echo
     for service in broker gateway; do
@@ -97,6 +101,7 @@ PY
     git rev-parse HEAD >"$tmp/git-head.txt" 2>&1 || true
 
     {
+      printf "product_version=%s\n" "$(vps_agent_version)"
       printf "instance_id=%s\n" "${VPS_AGENT_INSTANCE_ID:-}"
       printf "instance_name=%s\n" "${VPS_AGENT_INSTANCE_NAME:-}"
       printf "auth_mode=%s\n" "${VPS_AGENT_AUTH_MODE:-}"

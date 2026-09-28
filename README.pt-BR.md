@@ -2,7 +2,7 @@
 
 Plano de controle MCP orientado a segurança para permitir que ChatGPT ou outro cliente MCP trabalhe numa VPS Linux com a autoridade escolhida explicitamente pelo dono da VPS.
 
-> **Status: candidato a release no que depende de aceitação automatizada.** Os workflows em Ubuntu 24.04 validam o pacote Docker de ponta a ponta. O gate restante é o OAuth integrado e auto-hospedado mais uma chamada real auditada do ChatGPT contra a VPS.
+> **Status: candidato em productização pré-release.** Os workflows em Ubuntu 24.04 validam o pacote de ponta a ponta, e o caminho OAuth integrado e auto-hospedado foi verificado por uma chamada real auditada de `system.info` feita pelo ChatGPT Web em 28/09/2026. Ainda faltam a primeira release pública estável, uma promessa formal de compatibilidade e evidência de confiabilidade prolongada em produção.
 
 ## A ideia
 
@@ -42,89 +42,35 @@ Docker é o mecanismo de empacotamento. O Broker continua sendo um componente pr
 
 ## Começo rápido
 
-Requisitos: VPS Linux, Docker Engine, plugin Docker Compose, Git, OpenSSL e Python 3.
+Requisitos: VPS Linux suportada, Docker Engine + Docker Compose v2, Git, OpenSSL, Python 3 e curl. Veja [compatibilidade](docs/compatibility.md).
 
 ~~~bash
-git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git &&
-cd mcp-vps-agent-gateway &&
-sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 /opt/vps-agent-sandbox &&
-bash scripts/init.sh --scope /opt/vps-agent-sandbox &&
-docker compose up -d --build &&
-bash scripts/verify.sh
+git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
+cd mcp-vps-agent-gateway
+bash scripts/install.sh
 ~~~
 
-O Começo rápido delega propositalmente apenas `/opt/vps-agent-sandbox`; troque esse caminho pelo diretório que você quer entregar ao MCP. A cadeia com `&&` para imediatamente se alguma etapa falhar.
-
-O bootstrap cria segredos locais aleatórios, ID estável da instância, estado e uma policy do operador **fora do Git**, a partir de config/policy.example.yaml. `--scope` grava `VPS_AGENT_SCOPE_ROOT` no `.env` e migra os caminhos da policy padrão a partir do escopo anterior. O diretório escolhido precisa existir; agora o bootstrap falha antes de qualquer build Docker quando ele não existe. A autoridade continua sendo escolhida explicitamente pelo usuário.
-
-A verificação local prova health, negação de token inválido, chamada MCP real de system.info e integridade do audit chain. **A instalação ainda não terminou.**
-
-### Limite do procedimento suportado
-
-O fluxo documentado é autônomo na própria VPS do usuário. Comandos temporários usados por mantenedores durante desenvolvimento ou validação não são requisitos de instalação. O tutorial suportado nunca pede que o usuário exponha senha da VPS, chave SSH privada, acesso administrativo remoto irrestrito ou segredos não relacionados ao serviço ao ChatGPT ou a um mantenedor.
-
-A senha do operador OAuth integrado é digitada localmente no script de configuração porque é uma credencial deste serviço. Ela não é uma credencial SSH/VPS e não é fornecida ao ChatGPT. Veja o [contrato de instalação](docs/installation-contract.md).
-
-### Autoridade de filesystem sobre o host inteiro
-
-Scoped é o padrão. Para expor deliberadamente o filesystem inteiro ao Broker, use o override explícito:
-
-~~~bash
-sed -i 's/^VPS_AGENT_WHOLE_HOST=.*/VPS_AGENT_WHOLE_HOST=1/' .env
-docker compose -f compose.yaml -f compose.host.yaml up -d --build
-~~~
-
-`compose.host.yaml` é a chave deliberada de whole-host e define `/` como teto físico do Broker. A policy server-side continua controlando quais operações MCP são permitidas.
-### Terminar a instalação: OAuth integrado + ChatGPT
-
-O caminho público suportado é OAuth/OIDC auto-hospedado dentro deste pacote. Não é necessário contratar um provedor de identidade externo nem usar um túnel separado.
-
-Antes do próximo comando, crie um registro DNS A/AAAA para um domínio ou subdomínio seu apontando para a VPS. Depois rode:
-
-~~~bash
-bash scripts/setup-integrated-auth.sh
-~~~
-
-O script:
-
-- reaproveita um único Traefik já existente quando ele é a borda da VPS;
-- se não houver Traefik, sobe o Traefik do pacote automaticamente quando 80/443 estiverem livres;
-- sobe ZITADEL + PostgreSQL com versões fixadas;
-- cria uma identidade dedicada e não administrativa para o operador da VPS;
-- cria uma audiência OAuth exclusiva para o MCP e um cliente privado de introspecção;
-- habilita Dynamic Client Registration (DCR) compatível com MCP e discovery de PKCE;
-- configura o Gateway como protected resource OAuth;
-- prende o Broker exatamente ao subject desse operador;
-- valida HTTPS, discovery OAuth e negação fail-closed sem autenticação.
-
-O script pede e-mail e senha do operador de forma interativa. A senha é enviada somente à API local de bootstrap do ZITADEL e não é armazenada pelo instalador.
-
-Antes da etapa do ChatGPT, confirme que a conta/workspace de destino realmente mostra Modo de Desenvolvedor / Plugins com a opção de criar um aplicativo MCP personalizado. Não deduza a disponibilidade apenas pelo nome do plano; os rollouts de produto da OpenAI podem mudar independentemente deste projeto.
-
-Depois:
-
-~~~bash
-bash scripts/connect-chatgpt.sh
-~~~
-
-O script mostra o fluxo de conexão no ChatGPT e espera uma **nova chamada auditada de system.info feita pelo ChatGPT**.
+O terminal conduz o fluxo suportado:
 
 ~~~text
-OAuth integrado pronto
- -> ChatGPT descobre recurso MCP + authorization server
- -> ChatGPT registra dinamicamente seu cliente OAuth
- -> operador faz login
- -> ChatGPT chama o MCP
- -> Gateway autentica
- -> Broker valida subject + policy
- -> operação autorizada chega à VPS
- -> audit registra
+Ambiente
+ -> Escopo: Project / Custom / Whole Host
+ -> revisão da autoridade efetiva
+ -> Containers
+ -> Verificação local
+ -> HTTPS + OAuth integrado
+ -> Conectar ChatGPT
+ -> system.info real e auditado
  -> INSTALAÇÃO CONCLUÍDA
 ~~~
 
-Sem a chamada real, a instalação permanece incompleta.
+**Project** é o padrão recomendado. **Whole Host** muda o teto físico do filesystem para `/`, mas não habilita Full nem rede irrestrita. Filesystem e capabilities continuam dimensões separadas da policy.
 
-A interface e a disponibilidade de recursos do ChatGPT mudam com o tempo e devem ser conferidas na hora do release/setup. O servidor MCP continua baseado em padrões e o caminho suportado não exige provedor de identidade externo.
+A orquestração é fina e transparente. Os scripts individuais `init.sh`, Compose, `verify.sh`, OAuth e ChatGPT continuam disponíveis e documentados. Veja o [Quick Start](docs/quick-start.md) e o [fluxo de instalação](docs/installer-flow.md).
+
+O fluxo suportado é autônomo na própria VPS do usuário. Ele nunca pede senha da VPS, chave SSH privada, acesso administrativo remoto irrestrito ou segredos não relacionados ao serviço para ChatGPT ou mantenedor.
+
+Durante o release candidate, `main` continua sendo desenvolvimento. Depois que o gate humano final congelar `v0.1.0`, instalações normais devem usar o checkout da tag estável.
 
 ## Caixa de ferramentas
 
@@ -170,15 +116,23 @@ VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge
 A remoção segura preserva configuração e auditoria. O purge exige confirmação explícita e remove apenas artefatos do MCP. O update faz backup da configuração/estado, usa Git fast-forward, verifica o runtime novo e restaura código/estado anterior se a verificação falhar.
 ## Documentação
 
+- [Quick Start](docs/quick-start.md)
 - [Contrato de instalação](docs/installation-contract.md)
 - [Modelo do produto](docs/product-model.md)
-- [Fluxo Docker e primeira execução](docs/installer-flow.md)
+- [Operação](docs/operations.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Compatibilidade](docs/compatibility.md)
+- [Privacidade e telemetria](docs/privacy.md)
+- [Política de releases](docs/releases.md)
+- [Suporte](docs/support.md)
 - [Arquitetura](docs/architecture.md)
 - [Autenticação](docs/authentication.md)
-- [Múltiplas instâncias](docs/multi-instance.md)
 - [Integração ChatGPT](docs/chatgpt-integration.md)
-- [Threat model](docs/threat-model.md)
-- [Hardening](docs/security-hardening-v2.md)
+- [Matriz de segurança do release](docs/security-release.md)
+
+## Contribuição
+
+Veja [CONTRIBUTING.md](CONTRIBUTING.md) para princípios de engenharia e validação e [SECURITY.md](SECURITY.md) para orientação de reporte privado de vulnerabilidades.
 
 ## Licença
 

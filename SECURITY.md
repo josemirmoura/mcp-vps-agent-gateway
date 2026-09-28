@@ -1,16 +1,29 @@
 # Security Policy
 
+## Supported versions
+
+Security fixes target the newest supported release line.
+
+| Version | Status |
+| --- | --- |
+| 0.1.x | release-candidate / initial public line |
+| main | development, not a stable support promise |
+
 ## Reporting a vulnerability
 
-Please report security issues privately to the repository maintainer instead of opening a public issue with exploit details.
+Do **not** open a public issue containing exploit details, credentials or sensitive infrastructure information.
+
+Use the repository's private Security reporting/advisory surface when it is available. If private reporting is not exposed for the repository, contact the maintainer through the GitHub profile without publishing the exploit, then establish a private channel before sending sensitive reproduction material.
 
 Include when possible:
 
-- affected component
-- reproduction steps
-- expected vs actual behavior
-- impact
-- suggested mitigation
+- affected version/component;
+- reproduction conditions;
+- expected vs actual behavior;
+- security impact;
+- suggested mitigation.
+
+Never send real production passwords, private SSH keys or unrelated secrets as reproduction material.
 
 ## Security posture
 
@@ -18,15 +31,20 @@ This project assumes AI-generated actions, remote clients and external content c
 
 Deliberate security requirements include:
 
-- no root MCP Gateway
-- no direct Docker socket for the Gateway
-- deny-by-default authorization
-- human-approved temporary elevation
-- Unix-socket-only privileged Broker
-- filesystem escape resistance
-- sandboxed shell execution
-- idempotent writes where practical
-- redacted audit logs
-- no secrets committed to the repository
+- non-root MCP Gateway;
+- no direct Docker socket or host root for Gateway;
+- local-only privileged Broker over Unix socket;
+- deny-by-default Broker authorization;
+- exact subject/resource/action re-authorization;
+- human-approved temporary elevation when enabled;
+- filesystem traversal and symlink-escape resistance;
+- sandboxed scoped shell execution;
+- replay/idempotency controls;
+- redacted operational diagnostics;
+- no secrets committed to the repository;
+- Full disabled by default;
+- unrestricted network separate from Full.
 
-A change that weakens one of these properties should be treated as a security-sensitive architectural change.
+The supported public path additionally validates integrated OAuth/OIDC issuer, active state, expiration, dedicated audience and required scopes through private token introspection.
+
+A change that weakens one of these properties is a security-sensitive architectural change and requires negative tests.

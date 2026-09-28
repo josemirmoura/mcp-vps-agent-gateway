@@ -27,7 +27,7 @@ GitHub-hosted Ubuntu runner
 ~~~json
 {
   "id": "example-file",
-  "subject": "josemir-proof",
+  "subject": "proof-operator",
   "type": "file_write_read",
   "path": "/var/lib/vps-agent/proof/example.txt",
   "content": "hello"
@@ -39,7 +39,7 @@ GitHub-hosted Ubuntu runner
 ~~~json
 {
   "id": "example-deny",
-  "subject": "josemir-proof",
+  "subject": "proof-operator",
   "type": "file_read_denied",
   "path": "/etc/shadow"
 }
@@ -50,7 +50,7 @@ GitHub-hosted Ubuntu runner
 ~~~json
 {
   "id": "example-restart",
-  "subject": "josemir-proof",
+  "subject": "proof-operator",
   "type": "service_restart",
   "service": "vps-agent-test.service"
 }

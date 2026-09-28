@@ -47,6 +47,15 @@ jobs:
           fi
       - name: Validate supported installation documentation
         run: python3 scripts/check-installation-contract.py
+      - name: Validate productization metadata and documentation links
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' VERSION
+          bash scripts/version.sh
+          bash scripts/install.sh --help >/dev/null
+          python3 scripts/authority-summary.py --env .env.example --policy config/policy.example.yaml >/dev/null
+          python3 scripts/check-doc-links.py
       - name: Validate integrated-auth Compose model
         env:
           VPS_AGENT_ADMIN_TOKEN: ci-admin-token

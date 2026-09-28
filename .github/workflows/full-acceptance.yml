@@ -96,14 +96,14 @@ jobs:
             echo "VPS_AGENT_LISTEN=127.0.0.1:18080"
             echo "VPS_AGENT_AUTH_MODE=static"
             echo "VPS_AGENT_STATIC_TOKEN=$PROOF_TOKEN"
-            echo "VPS_AGENT_STATIC_SUBJECT=josemir-proof"
+            echo "VPS_AGENT_STATIC_SUBJECT=proof-operator"
           } | sudo tee /etc/vps-agent/gateway.env >/dev/null
           {
             echo "VPS_AGENT_POLICY=/etc/vps-agent/policy.yaml"
             echo "VPS_AGENT_BROKER_SOCKET=/run/vps-agent/broker.sock"
             echo "VPS_AGENT_STATE_DB=/var/lib/vps-agent/state.db"
             echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN"
-            echo "VPS_AGENT_EXPECTED_SUBJECT=josemir-proof"
+            echo "VPS_AGENT_EXPECTED_SUBJECT=proof-operator"
           } | sudo tee /etc/vps-agent/broker.env >/dev/null
           sudo chmod 0600 /etc/vps-agent/gateway.env /etc/vps-agent/broker.env
 
@@ -149,7 +149,7 @@ jobs:
           cat > acceptance/file.json <<'JSON'
           {
             "id": "accept-file",
-            "subject": "josemir-proof",
+            "subject": "proof-operator",
             "type": "file_write_read",
             "path": "/var/lib/vps-agent/proof/acceptance.txt",
             "content": "full acceptance via MCP -> Gateway -> Broker -> Linux"
@@ -164,7 +164,7 @@ jobs:
           cat > acceptance/deny.json <<'JSON'
           {
             "id": "accept-deny",
-            "subject": "josemir-proof",
+            "subject": "proof-operator",
             "type": "file_read_denied",
             "path": "/etc/shadow"
           }
@@ -178,7 +178,7 @@ jobs:
           cat > acceptance/restart.json <<'JSON'
           {
             "id": "accept-restart",
-            "subject": "josemir-proof",
+            "subject": "proof-operator",
             "type": "service_restart",
             "service": "vps-agent-test.service"
           }

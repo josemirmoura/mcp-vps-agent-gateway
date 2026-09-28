@@ -18,16 +18,23 @@ The installation completion rule is deliberately stricter than "containers are h
 
 ## ChatGPT product prerequisite
 
-ChatGPT product surfaces and plan rollouts change independently from this project. Do **not** hard-block installation based only on a subscription name.
+The supported product path includes write/modify tools, so release documentation follows OpenAI's current **full MCP** availability rather than assuming that any custom-app surface is sufficient.
 
-The supported rule is feature detection:
+As checked on 2026-09-28, OpenAI documents full MCP support with write/modify actions on ChatGPT web for **Business and Enterprise/Edu** workspaces. Pro can connect custom MCP apps in developer mode with read/fetch permissions, but that is not equivalent to this product's full write-capable path.
 
-1. open the target ChatGPT account/workspace;
-2. confirm Developer Mode / Plugins exposes the option to create a custom MCP app;
-3. if the option exists, continue with the connection test;
-4. if it does not, recheck current official OpenAI documentation for that account/workspace.
+Before starting public setup:
 
-As of 2026-09-28, OpenAI documentation is in transition: one Help Center article describes full MCP write/modify support as a Business/Enterprise/Edu rollout, while newer Plugins documentation describes the developer-mode MCP registration flow more generally. The actual feature surface exposed to the account is therefore the installation-time authority for availability.
+1. use a ChatGPT Business or Enterprise/Edu workspace for the supported full path;
+2. ensure an admin/owner has enabled Developer Mode / custom apps as required by the workspace;
+3. confirm the account can create a custom app and provide the HTTPS `/mcp` endpoint;
+4. if OpenAI changes plan availability or UI, recheck the current official documentation before proceeding.
+
+Official references checked for this release candidate:
+
+- https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
+- https://developers.openai.com/plugins/build/app-quickstart
+
+A read-only MCP connection can still be useful for diagnostics, but it must not be presented as completion of the write-capable product installation.
 
 ## Prerequisites
 

@@ -14,14 +14,28 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
           go-version: '1.27.1'
           cache: true
-      - name: Validate source and Docker package
+      - name: Validate tag matches VERSION
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="v$(tr -d '[:space:]' < VERSION)"
+          test "$GITHUB_REF_NAME" = "$expected" || {
+            echo "tag $GITHUB_REF_NAME does not match VERSION ($expected)" >&2
+            exit 1
+          }
+      - name: Validate source and installation contract
         run: |
           go mod tidy
           go test -race -count=1 ./...
+          bash -n scripts/*.sh
+          bash -n scripts/lib/*.sh
+          python3 scripts/check-installation-contract.py
           docker compose config -q
 
   images:
@@ -49,24 +63,37 @@ jobs:
           target: ${{ matrix.target }}
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ github.ref_name }}
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:latest
+          sbom: true
+          provenance: mode=max
+          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ github.ref_name }}
 
   github-release:
     needs: images
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Build Compose bundle
+        with:
+          fetch-depth: 0
+      - name: Build complete source package
+        shell: bash
         run: |
-          mkdir -p dist/mcp-vps-agent
-          cp compose.yaml compose.host.yaml compose.integrated-auth.yaml compose.integrated-auth.proxy.yaml .env.example LICENSE README.md README.pt-BR.md dist/mcp-vps-agent/
-          cp -r config scripts dist/mcp-vps-agent/
-          tar -C dist -czf dist/mcp-vps-agent-docker-package.tar.gz mcp-vps-agent
-          sha256sum dist/mcp-vps-agent-docker-package.tar.gz > dist/mcp-vps-agent-docker-package.tar.gz.sha256
+          set -euo pipefail
+          mkdir -p dist
+          git archive --format=tar --prefix=mcp-vps-agent/ "$GITHUB_SHA" | gzip -n > dist/mcp-vps-agent-source-package.tar.gz
+          sha256sum dist/mcp-vps-agent-source-package.tar.gz > dist/mcp-vps-agent-source-package.tar.gz.sha256
+          cat > dist/RELEASE-INTEGRITY.txt <<'EOF'
+          Release images carry BuildKit SBOM/provenance attestations in GHCR.
+          The source package is protected by the accompanying SHA-256 checksum.
+          A separate project-managed cryptographic release-signing key is not yet used.
+          The preferred updateable installation remains a tagged Git checkout.
+          EOF
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}"             dist/mcp-vps-agent-docker-package.tar.gz             dist/mcp-vps-agent-docker-package.tar.gz.sha256             --generate-notes             --title "MCP VPS Agent Gateway ${GITHUB_REF_NAME}"
+          gh release create "${GITHUB_REF_NAME}" \
+            dist/mcp-vps-agent-source-package.tar.gz \
+            dist/mcp-vps-agent-source-package.tar.gz.sha256 \
+            dist/RELEASE-INTEGRITY.txt \
+            --generate-notes \
+            --title "MCP VPS Agent Gateway ${GITHUB_REF_NAME}"

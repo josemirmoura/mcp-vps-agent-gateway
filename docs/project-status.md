@@ -2,7 +2,7 @@
 
 ## Current stage
 
-**AUTOMATED RELEASE CANDIDATE / EXTERNAL CHATGPT GATE PENDING**
+**PRE-RELEASE PRODUCTIZATION / CHATGPT E2E GATE COMPLETE**
 
 The Docker-first Go implementation now has repeatable clean-runner validation across the core Scoped runtime, package lifecycle and host-operation path.
 
@@ -11,10 +11,9 @@ There is still:
 - no stable production release
 - no production compatibility promise
 - no long-running real-VPS deployment history
-- no completed real ChatGPT Web OAuth product-surface gate against the target workspace/VPS
 - no production claim for Full/admin shell
 
-Laboratory evidence now covers the Docker package end-to-end on a clean Ubuntu runner: filesystem CRUD, authorization denial, sandboxed shell/jobs, host systemd, host Docker/Compose, diagnostics and audit. Automated acceptance is substantially beyond the original R0/R1 architecture phase, but the product is not promoted to a stable release until the actual ChatGPT Web integration route is proven on the target workspace and VPS.
+Laboratory evidence covers the Docker package end-to-end on clean Ubuntu runners: filesystem CRUD, authorization denial, sandboxed shell/jobs, host systemd, host Docker/Compose, diagnostics, lifecycle and audit. On 2026-09-28 the supported integrated self-hosted OAuth path was also exercised against ChatGPT Web on a real target VPS through an authenticated `system.info` call observed by the Broker and recorded in the audit chain. This closes Gate 0A for the supported product path without creating a stable-production claim.
 
 ## Maturity ladder
 
@@ -24,7 +23,7 @@ Documentation exists. No executable reference implementation.
 
 ### R1 — Product path + Gate 0B
 
-- Gate 0A records the actual ChatGPT/client integration route.
+- Gate 0A records the actual ChatGPT/client integration route. **Completed 2026-09-28 for the integrated OAuth + ChatGPT Web path.**
 - MCP Inspector passes.
 - Safe read/write POC works only in the disposable test root.
 
@@ -96,6 +95,6 @@ Prefer:
 
 ## Current next milestone
 
-The implementation has clean-room evidence through the broad Scoped toolbox and the Docker packaging path.
+The implementation has clean-room evidence through the broad Scoped toolbox and Docker packaging, plus a completed real ChatGPT Web OAuth end-to-end gate on 2026-09-28.
 
-The next external milestone is **Gate 0A on the actual ChatGPT Web surface**, followed by a real-VPS Scoped pilot and long-running reliability work. See [implementation-validation.md](implementation-validation.md).
+The current milestone is **public productization of the Scoped path**: synchronize documentation, sanitize the repository, provide a guided terminal flow, formalize versioning/releases and compatibility, complete pre-release security hardening, and prepare a release candidate for the owner's final clean-install human gate. Long-running reliability remains a later production-maturity requirement. See [implementation-validation.md](implementation-validation.md).

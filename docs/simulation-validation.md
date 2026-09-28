@@ -2,11 +2,13 @@
 
 Date: 2026-09-26
 Seed: 26092026
-Scope: executable architectural model, not production implementation.
+Scope: executable architectural model created before the production Go implementation.
+
+> Historical evidence: this document records what the architecture simulator established on 2026-09-26. The repository subsequently implemented and tested the Go runtime, Docker/systemd adapters, integrated OAuth and a real ChatGPT Web E2E path. Current maturity is tracked in [project-status.md](project-status.md) and [implementation-validation.md](implementation-validation.md).
 
 ## Why simulate
 
-The repository is still docs-first. Simulation cannot prove Linux syscalls, systemd, OAuth, Docker behavior or ChatGPT product compatibility, but it can falsify logical invariants before the Go implementation exists.
+At the time this model was created, the repository was still docs-first. Simulation could not prove Linux syscalls, systemd, OAuth, Docker behavior or ChatGPT product compatibility, but it could falsify logical invariants before the Go implementation existed.
 
 The model deliberately includes vulnerable baselines so the suite proves it can detect insecure design rather than only asserting success.
 
@@ -131,22 +133,22 @@ It provides evidence for the logical consistency of:
 - fenced resource locks
 - crash-aware operation journaling
 
-## What it does not validate
+## What the simulation itself does not validate
 
-Real implementation gates still include:
+The simulator, by design, does not validate:
 
-- actual openat2 and directory-FD behavior
-- symlink races under the Linux kernel
-- Landlock/systemd/cgroup containment
-- Docker/systemd adapters
-- SQLite durability under real power loss
-- OAuth/OIDC
-- MCP Go SDK behavior in our implementation
-- reverse proxy behavior
-- ChatGPT Plus Web write-capable integration
-- real VPS workload recovery
+- actual openat2 and directory-FD behavior;
+- symlink races under the Linux kernel;
+- Landlock/systemd/cgroup containment;
+- Docker/systemd adapters;
+- SQLite durability under real power loss;
+- OAuth/OIDC;
+- MCP Go SDK behavior;
+- reverse proxy behavior;
+- ChatGPT product integration;
+- real VPS workload recovery.
 
-Those belong to Gate 0A, Gate 0B, Gate 1 and later integration/security testing.
+Many of these gaps are now covered by implementation/acceptance tests and the real ChatGPT E2E evidence. They remain outside the evidentiary scope of this simulator and should not be inferred from its PASS result.
 
 ## Reproduce
 

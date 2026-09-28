@@ -1,6 +1,6 @@
 # Executable implementation validation
 
-Checked: 2026-09-27.
+Checked: 2026-09-28.
 
 This document records evidence from clean GitHub-hosted Ubuntu runners. These runners are disposable machines, so successful runs prove reproducible behavior in a fresh Linux environment without touching a production VPS.
 
@@ -138,6 +138,28 @@ The proof workflow explicitly fails if the Gateway OS account can read:
 - `/etc/vps-agent/policy.yaml`
 - `/var/lib/vps-agent/state.db`
 
+## Real ChatGPT Web + integrated OAuth acceptance
+
+On 2026-09-28 the supported public path was validated on a real target VPS after the integrated OAuth implementation was merged into the release-candidate line.
+
+The validated chain was:
+
+~~~text
+ChatGPT Web
+  -> HTTPS MCP protected resource
+  -> OAuth/OIDC discovery
+  -> Dynamic Client Registration + PKCE
+  -> dedicated operator authentication
+  -> Gateway token validation
+  -> Broker subject + policy authorization
+  -> system.info execution
+  -> Broker audit record
+~~~
+
+The completion flow observed the authenticated `system.info` event for the expected subject and reached the same `CHATGPT WEB CONNECTION VERIFIED` / `INSTALLATION COMPLETE` criterion enforced by `scripts/connect-chatgpt.sh`. Environment-specific hostname, subject and credential values are intentionally not committed as public evidence.
+
+This closes the product-surface Gate 0A for the supported integrated-auth path. It does not by itself establish long-running production reliability or Full/R5 maturity.
+
 ## What this proves
 
 It proves that the current reference implementation can be built from a clean checkout and can exercise the intended chain:
@@ -157,10 +179,8 @@ MCP client
 
 It does not yet prove:
 
-- the final ChatGPT Web distribution path (Gate 0A)
-- deployment on the user's real VPS
 - long-running production reliability
-- a real external OIDC provider in the target environment
+- compatibility across a formally declared support matrix
 - remote audit anchoring
 - production use of Full/admin shell
 - long-running reliability and recovery behavior under real workloads

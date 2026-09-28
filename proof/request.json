@@ -1,10 +1,10 @@
 {
-  "id": "josemir-human-proof-2026-09-27",
-  "subject": "josemir-proof",
+  "id": "human-proof-example",
+  "subject": "proof-operator",
   "type": "directory_html_and_file",
-  "directory": "/opt/josemir-agradece-seu-gpt",
-  "html_path": "/opt/josemir-agradece-seu-gpt/index.html",
-  "html_content": "<!doctype html>\n<html lang=\"pt-BR\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <title>Josemir agradece seu GPT</title>\n  <style>\n    html,body{height:100%;margin:0}\n    body{display:grid;place-items:center;background:#fff7f8;font-family:system-ui,sans-serif}\n    .heart{font-size:min(42vw,18rem);line-height:1;color:#e11d48;filter:drop-shadow(0 10px 24px #e11d4840)}\n  </style>\n</head>\n<body>\n  <div class=\"heart\" role=\"img\" aria-label=\"Coração\">♥</div>\n</body>\n</html>",
-  "second_path": "/var/lib/vps-agent/proof/josemir.txt",
-  "second_content": "Se você está lendo isso, o MCP funcionou de verdade."
+  "directory": "/opt/vps-agent-proof-site",
+  "html_path": "/opt/vps-agent-proof-site/index.html",
+  "html_content": "<!doctype html>\n<html lang=\"en\">\n<head><meta charset=\"utf-8\"><title>MCP VPS Agent proof</title></head>\n<body><main><h1>MCP VPS Agent proof</h1><p>End-to-end ephemeral proof ♥</p></main></body>\n</html>",
+  "second_path": "/var/lib/vps-agent/proof/proof.txt",
+  "second_content": "If you are reading this, the ephemeral MCP proof completed."
 }

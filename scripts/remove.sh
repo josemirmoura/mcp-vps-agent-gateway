@@ -2,6 +2,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=scripts/lib/product.sh
+source scripts/lib/product.sh
+vps_agent_banner
+
 mode="${1:-safe}"
 if [ "$mode" != "safe" ] && [ "$mode" != "--purge" ]; then
   echo "usage: $0 [safe|--purge]" >&2
