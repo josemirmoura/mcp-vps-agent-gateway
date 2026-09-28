@@ -28,6 +28,30 @@ Do not infer write support for another plan/surface merely because the MCP serve
 
 ChatGPT connects to remote MCP servers. A local/private-network MCP cannot be attached directly unless a supported secure tunnel/remote route is used.
 
+## Public OAuth preflight
+
+Before opening the ChatGPT app-creation flow, run:
+
+~~~bash
+bash scripts/verify-public.sh
+~~~
+
+The preflight checks the actual public boundary rather than only local containers:
+
+1. HTTPS health endpoint is reachable.
+2. RFC 9728 protected-resource metadata identifies the expected resource and Authorization Server.
+3. Required scopes are present in protected-resource metadata.
+4. OIDC discovery exposes the exact issuer plus HTTPS authorization/token endpoints.
+5. PKCE S256 is advertised.
+6. Token endpoint authentication methods are published.
+7. CIMD or DCR is available, unless a predefined OAuth client was explicitly configured.
+8. An unauthenticated /mcp request returns HTTP 401 with a WWW-Authenticate challenge pointing to the protected-resource metadata.
+9. If VPS_AGENT_TEST_ACCESS_TOKEN is supplied, a real authenticated system.info call must pass.
+
+The verifier warns when offline_access is not advertised because long-lived ChatGPT connectivity may then require reauthentication.
+
+This preflight cannot prove the interactive browser authorization itself. That remains the final ChatGPT-side gate.
+
 ## Current documented connection flow
 
 For an eligible workspace/surface:
@@ -46,12 +70,12 @@ The OpenAI UI and permissions are version-sensitive. Recheck the official page a
 
 ## Our package completion rule
 
-scripts/connect-chatgpt.sh shows the tutorial and then waits for an audited system.info call from the configured subject.
+scripts/connect-chatgpt.sh runs the public OAuth preflight, shows the connection tutorial and then waits for an audited system.info call from the configured subject.
 
 Showing the tutorial is not success.
 
 ~~~text
-tutorial shown
+public OAuth preflight passes
  -> ChatGPT app connected
  -> system.info invoked from ChatGPT
  -> expected subject authenticated
@@ -66,6 +90,10 @@ If the target ChatGPT plan/workspace cannot invoke the required tool, the script
 ## Authentication
 
 For the public ChatGPT route, configure VPS_AGENT_AUTH_MODE=oidc. The Gateway publishes RFC 9728 protected-resource metadata and validates issuer, audience/resource, signature, expiration, scopes and subject. The Broker then independently checks the expected subject and policy.
+
+The Gateway uses the official MCP Go SDK bearer middleware. Failed unauthenticated requests include a WWW-Authenticate challenge containing the protected-resource metadata URL, which is independently checked by scripts/verify-public.sh.
+
+For ChatGPT-compatible Authorization Server requirements, including PKCE S256 and CIMD/DCR/predefined clients, see docs/authentication.md and the current OpenAI authentication guide.
 
 If the OpenAI integration requires refresh-token support, follow the current OpenAI guidance for offline_access/refresh-token issuance.
 
