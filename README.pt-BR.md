@@ -90,7 +90,7 @@ A orquestração é fina e transparente. Os scripts individuais `init.sh`, Compo
 
 O fluxo suportado é autônomo na própria VPS do usuário. Ele nunca pede senha da VPS, chave SSH privada, acesso administrativo remoto irrestrito ou segredos não relacionados ao serviço para ChatGPT ou mantenedor.
 
-Durante o release candidate, `main` continua sendo desenvolvimento. Depois que o gate humano final congelar `v0.1.0`, instalações normais devem usar o checkout da tag estável.
+Durante o release candidate, `main` continua sendo desenvolvimento. Depois que a aceitação final pelo operador congelar `v0.1.0`, instalações normais devem usar o checkout da tag estável.
 
 ## Caixa de ferramentas
 
