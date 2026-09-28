@@ -22,9 +22,12 @@ jobs:
           echo "=== DNS ==="
           getent ahosts mcp.josemirmoura.com.br || true
           echo
+          echo "=== TLS certificate ==="
+          echo | openssl s_client -connect mcp.josemirmoura.com.br:443 -servername mcp.josemirmoura.com.br 2>/dev/null | openssl x509 -noout -subject -issuer -dates || true
+          echo
           for path in /healthz /.well-known/openid-configuration /.well-known/oauth-protected-resource /mcp; do
             echo "=== https://mcp.josemirmoura.com.br$path ==="
-            curl -sS --max-time 12 -D - -o /tmp/body "https://mcp.josemirmoura.com.br$path" || true
+            curl -k -sS --max-time 12 -D - -o /tmp/body "https://mcp.josemirmoura.com.br$path" || true
             head -c 500 /tmp/body 2>/dev/null || true
             echo
           done
