@@ -71,7 +71,7 @@ ChatGPT needs a reachable remote HTTPS MCP endpoint, but the operator should not
 Create a DNS A/AAAA record pointing a hostname at the VPS, then run:
 
 ~~~bash
-bash scripts/setup-integrated-auth.sh --domain mcp.example.com
+bash scripts/setup-integrated-auth.sh
 ~~~
 
 The script reuses a single existing Traefik when one is present. If none is present and ports 80/443 are free, it starts the bundled Traefik. It then starts ZITADEL + PostgreSQL, creates the dedicated non-admin operator identity, enables MCP-compatible Dynamic Client Registration, configures the Gateway/Broker identity binding and runs the public verification.
