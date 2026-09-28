@@ -130,6 +130,10 @@ Safe removal preserves configuration and audit state. Purge requires explicit co
 - [ChatGPT integration](docs/chatgpt-integration.md)
 - [Security release matrix](docs/security-release.md)
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for engineering principles and validation expectations, and [SECURITY.md](SECURITY.md) for private vulnerability-reporting guidance.
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
