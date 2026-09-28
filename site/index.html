@@ -45,7 +45,7 @@
 
     <section class="grid two">
       <article><p class="eyebrow">Security</p><h2>The LLM is not the authorization engine.</h2><p>Deny-by-default policy, scoped filesystem resolution, isolated shell/jobs, bounded requests, expected-subject checks, operation journals, locks/fencing and a Broker-owned audit hash chain keep authority in code the operator controls.</p></article>
-      <article><p class="eyebrow">Toolbox</p><h2>Useful enough to run a server.</h2><p>Filesystem CRUD, durable shell/jobs, systemd, Docker/Compose, diagnostics, package inventory/management, users/groups, UFW and temporary out-of-band elevation are available when policy enables them.</p></article>
+      <article><p class="eyebrow">Identity</p><h2>OAuth without an OAuth homework assignment.</h2><p>The supported public path self-hosts ZITADEL beside the Gateway. The setup script creates the operator identity, a dedicated MCP audience, private token introspection, dynamic client registration and reuses the VPS edge proxy when possible.</p></article>
     </section>
 
     <section id="quick-start" class="quick">
@@ -64,7 +64,24 @@ docker compose up -d --build &&
 bash scripts/verify.sh</code></pre>
       </div>
       <p>The Quick Start delegates only <code>/opt/vps-agent-sandbox</code>. Change that path to the existing directory you want the MCP to control. The <code>&amp;&amp;</code> chain stops at the first failed step instead of continuing into a broken verification.</p>
-      <p>For ChatGPT, add a remote HTTPS endpoint plus OAuth/OIDC, run <code>scripts/verify-public.sh</code>, then <code>scripts/connect-chatgpt.sh</code>. The final script waits for the real audited call before declaring installation complete.</p>
+      <p>Local verification is only checkpoint one. To finish, point a DNS hostname at the VPS and run the integrated-auth step below. No third-party identity provider account is required.</p>
+    </section>
+
+    <section id="connect-chatgpt" class="quick">
+      <p class="eyebrow">Step 2 · Connect ChatGPT</p>
+      <h2>One domain, integrated OAuth, real proof.</h2>
+      <p>Create a DNS A/AAAA record such as <code>mcp.example.com</code> pointing to the VPS. Then run the block below; the setup asks for the domain, operator email and password interactively:</p>
+      <div class="code-block">
+        <button class="copy-button" type="button" data-copy-target="integrated-auth-code" aria-label="Copy integrated auth commands" title="Copy commands">
+          <svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h10v10H9z"></path><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg>
+          <svg class="check-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>
+        </button>
+        <pre><code id="integrated-auth-code">bash scripts/setup-integrated-auth.sh &&
+bash scripts/connect-chatgpt.sh</code></pre>
+      </div>
+      <p>The setup script asks locally for the dedicated OAuth operator email and password, then handles the rest: existing Traefik detection or bundled edge on a clean VPS, TLS, ZITADEL + PostgreSQL, dedicated operator identity, MCP-only resource audience, private token introspection, DCR, PKCE discovery, Gateway/Broker identity binding and public verification.</p>
+      <p><strong>No VPS or SSH credentials are given to ChatGPT.</strong> The supported installation never requires a VPS password, private SSH key or unrestricted remote admin access to be shared with ChatGPT or a maintainer.</p>
+      <p><code>connect-chatgpt.sh</code> does not declare victory when it merely prints instructions. It waits until ChatGPT actually calls <code>system.info</code> and the Broker audit confirms the authenticated request. Only then does it print <code>INSTALLATION COMPLETE</code>.</p>
     </section>
 
     <section class="grid two">

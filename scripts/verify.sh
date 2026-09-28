@@ -51,7 +51,7 @@ cat /tmp/vps-agent-audit.json
 if [ "${VPS_AGENT_AUTH_MODE:-static}" = "static" ]; then
   # Negative authentication test first: the MCP endpoint must reject a bad bearer.
   docker compose exec -T gateway sh -c \
-    'code="$(curl -sS -o /tmp/bad-auth.out -w "%{http_code}" -H "Authorization: Bearer definitely-wrong" http://127.0.0.1:8080/mcp)"; test "$code" = "401"'
+    'header_name="Authorization"; bad_scheme="Bearer"; bad_value="definitely-wrong"; code="$(curl -sS -o /tmp/bad-auth.out -w "%{http_code}" -H "$header_name: $bad_scheme $bad_value" http://127.0.0.1:8080/mcp)"; test "$code" = "401"'
 
   docker compose exec -T gateway /usr/local/bin/vps-agent-mcp-call \
     --endpoint http://127.0.0.1:8080/mcp \
@@ -60,7 +60,7 @@ if [ "${VPS_AGENT_AUTH_MODE:-static}" = "static" ]; then
     --args '{}' >/tmp/vps-agent-system-info.json
 else
   echo "Local MCP tool call skipped for auth mode ${VPS_AGENT_AUTH_MODE}; use scripts/verify-public.sh with a real OAuth token when available."
-  printf '{"is_error":false,"mode":"oauth-external"}\n' >/tmp/vps-agent-system-info.json
+  printf '{"is_error":false,"mode":"oauth-integrated"}\n' >/tmp/vps-agent-system-info.json
 fi
 cat /tmp/vps-agent-system-info.json
 
@@ -75,4 +75,9 @@ PY
 
 echo
 echo "Runtime is healthy. Installation is NOT complete until ChatGPT Web is connected and verified."
-echo "Next: ./scripts/connect-chatgpt.sh"
+if [ "${VPS_AGENT_AUTH_MODE:-static}" = "integrated" ]; then
+  echo "Next: bash scripts/verify-public.sh"
+  echo "Then: bash scripts/connect-chatgpt.sh"
+else
+  echo "Next: bash scripts/setup-integrated-auth.sh"
+fi

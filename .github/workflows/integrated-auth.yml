@@ -1,0 +1,248 @@
+name: integrated-auth-component-acceptance
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integrated-auth:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prepare isolated identity stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/vps-agent-auth-ci state
+          cp config/policy.example.yaml config/policy.yaml
+          docker network create ci-edge
+
+          ADMIN_TOKEN="$(openssl rand -hex 32)"
+          STATIC_TOKEN="$(openssl rand -hex 32)"
+          MASTER_KEY="$(openssl rand -hex 16)"
+          DB_SECRET="$(openssl rand -hex 24)"
+          BOOTSTRAP_SECRET="T1!$(openssl rand -hex 18)"
+          OPERATOR_SECRET="T2!$(openssl rand -hex 18)"
+          {
+            echo "VPS_AGENT_ADMIN_TOKEN=$ADMIN_TOKEN"
+            echo "VPS_AGENT_STATIC_TOKEN=$STATIC_TOKEN"
+            echo "VPS_AGENT_SUBJECT=ci-placeholder"
+            echo "VPS_AGENT_INSTANCE_ID=ci-integrated-auth"
+            echo "VPS_AGENT_INSTANCE_NAME=ci-integrated-auth"
+            echo "VPS_AGENT_SCOPE_ROOT=/tmp/vps-agent-auth-ci"
+            echo "VPS_AGENT_WHOLE_HOST=0"
+            echo "VPS_AGENT_AUTH_MODE=integrated"
+            echo "VPS_AGENT_DOMAIN=mcp.example.invalid"
+            echo "VPS_AGENT_PUBLIC_URL=https://mcp.example.invalid/mcp"
+            echo "VPS_AGENT_OIDC_ISSUER=https://mcp.example.invalid"
+            echo "VPS_AGENT_OAUTH_RESOURCE=https://mcp.example.invalid/mcp"
+            echo "VPS_AGENT_RESOURCE_METADATA_URL=https://mcp.example.invalid/.well-known/oauth-protected-resource"
+            echo "VPS_AGENT_REQUIRED_SCOPES=openid"
+            echo "VPS_AGENT_EDGE_NETWORK=ci-edge"
+            echo "VPS_AGENT_TRAEFIK_CERTRESOLVER=letsencrypt"
+            echo "VPS_AGENT_BUNDLED_PROXY=0"
+            echo "ZITADEL_VERSION=v4.19.1"
+            echo "ZITADEL_MASTERKEY=$MASTER_KEY"
+            echo "ZITADEL_POSTGRES_DB=zitadel"
+            echo "ZITADEL_POSTGRES_USER=zitadel"
+            echo "ZITADEL_POSTGRES_PASSWORD=$DB_SECRET"
+            echo "ZITADEL_BOOTSTRAP_ADMIN_PASSWORD=$BOOTSTRAP_SECRET"
+            echo "ZITADEL_BOOTSTRAP_PAT_EXPIRATION=2099-01-01T00:00:00Z"
+            echo "ZITADEL_LOGIN_PAT_EXPIRATION=2099-01-01T00:00:00Z"
+            echo "CI_OPERATOR_SECRET=$OPERATOR_SECRET"
+          } > .env
+          chmod 600 .env config/policy.yaml
+
+      - name: Start ZITADEL, Login UI and PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          COMPOSE=(docker compose -f compose.yaml -f compose.integrated-auth.yaml)
+          "${COMPOSE[@]}" up -d zitadel-postgres zitadel-api zitadel-login
+          for _ in $(seq 1 120); do
+            api_id="$("${COMPOSE[@]}" ps -q zitadel-api)"
+            login_id="$("${COMPOSE[@]}" ps -q zitadel-login)"
+            api_status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$api_id" 2>/dev/null || true)"
+            login_status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$login_id" 2>/dev/null || true)"
+            if [ "$api_status" = healthy ] && [ "$login_status" = healthy ]; then
+              "${COMPOSE[@]}" ps
+              exit 0
+            fi
+            sleep 2
+          done
+          "${COMPOSE[@]}" logs --no-color zitadel-api zitadel-login zitadel-postgres
+          exit 1
+
+      - name: Enable DCR and create operator through real ZITADEL API
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -a
+          . ./.env
+          set +a
+          PAT="$(docker run --rm -v mcp-vps-agent_zitadel-bootstrap:/zitadel/bootstrap:ro alpine:3.22 cat /zitadel/bootstrap/bootstrap-admin.pat)"
+          test -n "$PAT"
+          echo "::add-mask::$PAT"
+
+          curl_ci() {
+            docker run --rm -i --network ci-edge curlimages/curl:8.16.0               -fsS               -H 'Host: mcp.example.invalid'               -H 'X-Forwarded-Proto: https'               "$@"
+          }
+
+          curl_ci http://zitadel-api:8080/.well-known/openid-configuration > /tmp/oidc-before.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/oidc-before.json'))
+          assert x['issuer'] == 'https://mcp.example.invalid', x
+          print('OIDC DISCOVERY: PASS')
+          PY
+
+          curl_ci             -X PUT http://zitadel-api:8080/v2/settings/security             -H "Authorization: Bearer $PAT"             -H 'Content-Type: application/json'             --data '{"dynamicClientRegistration":{"enabled":true,"allowUnauthenticated":true}}'             > /tmp/security.json
+
+          python3 - "$CI_OPERATOR_SECRET" <<'PY' > /tmp/operator.json
+          import json,sys
+          print(json.dumps({
+            "userId":"ci-operator-001",
+            "username":"ci-operator",
+            "profile":{"givenName":"CI","familyName":"Operator","displayName":"CI Operator","preferredLanguage":"en"},
+            "email":{"email":"ci-operator@example.invalid","isVerified":True},
+            "password":{"password":sys.argv[1],"changeRequired":False},
+          }))
+          PY
+
+          curl_ci             -X POST http://zitadel-api:8080/v2/users/human             -H "Authorization: Bearer $PAT"             -H 'Content-Type: application/json'             --data-binary @-             < /tmp/operator.json             > /tmp/operator-response.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/operator-response.json'))
+          assert x.get('userId') == 'ci-operator-001', x
+          print('DEDICATED OPERATOR: PASS')
+          PY
+
+          curl_ci             -X POST http://zitadel-api:8080/management/v1/projects             -H "Authorization: Bearer $PAT"             -H 'Content-Type: application/json'             --data '{"name":"MCP VPS Agent Resource CI"}'             > /tmp/resource-project.json
+          RESOURCE_PROJECT_ID="$(python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/resource-project.json'))
+          value=x.get('id','')
+          assert value, x
+          print(value)
+          PY
+          )"
+          test -n "$RESOURCE_PROJECT_ID"
+
+          curl_ci             -X POST "http://zitadel-api:8080/management/v1/projects/$RESOURCE_PROJECT_ID/apps/api"             -H "Authorization: Bearer $PAT"             -H 'Content-Type: application/json'             --data '{"name":"MCP VPS Agent Introspector CI","authMethodType":"API_AUTH_METHOD_TYPE_BASIC"}'             > /tmp/introspection-app.json
+          readarray -t INTROSPECTION_VALUES < <(python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/introspection-app.json'))
+          for key in ('appId','clientId','clientSecret'):
+              value=x.get(key,'')
+              assert value, x
+              print(value)
+          PY
+          )
+          test "${#INTROSPECTION_VALUES[@]}" -eq 3
+          INTROSPECTION_CLIENT_ID="${INTROSPECTION_VALUES[1]}"
+          INTROSPECTION_CLIENT_SECRET="${INTROSPECTION_VALUES[2]}"
+          echo "::add-mask::$INTROSPECTION_CLIENT_SECRET"
+
+          curl_ci             -X POST http://zitadel-api:8080/oauth/v2/introspect             -u "$INTROSPECTION_CLIENT_ID:$INTROSPECTION_CLIENT_SECRET"             -H 'Content-Type: application/x-www-form-urlencoded'             --data 'token=deliberately-invalid-component-probe'             > /tmp/introspection-probe.json
+          python3 - "$RESOURCE_PROJECT_ID" <<'PY'
+          import json,sys
+          project=sys.argv[1]
+          x=json.load(open('/tmp/introspection-probe.json'))
+          assert x.get('active') is False, x
+          scope=f"urn:zitadel:iam:org:project:id:{project}:aud"
+          assert scope.endswith(':aud')
+          print('AUDIENCE RESOURCE + PRIVATE INTROSPECTION CLIENT: PASS')
+          PY
+
+          # Prove ZITADEL actually places the dedicated resource project in aud
+          # and that the resource API client can introspect that token.
+          curl_ci             -X POST http://zitadel-api:8080/management/v1/users/machine             -H "Authorization: Bearer $PAT"             -H 'Content-Type: application/json'             --data '{"userName":"ci-resource-probe","name":"CI Resource Probe","description":"audience acceptance probe","accessTokenType":"ACCESS_TOKEN_TYPE_BEARER"}'             > /tmp/probe-machine.json
+          PROBE_USER_ID="$(python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/probe-machine.json'))
+          value=x.get('userId','')
+          assert value, x
+          print(value)
+          PY
+          )"
+
+          curl_ci             -X PUT "http://zitadel-api:8080/management/v1/users/$PROBE_USER_ID/secret"             -H "Authorization: Bearer $PAT"             -H 'Content-Type: application/json'             --data '{}'             > /tmp/probe-secret.json
+          readarray -t PROBE_CREDS < <(python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/probe-secret.json'))
+          for key in ('clientId','clientSecret'):
+              value=x.get(key,'')
+              assert value, x
+              print(value)
+          PY
+          )
+          PROBE_CLIENT_ID="${PROBE_CREDS[0]}"
+          PROBE_CLIENT_SECRET="${PROBE_CREDS[1]}"
+          echo "::add-mask::$PROBE_CLIENT_SECRET"
+
+          AUDIENCE_SCOPE="urn:zitadel:iam:org:project:id:$RESOURCE_PROJECT_ID:aud"
+          curl_ci             -X POST http://zitadel-api:8080/oauth/v2/token             -u "$PROBE_CLIENT_ID:$PROBE_CLIENT_SECRET"             -H 'Content-Type: application/x-www-form-urlencoded'             --data 'grant_type=client_credentials'             --data-urlencode "scope=openid $AUDIENCE_SCOPE"             > /tmp/probe-token.json
+          ACCESS_TOKEN="$(python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/probe-token.json'))
+          value=x.get('access_token','')
+          assert value, x
+          print(value)
+          PY
+          )"
+          echo "::add-mask::$ACCESS_TOKEN"
+
+          curl_ci             -X POST http://zitadel-api:8080/oauth/v2/introspect             -u "$INTROSPECTION_CLIENT_ID:$INTROSPECTION_CLIENT_SECRET"             -H 'Content-Type: application/x-www-form-urlencoded'             --data-urlencode "token=$ACCESS_TOKEN"             > /tmp/probe-token-introspection.json
+          python3 - "$RESOURCE_PROJECT_ID" "$AUDIENCE_SCOPE" <<'PY'
+          import json,sys,time
+          project,required_scope=sys.argv[1:]
+          x=json.load(open('/tmp/probe-token-introspection.json'))
+          aud=x.get('aud',[])
+          if isinstance(aud,str):
+              aud=[aud]
+          assert x.get('active') is True, x
+          assert project in aud, (project,aud)
+          assert required_scope in x.get('scope','').split(), x
+          assert x.get('sub'), x
+          assert int(x.get('exp',0)) > int(time.time()), x
+          assert x.get('iss') == 'https://mcp.example.invalid', x
+          print('REAL AUDIENCE-BOUND TOKEN INTROSPECTION: PASS')
+          PY
+
+          curl_ci http://zitadel-api:8080/.well-known/openid-configuration > /tmp/oidc-after.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/oidc-after.json'))
+          assert x.get('registration_endpoint'), x
+          assert 'S256' in x.get('code_challenge_methods_supported',[]), x
+          assert 'offline_access' in x.get('scopes_supported',[]), x
+          assert 'authorization_code' in x.get('grant_types_supported',[]), x
+          assert 'refresh_token' in x.get('grant_types_supported',[]), x
+          assert 'none' in x.get('token_endpoint_auth_methods_supported',[]), x
+          print('DCR + PKCE + REFRESH DISCOVERY: PASS')
+          PY
+
+          curl_ci             -X POST http://zitadel-api:8080/oauth/v2/register             -H 'Content-Type: application/json'             --data '{"client_name":"CI MCP Client","redirect_uris":["https://example.com/callback"],"grant_types":["authorization_code","refresh_token"],"response_types":["code"],"token_endpoint_auth_method":"none"}'             > /tmp/dcr-client.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/dcr-client.json'))
+          assert x.get('client_id'), x
+          assert x.get('registration_access_token'), x
+          print('REAL DYNAMIC CLIENT REGISTRATION: PASS')
+          PY
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f compose.yaml -f compose.integrated-auth.yaml down -v --remove-orphans || true
+          docker network rm ci-edge >/dev/null 2>&1 || true
+          rm -f .env config/policy.yaml

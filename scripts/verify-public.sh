@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. ./scripts/lib/oauth-scopes.sh
 
 if [ ! -f .env ]; then
   echo "Missing .env. Run ./scripts/init.sh first." >&2
@@ -13,6 +14,8 @@ set +a
 PUBLIC_URL="${VPS_AGENT_PUBLIC_URL:-}"
 AUTH_MODE="${VPS_AGENT_AUTH_MODE:-static}"
 ISSUER="${VPS_AGENT_OIDC_ISSUER:-}"
+AUDIENCE_PROJECT_ID="${VPS_AGENT_INTEGRATED_AUDIENCE_PROJECT_ID:-}"
+REQUIRED_SCOPES="${VPS_AGENT_REQUIRED_SCOPES:-}"
 
 if [ -z "$PUBLIC_URL" ]; then
   echo "VPS_AGENT_PUBLIC_URL is required." >&2
@@ -25,27 +28,32 @@ case "$PUBLIC_URL" in
     exit 1
     ;;
 esac
-if [ "$AUTH_MODE" != "oidc" ]; then
-  echo "Public ChatGPT verification requires VPS_AGENT_AUTH_MODE=oidc." >&2
-  echo "Static bearer/no-auth is reserved for local/lab acceptance." >&2
+if [ "$AUTH_MODE" != "integrated" ]; then
+  echo "Public ChatGPT verification requires the integrated self-hosted OAuth mode." >&2
+  echo "Run scripts/setup-integrated-auth.sh first." >&2
   exit 1
 fi
 if [ -z "$ISSUER" ]; then
-  echo "VPS_AGENT_OIDC_ISSUER is required in oidc mode." >&2
+  echo "VPS_AGENT_OIDC_ISSUER is required in integrated mode." >&2
   exit 1
 fi
-
-# Match the Gateway's canonical issuer handling.
 while [ "$ISSUER" != "/" ] && [ "${ISSUER%/}" != "$ISSUER" ]; do
   ISSUER="${ISSUER%/}"
 done
+if [ -z "$AUDIENCE_PROJECT_ID" ]; then
+  echo "VPS_AGENT_INTEGRATED_AUDIENCE_PROJECT_ID is required in integrated mode." >&2
+  exit 1
+fi
+AUDIENCE_SCOPE="urn:zitadel:iam:org:project:id:$AUDIENCE_PROJECT_ID:aud"
+if ! vps_agent_scope_list_contains "$REQUIRED_SCOPES" openid || ! vps_agent_scope_list_contains "$REQUIRED_SCOPES" "$AUDIENCE_SCOPE"; then
+  echo "Integrated OAuth must require both openid and the dedicated resource audience scope." >&2
+  echo "Configured scopes: ${REQUIRED_SCOPES:-<empty>}" >&2
+  exit 1
+fi
 
 ORIGIN="$(printf '%s' "$PUBLIC_URL" | sed -E 's#^(https://[^/]+).*$#\1#')"
 METADATA_URL="${VPS_AGENT_RESOURCE_METADATA_URL:-$ORIGIN/.well-known/oauth-protected-resource}"
 RESOURCE="${VPS_AGENT_OAUTH_RESOURCE:-$PUBLIC_URL}"
-OIDC_METADATA_URL="$ISSUER/.well-known/openid-configuration"
-REQUIRED_SCOPES="${VPS_AGENT_REQUIRED_SCOPES:-}"
-PREDEFINED_CLIENT="${VPS_AGENT_PREDEFINED_OAUTH_CLIENT:-0}"
 
 echo "Checking public health endpoint..."
 curl --fail --silent --show-error "$ORIGIN/healthz" >/tmp/vps-agent-public-health.json
@@ -57,149 +65,99 @@ curl --fail --silent --show-error "$METADATA_URL" >/tmp/vps-agent-prm.json
 cat /tmp/vps-agent-prm.json
 
 python3 - "$RESOURCE" "$ISSUER" "$REQUIRED_SCOPES" <<'PY'
-import json
-import sys
-
+import json, sys
 resource, issuer, required_raw = sys.argv[1:]
 data = json.load(open("/tmp/vps-agent-prm.json"))
-
 assert data.get("resource") == resource, (data, resource)
-servers = data.get("authorization_servers", [])
-assert issuer in servers, (data, issuer)
+servers = [x.rstrip("/") for x in data.get("authorization_servers", [])]
+assert issuer.rstrip("/") in servers, (data, issuer)
 assert "header" in data.get("bearer_methods_supported", []), data
-
-required = set(required_raw.replace(",", " ").split())
-supported = set(data.get("scopes_supported", []))
-if required:
-    assert required <= supported, {
-        "missing_scopes": sorted(required - supported),
-        "protected_resource_metadata": data,
-    }
-
-print("OAUTH PROTECTED RESOURCE METADATA: PASS")
+required=set(required_raw.split())
+advertised=set(data.get("scopes_supported", []))
+assert required <= advertised, (required, advertised)
+print("OAUTH PROTECTED RESOURCE + SCOPES: PASS")
 PY
 
 echo
-echo "Checking Authorization Server / OpenID Connect discovery..."
-curl --fail --silent --show-error "$OIDC_METADATA_URL" >/tmp/vps-agent-oidc.json
-cat /tmp/vps-agent-oidc.json
-
-python3 - "$ISSUER" "$REQUIRED_SCOPES" "$PREDEFINED_CLIENT" <<'PY'
-import json
-import sys
+echo "Checking integrated Authorization Server discovery..."
+curl --fail --silent --show-error "$ISSUER/.well-known/openid-configuration" >/tmp/vps-agent-oidc-discovery.json
+python3 - "$ISSUER" <<'PY'
+import json,sys
 from urllib.parse import urlparse
-
-issuer, required_raw, predefined = sys.argv[1:]
-data = json.load(open("/tmp/vps-agent-oidc.json"))
-
-assert data.get("issuer") == issuer, {
-    "expected_issuer": issuer,
-    "advertised_issuer": data.get("issuer"),
-}
-
+issuer=sys.argv[1].rstrip("/")
+data=json.load(open("/tmp/vps-agent-oidc-discovery.json"))
+assert data.get("issuer","").rstrip("/") == issuer, data
 for field in ("authorization_endpoint", "token_endpoint"):
-    value = data.get(field)
-    assert isinstance(value, str) and urlparse(value).scheme == "https" and urlparse(value).netloc, {
-        "missing_or_insecure": field,
-        "value": value,
-    }
+    value=data.get(field,"")
+    parsed=urlparse(value)
+    assert parsed.scheme == "https" and parsed.netloc, {"missing_or_insecure": field, "value": value}
+registration=data.get("registration_endpoint","")
+parsed=urlparse(registration)
+assert parsed.scheme == "https" and parsed.netloc, data
+methods=data.get("code_challenge_methods_supported", [])
+assert "S256" in methods, data
+scopes=data.get("scopes_supported", [])
+assert "offline_access" in scopes, data
+grants=data.get("grant_types_supported", [])
+assert "authorization_code" in grants, data
+assert "refresh_token" in grants, data
+token_auth=data.get("token_endpoint_auth_methods_supported", [])
+assert token_auth, "token_endpoint_auth_methods_supported must be published"
+assert "none" in token_auth, data
+print("INTEGRATED OAUTH DISCOVERY + DCR + PKCE + REFRESH: PASS")
+PY
 
-assert "S256" in data.get("code_challenge_methods_supported", []), {
-    "missing_pkce_method": "S256",
-    "code_challenge_methods_supported": data.get("code_challenge_methods_supported", []),
-}
-
-methods = set(data.get("token_endpoint_auth_methods_supported", []))
-assert methods, "token_endpoint_auth_methods_supported must be published"
-
-cimd = data.get("client_id_metadata_document_supported") is True
-registration = data.get("registration_endpoint")
-dcr = isinstance(registration, str) and bool(registration)
-
-if dcr:
-    parsed = urlparse(registration)
-    assert parsed.scheme == "https" and parsed.netloc, {
-        "registration_endpoint_must_use_https": registration,
-    }
-
-if not cimd and not dcr and predefined != "1":
-    raise AssertionError(
-        "Authorization Server advertises neither CIMD nor DCR. "
-        "If a predefined ChatGPT OAuth client is deliberately configured, "
-        "set VPS_AGENT_PREDEFINED_OAUTH_CLIENT=1."
-    )
-
-if cimd:
-    supported_by_chatgpt_cimd = {"none", "private_key_jwt"}
-    assert methods & supported_by_chatgpt_cimd, {
-        "cimd_requires_compatible_token_endpoint_auth_method": sorted(methods),
-        "chatgpt_supported": sorted(supported_by_chatgpt_cimd),
-    }
-else:
-    common_methods = {"none", "private_key_jwt", "client_secret_post", "client_secret_basic"}
-    assert methods & common_methods, {
-        "no_known_chatgpt_compatible_token_endpoint_auth_method": sorted(methods),
-    }
-
-required = set(required_raw.replace(",", " ").split())
-advertised_scopes = set(data.get("scopes_supported", []))
-if required and advertised_scopes:
-    assert required <= advertised_scopes, {
-        "required_scopes_not_advertised_by_authorization_server": sorted(required - advertised_scopes),
-    }
-
-if "offline_access" not in advertised_scopes:
-    print(
-        "WARNING: discovery metadata does not advertise offline_access; "
-        "long-lived ChatGPT connectivity may require reauthentication."
-    )
-
-if data.get("authorization_response_iss_parameter_supported") is True:
-    print("OAUTH CALLBACK ISSUER IDENTIFICATION: PASS (stable callback eligible)")
-else:
-    print("OAUTH CALLBACK ISSUER IDENTIFICATION: not advertised; callback-specific redirect may be used")
-
-mode = "CIMD" if cimd else ("DCR" if dcr else "predefined client")
-print(f"AUTHORIZATION SERVER DISCOVERY: PASS ({mode})")
+echo
+echo "Checking private audience-bound token introspection..."
+docker compose exec -T gateway sh -c '
+  curl --fail --silent --show-error     --request POST     --url "$VPS_AGENT_INTEGRATED_INTROSPECTION_URL"     --user "$VPS_AGENT_INTEGRATED_INTROSPECTION_CLIENT_ID:$VPS_AGENT_INTEGRATED_INTROSPECTION_CLIENT_SECRET"     --header "Host: $VPS_AGENT_INTEGRATED_INTROSPECTION_HOST"     --header "X-Forwarded-Proto: https"     --header "Content-Type: application/x-www-form-urlencoded"     --data "token=deliberately-invalid-verification-probe"
+' >/tmp/vps-agent-introspection-probe.json
+python3 - <<'PY'
+import json
+x=json.load(open("/tmp/vps-agent-introspection-probe.json"))
+assert x.get("active") is False, x
+print("PRIVATE AUDIENCE-BOUND INTROSPECTION: PASS")
 PY
 
 echo
 echo "Checking that unauthenticated MCP access fails closed with OAuth discovery challenge..."
-code="$(curl --silent --show-error   --dump-header /tmp/vps-agent-public-unauth-headers.txt   --output /tmp/vps-agent-public-unauth.txt   --write-out '%{http_code}'   "$PUBLIC_URL" || true)"
+code="$(curl --silent --show-error \
+  --dump-header /tmp/vps-agent-public-unauth-headers.txt \
+  --output /tmp/vps-agent-public-unauth.txt \
+  --write-out '%{http_code}' \
+  "$PUBLIC_URL" || true)"
 if [ "$code" != "401" ]; then
   echo "Expected HTTP 401 from unauthenticated MCP request, got $code." >&2
   cat /tmp/vps-agent-public-unauth.txt >&2 || true
   exit 1
 fi
-
 python3 - "$METADATA_URL" <<'PY'
 import sys
-
-metadata_url = sys.argv[1]
-raw = open("/tmp/vps-agent-public-unauth-headers.txt", errors="replace").read()
-headers = {}
+metadata_url=sys.argv[1]
+raw=open("/tmp/vps-agent-public-unauth-headers.txt", errors="replace").read()
+headers={}
 for line in raw.splitlines():
     if ":" not in line:
         continue
-    name, value = line.split(":", 1)
+    name,value=line.split(":",1)
     headers.setdefault(name.strip().lower(), []).append(value.strip())
-
-challenges = headers.get("www-authenticate", [])
+challenges=headers.get("www-authenticate", [])
 assert challenges, "401 response is missing WWW-Authenticate"
-joined = ", ".join(challenges)
+joined=", ".join(challenges)
 assert "bearer" in joined.lower(), joined
-needle = f'resource_metadata="{metadata_url}"'
-assert needle in joined, {
-    "expected": needle,
-    "www_authenticate": joined,
-}
+needle=f'resource_metadata="{metadata_url}"'
+assert needle in joined, {"expected": needle, "www_authenticate": joined}
 print("UNAUTHENTICATED MCP DENIAL + OAUTH CHALLENGE: PASS")
 PY
 
 if [ -n "${VPS_AGENT_TEST_ACCESS_TOKEN:-}" ]; then
   echo
   echo "Testing a real OAuth access token against system.info..."
-  docker compose exec -T gateway /usr/local/bin/vps-agent-mcp-call     --endpoint "$PUBLIC_URL"     --token "$VPS_AGENT_TEST_ACCESS_TOKEN"     --tool system.info     --args '{}' >/tmp/vps-agent-public-system-info.json
+  docker compose exec -T gateway /usr/local/bin/vps-agent-mcp-call \
+    --endpoint "$PUBLIC_URL" \
+    --token "$VPS_AGENT_TEST_ACCESS_TOKEN" \
+    --tool system.info \
+    --args '{}' >/tmp/vps-agent-public-system-info.json
   cat /tmp/vps-agent-public-system-info.json
   python3 - <<'PY'
 import json
@@ -210,6 +168,6 @@ PY
 else
   echo
   echo "No VPS_AGENT_TEST_ACCESS_TOKEN set; token-authenticated public call not executed."
-  echo "OAuth discovery, PKCE/client-registration metadata and fail-closed behavior are valid."
+  echo "OAuth discovery, DCR/PKCE, private introspection and fail-closed challenge behavior are valid."
   echo "The real ChatGPT authorization flow remains the final client-side gate."
 fi

@@ -48,8 +48,11 @@ compose=(docker compose -f compose.yaml)
 if [ "${VPS_AGENT_WHOLE_HOST:-0}" = "1" ]; then
   compose+=(-f compose.host.yaml)
 fi
-if [ -n "${VPS_AGENT_DOMAIN:-}" ] && [ -f compose.https.yaml ]; then
-  compose+=(-f compose.https.yaml)
+if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ] && [ -f compose.integrated-auth.yaml ]; then
+  compose+=(-f compose.integrated-auth.yaml)
+  if [ "${VPS_AGENT_BUNDLED_PROXY:-0}" = "1" ] && [ -f compose.integrated-auth.proxy.yaml ]; then
+    compose+=(-f compose.integrated-auth.proxy.yaml)
+  fi
 fi
 
 if [ -f .env ] && [ -n "$project_ids" ]; then
@@ -90,12 +93,19 @@ fi
 
 if [ -n "${VPS_AGENT_PUBLIC_URL:-}" ]; then
   code="$(curl --silent --show-error --max-time 5 --output /dev/null --write-out '%{http_code}' "${VPS_AGENT_PUBLIC_URL}" 2>/dev/null || true)"
-  if [ -n "$code" ] && [ "$code" != "000" ]; then
-    echo "Removal incomplete: public endpoint still returned HTTP $code." >&2
-    echo "Disable the external reverse proxy/tunnel/DNS route and run this command again." >&2
-    exit 1
-  fi
-  echo "Public endpoint is no longer reachable from this host."
+  case "$code" in
+    000|"")
+      echo "Public MCP endpoint is no longer reachable from this host."
+      ;;
+    404|410)
+      echo "Public MCP route is gone (HTTP $code from the remaining edge proxy)."
+      ;;
+    *)
+      echo "Removal incomplete: the MCP URL still returned HTTP $code instead of disappearing." >&2
+      echo "Check for a stale proxy route before considering removal complete." >&2
+      exit 1
+      ;;
+  esac
 fi
 
 if [ "$mode" = "safe" ]; then
@@ -111,7 +121,7 @@ Preserved:
   .env (with rotated local credentials)
   config/policy.yaml
   state/ audit and operation history
-  package Caddy data volumes
+  integrated identity state on safe remove
   every VPS resource the MCP was allowed to manage
 EOF
   exit 0
@@ -120,7 +130,12 @@ fi
 if [ -f .env ]; then
   "${compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
 fi
-docker volume rm mcp-vps-agent_broker-run mcp-vps-agent_caddy-data mcp-vps-agent_caddy-config >/dev/null 2>&1 || true
+docker volume rm \
+  mcp-vps-agent_broker-run \
+  mcp-vps-agent_zitadel-postgres-data \
+  mcp-vps-agent_zitadel-bootstrap \
+  mcp-vps-agent_vps-agent-letsencrypt \
+  >/dev/null 2>&1 || true
 rm -rf -- state backups
 rm -f -- .env config/policy.yaml
 

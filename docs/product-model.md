@@ -285,10 +285,11 @@ bash scripts/init.sh --scope /opt/vps-agent-sandbox
 # optionally refine config/policy.yaml and .env
 docker compose up -d --build
 bash scripts/verify.sh
+bash scripts/setup-integrated-auth.sh
 bash scripts/connect-chatgpt.sh
 ~~~
 
-There is no separate interactive installer or alternate native-install product flow.
+There is no separate proprietary installer or alternate native-install product flow. The supported installation boundary is defined by [installation-contract.md](installation-contract.md): development-session access workarounds are not user installation requirements, and deterministic setup work should be automated by the package.
 
 ## Installation is not complete until ChatGPT connectivity is verified
 
@@ -333,7 +334,7 @@ clone / release bundle
  -> choose exactly what MCP may control
  -> start Gateway + Broker with Docker Compose
  -> validate policy and security
- -> expose authenticated MCP endpoint
+ -> bootstrap integrated OAuth + HTTPS endpoint
  -> show ChatGPT Web connection tutorial
  -> user connects ChatGPT
  -> verify real end-to-end ChatGPT tool call

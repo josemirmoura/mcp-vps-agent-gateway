@@ -15,6 +15,16 @@ Both are local operator state. config/policy.yaml is created from the versioned 
 
 Then Docker Compose starts the package. No separate wizard or native installer owns the configuration.
 
+## Supported user installation boundary
+
+This document describes the supported end-user installation. It does not require a developer, a remote shell controlled by ChatGPT, or disclosure of VPS credentials.
+
+The user runs the documented commands directly on the VPS. The tutorial never requires the VPS password, a private SSH key, unrestricted remote administrative access, or unrelated secrets to be supplied to ChatGPT or to the project maintainers.
+
+The dedicated OAuth operator password is different: it is a service credential required by the integrated identity stack. It is entered locally into `setup-integrated-auth.sh` without terminal echo and is not supplied to ChatGPT.
+
+See [installation-contract.md](installation-contract.md) for the normative boundary between supported installation and development-only procedures.
+
 ## Phase 1 — Bootstrap
 
 ~~~bash
@@ -64,25 +74,51 @@ This verifies Compose configuration, Broker health, Gateway health, audit integr
 
 A local verification success means the runtime is ready. It does **not** mean installation is complete.
 
-## Phase 5 — HTTPS/public endpoint
+## Phase 5 — Integrated OAuth + public endpoint
 
-ChatGPT needs a reachable remote HTTPS MCP endpoint.
+ChatGPT needs a reachable remote HTTPS MCP endpoint, but the operator should not have to assemble an identity provider by hand.
 
-Use the operator's existing reverse proxy/tunnel, or the optional Caddy override. The public write-capable ChatGPT route requires OAuth/OIDC and HTTPS:
+The package does not control the user's DNS provider, so DNS is an unavoidable manual platform action. Create a DNS A/AAAA record pointing a hostname at the VPS. The setup script validates that the hostname resolves before it proceeds, and the public verifier later confirms valid HTTPS.
+
+Then run:
 
 ~~~bash
-docker compose -f compose.yaml -f compose.https.yaml up -d --build
+bash scripts/setup-integrated-auth.sh
 ~~~
 
-Set the final HTTPS /mcp URL in VPS_AGENT_PUBLIC_URL, configure the OAuth issuer/audience and expected token subject, then run bash scripts/verify-public.sh before connecting ChatGPT.
+The script reuses a single existing Traefik when one is present. If none is present and ports 80/443 are free, it starts the bundled Traefik. It then starts ZITADEL + PostgreSQL, creates the dedicated non-admin operator identity, creates an MCP-only OAuth resource audience plus a private introspection client, enables MCP-compatible Dynamic Client Registration, configures the Gateway/Broker identity binding and runs the public verification.
 
-## Phase 6 — Show the current ChatGPT Web tutorial
+A successful phase ends with:
+
+~~~text
+INTEGRATED AUTH: READY
+~~~
+
+The setup already runs the public verification. It can be rerun independently after any DNS, proxy or OAuth change:
+
+~~~bash
+bash scripts/verify-public.sh
+~~~
+
+That command validates the public HTTPS certificate/route, OAuth/OIDC discovery, protected-resource metadata, DCR/PKCE expectations, private token introspection and fail-closed unauthenticated MCP behavior.
+
+The script refuses to replace an unknown service already occupying 80/443.
+
+## Phase 6 — Confirm ChatGPT MCP capability
+
+Before starting the ChatGPT-side connection, inspect the actual feature surface of the target account/workspace.
+
+Continue when ChatGPT exposes Developer Mode / Plugins with an option to create a custom MCP app. Do not reject an account solely from its plan name, because OpenAI product rollouts and documentation can change independently.
+
+If custom MCP creation is absent, the VPS/public OAuth side may still be healthy, but the ChatGPT-side completion gate cannot run on that account until the feature becomes available.
+
+## Phase 7 — Show the current ChatGPT Web tutorial
 
 ~~~bash
 bash scripts/connect-chatgpt.sh
 ~~~
 
-The script displays endpoint, authentication mode, expected subject, and the current connection steps.
+The ChatGPT product UI is an unavoidable manual platform action: the user must create/select the MCP app and complete the OAuth browser login. The script displays the endpoint, authentication mode, expected subject, and the current connection steps. The user signs in with the dedicated OAuth operator account, never with VPS/SSH credentials.
 
 At this point:
 
@@ -91,7 +127,7 @@ Tutorial shown.
 Installation is NOT complete.
 ~~~
 
-## Phase 7 — Verify the real ChatGPT connection
+## Phase 8 — Verify the real ChatGPT connection
 
 The connection script waits for an audited call from the configured subject.
 
@@ -116,6 +152,14 @@ INSTALLATION COMPLETE
 ~~~
 
 If the call does not arrive or fails authorization, installation remains incomplete.
+
+## Development-only procedures
+
+Development and acceptance may use temporary probes, ephemeral runners, project-specific self-hosted runners, ad-hoc curl/openssl diagnostics, development branches, or a human operator who runs commands because the development session has no VPS execution channel.
+
+Those are **not installation steps**. They belong in PR/issue evidence or development notes and must not be copied into the supported user tutorial.
+
+The release review runs `python3 scripts/check-installation-contract.py` to detect environment-specific development artifacts and prohibited credential-sharing instructions in the supported installation documents.
 
 ## Updates
 

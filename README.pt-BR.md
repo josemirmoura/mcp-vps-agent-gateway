@@ -2,7 +2,7 @@
 
 Plano de controle MCP orientado a segurança para permitir que ChatGPT ou outro cliente MCP trabalhe numa VPS Linux com a autoridade escolhida explicitamente pelo dono da VPS.
 
-> **Status: candidato a release no que depende de aceitação automatizada.** Os workflows em Ubuntu 24.04 validam o pacote Docker de ponta a ponta. Um release estável ainda depende do gate externo OAuth no ChatGPT Web e de uma chamada real auditada contra o deployment alvo.
+> **Status: candidato a release no que depende de aceitação automatizada.** Os workflows em Ubuntu 24.04 validam o pacote Docker de ponta a ponta. O gate restante é o OAuth integrado e auto-hospedado mais uma chamada real auditada do ChatGPT contra a VPS.
 
 ## A ideia
 
@@ -59,6 +59,12 @@ O bootstrap cria segredos locais aleatórios, ID estável da instância, estado 
 
 A verificação local prova health, negação de token inválido, chamada MCP real de system.info e integridade do audit chain. **A instalação ainda não terminou.**
 
+### Limite do procedimento suportado
+
+O fluxo documentado é autônomo na própria VPS do usuário. Comandos temporários usados por mantenedores durante desenvolvimento ou validação não são requisitos de instalação. O tutorial suportado nunca pede que o usuário exponha senha da VPS, chave SSH privada, acesso administrativo remoto irrestrito ou segredos não relacionados ao serviço ao ChatGPT ou a um mantenedor.
+
+A senha do operador OAuth integrado é digitada localmente no script de configuração porque é uma credencial deste serviço. Ela não é uma credencial SSH/VPS e não é fornecida ao ChatGPT. Veja o [contrato de instalação](docs/installation-contract.md).
+
 ### Autoridade de filesystem sobre o host inteiro
 
 Scoped é o padrão. Para expor deliberadamente o filesystem inteiro ao Broker, use o override explícito:
@@ -69,32 +75,45 @@ docker compose -f compose.yaml -f compose.host.yaml up -d --build
 ~~~
 
 `compose.host.yaml` é a chave deliberada de whole-host e define `/` como teto físico do Broker. A policy server-side continua controlando quais operações MCP são permitidas.
-### HTTPS público + ChatGPT
+### Terminar a instalação: OAuth integrado + ChatGPT
 
-Para uma conexão do ChatGPT com escrita, use um Authorization Server OAuth/OIDC aderente ao padrão MCP e configure endpoint público, issuer, audience/resource e subject esperado no .env. Bearer estático fica restrito a laboratório/acceptance local.
+O caminho público suportado é OAuth/OIDC auto-hospedado dentro deste pacote. Não é necessário contratar um provedor de identidade externo nem usar um túnel separado.
 
-~~~dotenv
-VPS_AGENT_DOMAIN=mcp.exemplo.com
-VPS_AGENT_PUBLIC_URL=https://mcp.exemplo.com/mcp
-VPS_AGENT_AUTH_MODE=oidc
-VPS_AGENT_OIDC_ISSUER=https://auth.exemplo.com
-VPS_AGENT_OIDC_AUDIENCE=https://mcp.exemplo.com/mcp
-VPS_AGENT_SUBJECT=<subject-esperado-do-token>
+Antes do próximo comando, crie um registro DNS A/AAAA para um domínio ou subdomínio seu apontando para a VPS. Depois rode:
+
+~~~bash
+bash scripts/setup-integrated-auth.sh
 ~~~
+
+O script:
+
+- reaproveita um único Traefik já existente quando ele é a borda da VPS;
+- se não houver Traefik, sobe o Traefik do pacote automaticamente quando 80/443 estiverem livres;
+- sobe ZITADEL + PostgreSQL com versões fixadas;
+- cria uma identidade dedicada e não administrativa para o operador da VPS;
+- cria uma audiência OAuth exclusiva para o MCP e um cliente privado de introspecção;
+- habilita Dynamic Client Registration (DCR) compatível com MCP e discovery de PKCE;
+- configura o Gateway como protected resource OAuth;
+- prende o Broker exatamente ao subject desse operador;
+- valida HTTPS, discovery OAuth e negação fail-closed sem autenticação.
+
+O script pede e-mail e senha do operador de forma interativa. A senha é enviada somente à API local de bootstrap do ZITADEL e não é armazenada pelo instalador.
+
+Antes da etapa do ChatGPT, confirme que a conta/workspace de destino realmente mostra Modo de Desenvolvedor / Plugins com a opção de criar um aplicativo MCP personalizado. Não deduza a disponibilidade apenas pelo nome do plano; os rollouts de produto da OpenAI podem mudar independentemente deste projeto.
 
 Depois:
 
 ~~~bash
-docker compose -f compose.yaml -f compose.https.yaml up -d --build
-bash scripts/verify-public.sh
 bash scripts/connect-chatgpt.sh
 ~~~
 
-O verificador público exige HTTPS, discovery OAuth e negação fail-closed sem autenticação. O script de conexão mostra o fluxo atual do ChatGPT Web e espera uma **nova chamada auditada de system.info feita pelo ChatGPT**.
+O script mostra o fluxo de conexão no ChatGPT e espera uma **nova chamada auditada de system.info feita pelo ChatGPT**.
 
 ~~~text
-tutorial
- -> app OAuth conectado no ChatGPT
+OAuth integrado pronto
+ -> ChatGPT descobre recurso MCP + authorization server
+ -> ChatGPT registra dinamicamente seu cliente OAuth
+ -> operador faz login
  -> ChatGPT chama o MCP
  -> Gateway autentica
  -> Broker valida subject + policy
@@ -105,11 +124,8 @@ tutorial
 
 Sem a chamada real, a instalação permanece incompleta.
 
-Orientação oficial verificada em 27/09/2026: Full MCP com escrita/modificação está documentado no ChatGPT Web para Business, Enterprise e Edu. Pro fica limitado a read/fetch. MCP autenticado com escrita usa OAuth 2.1; o ChatGPT não apresenta API keys customizadas.
+A interface e a disponibilidade de recursos do ChatGPT mudam com o tempo e devem ser conferidas na hora do release/setup. O servidor MCP continua baseado em padrões e o caminho suportado não exige provedor de identidade externo.
 
-Fontes oficiais:
-- https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
-- https://developers.openai.com/plugins/build/auth
 ## Caixa de ferramentas
 
 A implementação atual inclui filesystem completo em escopo, shell/jobs sandboxed, systemd tipado, Docker/Compose, diagnósticos, pacotes, usuários/grupos, UFW, elevação fora do canal MCP, SQLite exclusivo do Broker, journal de operações, fencing locks e audit hash-chain.
@@ -154,6 +170,7 @@ VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge
 A remoção segura preserva configuração e auditoria. O purge exige confirmação explícita e remove apenas artefatos do MCP. O update faz backup da configuração/estado, usa Git fast-forward, verifica o runtime novo e restaura código/estado anterior se a verificação falhar.
 ## Documentação
 
+- [Contrato de instalação](docs/installation-contract.md)
 - [Modelo do produto](docs/product-model.md)
 - [Fluxo Docker e primeira execução](docs/installer-flow.md)
 - [Arquitetura](docs/architecture.md)

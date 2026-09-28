@@ -1,5 +1,9 @@
 name: reference-implementation-ci
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
   push:
@@ -22,7 +26,48 @@ jobs:
       - name: Resolve module graph
         run: go mod download
       - name: Validate shell scripts
-        run: bash -n scripts/*.sh
+        run: |
+          bash -n scripts/*.sh
+          bash -n scripts/lib/*.sh
+      - name: Validate integrated OAuth scope matching
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/lib/oauth-scopes.sh
+          audience='urn:zitadel:iam:org:project:id:123456:aud'
+          vps_agent_scope_list_contains "openid $audience" openid
+          vps_agent_scope_list_contains "openid $audience" "$audience"
+          if vps_agent_scope_list_contains "openid" "$audience"; then
+            echo "audience scope unexpectedly accepted when missing" >&2
+            exit 1
+          fi
+          if vps_agent_scope_list_contains "$audience" openid; then
+            echo "openid unexpectedly accepted when missing" >&2
+            exit 1
+          fi
+      - name: Validate supported installation documentation
+        run: python3 scripts/check-installation-contract.py
+      - name: Validate integrated-auth Compose model
+        env:
+          VPS_AGENT_ADMIN_TOKEN: ci-admin-token
+          VPS_AGENT_STATIC_TOKEN: ci-static-token
+          VPS_AGENT_SUBJECT: ci-operator
+          VPS_AGENT_SCOPE_ROOT: /tmp/vps-agent-ci
+          VPS_AGENT_AUTH_MODE: integrated
+          VPS_AGENT_DOMAIN: mcp.example.invalid
+          VPS_AGENT_PUBLIC_URL: https://mcp.example.invalid/mcp
+          VPS_AGENT_OIDC_ISSUER: https://mcp.example.invalid
+          VPS_AGENT_OAUTH_RESOURCE: https://mcp.example.invalid/mcp
+          VPS_AGENT_EDGE_NETWORK: ci-edge
+          VPS_AGENT_TRAEFIK_CERTRESOLVER: letsencrypt
+          VPS_AGENT_LETSENCRYPT_EMAIL: ops@example.invalid
+          ZITADEL_BOOTSTRAP_PAT_EXPIRATION: 2099-01-01T00:00:00Z
+          ZITADEL_LOGIN_PAT_EXPIRATION: 2099-01-01T00:00:00Z
+        run: |
+          export ZITADEL_MASTERKEY="$(openssl rand -hex 16)"
+          export ZITADEL_POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+          export ZITADEL_BOOTSTRAP_ADMIN_PASSWORD="T1!$(openssl rand -hex 18)"
+          docker compose -f compose.yaml -f compose.integrated-auth.yaml -f compose.integrated-auth.proxy.yaml config -q
       - name: Format ephemeral workspace
         run: gofmt -w $(find . -name '*.go' -type f -print)
       - name: Vet
@@ -117,15 +162,29 @@ jobs:
           go test ./internal/securefs -run='^$' -fuzz=FuzzSelectRootNeverEscapes -fuzztime=10s
           go test ./internal/policy -run='^$' -fuzz=FuzzPolicyLoadNeverPanics -fuzztime=10s
       - name: Secret scan
-        uses: gitleaks/gitleaks-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.24.3
+          set +e
+          gitleaks dir . --redact --exit-code=2 --report-format=json --report-path=results.json
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            python3 - <<'PY'
+          import json
+          data=json.load(open("results.json"))
+          for x in data:
+              print(f"{x.get('RuleID','unknown')} {x.get('File','?')}:{x.get('StartLine','?')}")
+          PY
+            exit "$status"
+          fi
       - name: Upload security report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: source-security
-          path: gosec.json
+          path: |
+            gosec.json
+            results.json
           if-no-files-found: ignore
 
   systemd-job-smoke:

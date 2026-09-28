@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/subtle"
 	"errors"
+	"encoding/json"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 )
@@ -94,32 +96,107 @@ func staticVerifier(token, subject string) mcpauth.TokenVerifier {
 	}
 }
 
-func NewOIDCVerifier(ctx context.Context, issuer, audience string) (mcpauth.TokenVerifier, error) {
-	if issuer == "" || audience == "" {
-		return nil, errors.New("issuer and audience are required")
+// NewIntegratedOIDCVerifier validates opaque ZITADEL access tokens through a
+// private RFC 7662 introspection backchannel. The introspection client belongs
+// to a dedicated resource project. ZITADEL itself rejects tokens whose aud
+// does not contain that client or project, and we independently require the
+// expected issuer, resource-project audience and advertised scopes.
+func NewIntegratedOIDCVerifier(introspectionURL, forwardedHost, clientID, clientSecret, expectedIssuer, expectedAudience string) (mcpauth.TokenVerifier, error) {
+	if strings.TrimSpace(introspectionURL) == "" {
+		return nil, errors.New("integrated introspection URL is required")
 	}
-	provider, err := oidc.NewProvider(ctx, issuer)
-	if err != nil {
-		return nil, err
+	u, err := url.Parse(introspectionURL)
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return nil, errors.New("integrated introspection URL must be http(s)")
 	}
-	verifier := provider.Verifier(&oidc.Config{ClientID: audience})
+	if clientID == "" || clientSecret == "" {
+		return nil, errors.New("integrated introspection client credentials are required")
+	}
+	expectedIssuer = strings.TrimRight(strings.TrimSpace(expectedIssuer), "/")
+	if expectedIssuer == "" {
+		return nil, errors.New("integrated expected issuer is required")
+	}
+	if strings.TrimSpace(expectedAudience) == "" {
+		return nil, errors.New("integrated expected audience is required")
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
 	return func(ctx context.Context, raw string, _ *http.Request) (*mcpauth.TokenInfo, error) {
-		tok, err := verifier.Verify(ctx, raw)
+		if strings.TrimSpace(raw) == "" {
+			return nil, mcpauth.ErrInvalidToken
+		}
+
+		form := url.Values{"token": []string{raw}}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, introspectionURL, strings.NewReader(form.Encode()))
 		if err != nil {
 			return nil, mcpauth.ErrInvalidToken
 		}
-		var claims struct {
-			Subject     string   `json:"sub"`
-			Scope       string   `json:"scope"`
-			Permissions []string `json:"permissions"`
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.SetBasicAuth(clientID, clientSecret)
+		if forwardedHost != "" {
+			req.Host = forwardedHost
+			req.Header.Set("X-Forwarded-Proto", "https")
 		}
-		if err := tok.Claims(&claims); err != nil || claims.Subject == "" {
+
+		resp, err := client.Do(req)
+		if err != nil {
 			return nil, mcpauth.ErrInvalidToken
 		}
-		scopes := append([]string{}, claims.Permissions...)
-		scopes = append(scopes, strings.Fields(claims.Scope)...)
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+			return nil, mcpauth.ErrInvalidToken
+		}
+
+		var token struct {
+			Active     bool            `json:"active"`
+			Subject    string          `json:"sub"`
+			Scope      string          `json:"scope"`
+			Expiration int64           `json:"exp"`
+			Issuer     string          `json:"iss"`
+			Audience   json.RawMessage `json:"aud"`
+		}
+		dec := json.NewDecoder(io.LimitReader(resp.Body, 64<<10))
+		if err := dec.Decode(&token); err != nil {
+			return nil, mcpauth.ErrInvalidToken
+		}
+		if !token.Active || strings.TrimSpace(token.Subject) == "" {
+			return nil, mcpauth.ErrInvalidToken
+		}
+		if strings.TrimRight(token.Issuer, "/") != expectedIssuer {
+			return nil, mcpauth.ErrInvalidToken
+		}
+		if token.Expiration <= time.Now().Unix() {
+			return nil, mcpauth.ErrInvalidToken
+		}
+		if !audienceContains(token.Audience, expectedAudience) {
+			return nil, mcpauth.ErrInvalidToken
+		}
+
 		return &mcpauth.TokenInfo{
-			UserID: claims.Subject, Scopes: scopes, Expiration: tok.Expiry,
+			UserID:     token.Subject,
+			Scopes:     strings.Fields(token.Scope),
+			Expiration: time.Unix(token.Expiration, 0),
 		}, nil
 	}, nil
+}
+
+func audienceContains(raw json.RawMessage, expected string) bool {
+	if len(raw) == 0 {
+		return false
+	}
+	var one string
+	if err := json.Unmarshal(raw, &one); err == nil {
+		return one == expected
+	}
+	var many []string
+	if err := json.Unmarshal(raw, &many); err != nil {
+		return false
+	}
+	for _, candidate := range many {
+		if candidate == expected {
+			return true
+		}
+	}
+	return false
 }

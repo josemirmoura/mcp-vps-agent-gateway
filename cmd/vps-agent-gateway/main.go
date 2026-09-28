@@ -1,8 +1,7 @@
 package main
 
 import (
-	"context"
-	"log/slog"
+		"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -67,24 +66,28 @@ func main() {
 		slog.Error("unauthenticated_remote_bind_rejected", "listen", listen, "reason", "auth mode none is allowed only on loopback")
 		os.Exit(1)
 	}
-	if os.Getenv("VPS_AGENT_PUBLIC_URL") != "" && authCfg.Mode != "oidc" {
-		slog.Error("public_auth_rejected", "reason", "public MCP configuration requires oidc"); os.Exit(1)
+	if os.Getenv("VPS_AGENT_PUBLIC_URL") != "" && authCfg.Mode != "integrated" {
+		slog.Error("public_auth_rejected", "reason", "public MCP configuration requires integrated auth"); os.Exit(1)
 	}
-	if authCfg.Mode == "oidc" {
-		if resource == "" {
-			slog.Error("oidc_config_invalid", "reason", "OAuth resource/public URL required"); os.Exit(1)
+	if authCfg.Mode == "integrated" {
+		if resource == "" || issuer == "" {
+			slog.Error("integrated_auth_config_invalid", "reason", "OAuth resource/public URL and issuer required"); os.Exit(1)
 		}
-		audience := os.Getenv("VPS_AGENT_OIDC_AUDIENCE")
-		if audience == "" {
-			audience = resource
-		}
-		verifier, err := gateway.NewOIDCVerifier(
-			context.Background(),
+		introspectionURL := os.Getenv("VPS_AGENT_INTEGRATED_INTROSPECTION_URL")
+		introspectionHost := os.Getenv("VPS_AGENT_INTEGRATED_INTROSPECTION_HOST")
+		introspectionClientID := os.Getenv("VPS_AGENT_INTEGRATED_INTROSPECTION_CLIENT_ID")
+		introspectionClientSecret := os.Getenv("VPS_AGENT_INTEGRATED_INTROSPECTION_CLIENT_SECRET")
+		expectedAudience := os.Getenv("VPS_AGENT_INTEGRATED_AUDIENCE_PROJECT_ID")
+		verifier, err := gateway.NewIntegratedOIDCVerifier(
+			introspectionURL,
+			introspectionHost,
+			introspectionClientID,
+			introspectionClientSecret,
 			issuer,
-			audience,
+			expectedAudience,
 		)
 		if err != nil {
-			slog.Error("oidc_config_failed", "error", err); os.Exit(1)
+			slog.Error("integrated_auth_config_failed", "error", err); os.Exit(1)
 		}
 		authCfg.Verifier = verifier
 	}
@@ -101,6 +104,7 @@ func main() {
 	slog.Info("gateway_start", "listen", listen, "auth_mode", authCfg.Mode, "instance_id", authCfg.InstanceID, "instance_name", authCfg.InstanceName)
 	if err := srv.ListenAndServe(); err != nil { slog.Error("gateway_exit", "error", err); os.Exit(1) }
 }
+
 
 func metadataURLForResource(raw string) string {
 	u, err := url.Parse(raw)
