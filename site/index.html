@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Security-first Docker MCP gateway for scoped, auditable ChatGPT administration of a Linux VPS.">
+  <meta name="description" content="Scoped, auditable MCP control for a Linux VPS with a non-root Gateway, privileged local Broker and operator-defined authority.">
   <title>MCP VPS Agent Gateway</title>
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
@@ -12,26 +12,45 @@
   <header class="hero">
     <nav>
       <strong>MCP VPS Agent Gateway</strong>
-      <div><a href="https://github.com/josemirmoura/mcp-vps-agent-gateway">GitHub</a> <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/README.pt-BR.md">PT-BR</a></div>
+      <div>
+        <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway">GitHub</a>
+        <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/quick-start.md">Docs</a>
+        <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/README.pt-BR.md">PT-BR</a>
+      </div>
     </nav>
     <div class="hero-copy">
-      <p class="eyebrow">Docker-first · policy-enforced · auditable</p>
-      <h1>Give ChatGPT real VPS capabilities without handing the model an unrestricted root shell.</h1>
-      <p class="lede">A remote MCP Gateway authenticates the client. A privileged local Broker re-authorizes every host operation against the scope chosen by the VPS owner.</p>
-      <div class="actions"><a class="button" href="#quick-start">Quick Start</a><a class="button secondary" href="https://github.com/josemirmoura/mcp-vps-agent-gateway">Read the docs</a></div>
+      <p class="eyebrow">v0.1.0-rc.1 · Docker-first · policy-enforced · auditable</p>
+      <h1>Give ChatGPT useful VPS authority without turning the model into root.</h1>
+      <p class="lede">A non-root MCP Gateway authenticates the client. A privileged local Broker re-authorizes each host operation against policy chosen by the VPS owner.</p>
+      <div class="actions">
+        <a class="button" href="#quick-start">Quick Start</a>
+        <a class="button secondary" href="https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/architecture.md">Architecture</a>
+      </div>
     </div>
   </header>
 
   <main>
     <section class="grid three">
-      <article><h2>Operator-defined authority</h2><p>Delegate one project, several roots, selected services and containers, or broader host authority. Filesystem, shell, systemd, Docker, network and admin capabilities remain separate policy decisions.</p></article>
-      <article><h2>Privilege stays server-side</h2><p>The Gateway is non-root and receives neither <code>/host</code> nor the Docker socket. The Broker is local-only, privileged and policy-authoritative.</p></article>
-      <article><h2>Proof before success</h2><p>Healthy containers are only a checkpoint. Installation completes after a real ChatGPT MCP call crosses authentication, policy, Broker execution and the tamper-evident audit trail.</p></article>
+      <article>
+        <p class="eyebrow">Authority</p>
+        <h2>You choose the delegated perimeter.</h2>
+        <p>Project, Custom and Whole Host define the physical filesystem ceiling. Filesystem, shell, systemd, Docker, network and administrative capabilities remain separate policy decisions.</p>
+      </article>
+      <article>
+        <p class="eyebrow">Privilege</p>
+        <h2>Root stays behind the Broker.</h2>
+        <p>The Gateway is non-root and receives neither <code>/host</code> nor the Docker socket. The Broker is local-only, privileged and policy-authoritative.</p>
+      </article>
+      <article>
+        <p class="eyebrow">Completion</p>
+        <h2>Proof before “installed”.</h2>
+        <p>Healthy containers are a checkpoint. Installation completes only after a real authenticated ChatGPT MCP call reaches policy, execution and Broker audit.</p>
+      </article>
     </section>
 
     <section>
       <p class="eyebrow">Architecture</p>
-      <h2>Small surface, explicit trust boundaries</h2>
+      <h2>Small public surface, explicit trust boundaries.</h2>
       <div class="architecture">
         <div class="node"><strong>ChatGPT</strong><span>OAuth + HTTPS MCP</span></div>
         <div class="arrow">→</div>
@@ -44,54 +63,92 @@
     </section>
 
     <section class="grid two">
-      <article><p class="eyebrow">Security</p><h2>The LLM is not the authorization engine.</h2><p>Deny-by-default policy, scoped filesystem resolution, isolated shell/jobs, bounded requests, expected-subject checks, operation journals, locks/fencing and a Broker-owned audit hash chain keep authority in code the operator controls.</p></article>
-      <article><p class="eyebrow">Identity</p><h2>OAuth without an OAuth homework assignment.</h2><p>The supported public path self-hosts ZITADEL beside the Gateway. The setup script creates the operator identity, a dedicated MCP audience, private token introspection, dynamic client registration and reuses the VPS edge proxy when possible.</p></article>
+      <article>
+        <p class="eyebrow">Security</p>
+        <h2>The LLM is not the authorization engine.</h2>
+        <p>Deny-by-default policy, secure path resolution, isolated shell/jobs, bounded requests, exact-subject checks, operation journals, locks/fencing and a Broker-owned audit hash chain keep authority in server code.</p>
+      </article>
+      <article>
+        <p class="eyebrow">Identity</p>
+        <h2>Integrated OAuth, self-hosted.</h2>
+        <p>The supported public path runs ZITADEL + PostgreSQL beside the service, with a dedicated operator, MCP audience, private RFC 7662 introspection, DCR and PKCE. ZITADEL telemetry is disabled.</p>
+      </article>
     </section>
 
     <section id="quick-start" class="quick">
       <p class="eyebrow">Quick Start</p>
-      <h2>Clone, choose scope, start, verify.</h2>
+      <h2>Three commands to enter the guided flow.</h2>
       <div class="code-block">
-        <button class="copy-button" type="button" data-copy-target="quick-start-code" aria-label="Copy all Quick Start commands" title="Copy all commands">
+        <button class="copy-button" type="button" data-copy-target="quick-start-code" aria-label="Copy Quick Start" title="Copy commands">
           <svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h10v10H9z"></path><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg>
           <svg class="check-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>
         </button>
-        <pre><code id="quick-start-code">git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git &&
-cd mcp-vps-agent-gateway &&
-sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 /opt/vps-agent-sandbox &&
-bash scripts/init.sh --scope /opt/vps-agent-sandbox &&
-docker compose up -d --build &&
-bash scripts/verify.sh</code></pre>
+        <pre><code id="quick-start-code">git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
+cd mcp-vps-agent-gateway
+bash scripts/install.sh</code></pre>
       </div>
-      <p>The Quick Start delegates only <code>/opt/vps-agent-sandbox</code>. Change that path to the existing directory you want the MCP to control. The <code>&amp;&amp;</code> chain stops at the first failed step instead of continuing into a broken verification.</p>
-      <p>Local verification is only checkpoint one. To finish, point a DNS hostname at the VPS and run the integrated-auth step below. No third-party identity provider account is required.</p>
+      <p>The terminal checks requirements, asks for Project / Custom / Whole Host, displays the effective authority, starts the runtime, verifies it, configures public OAuth and then waits for the real ChatGPT completion call.</p>
+      <p><strong>Project is the recommended default.</strong> Whole Host sets the filesystem ceiling to <code>/</code>, but does not enable Full or unrestricted network.</p>
     </section>
 
     <section id="connect-chatgpt" class="quick">
-      <p class="eyebrow">Step 2 · Connect ChatGPT</p>
-      <h2>One domain, integrated OAuth, real proof.</h2>
-      <p>Create a DNS A/AAAA record such as <code>mcp.example.com</code> pointing to the VPS. Then run the block below; the setup asks for the domain, operator email and password interactively:</p>
+      <p class="eyebrow">Transparent components</p>
+      <h2>The guided flow does not hide the machinery.</h2>
+      <p>Advanced operators can run the same components individually:</p>
       <div class="code-block">
-        <button class="copy-button" type="button" data-copy-target="integrated-auth-code" aria-label="Copy integrated auth commands" title="Copy commands">
+        <button class="copy-button" type="button" data-copy-target="components-code" aria-label="Copy component commands" title="Copy commands">
           <svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h10v10H9z"></path><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg>
           <svg class="check-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>
         </button>
-        <pre><code id="integrated-auth-code">bash scripts/setup-integrated-auth.sh &&
+        <pre><code id="components-code">bash scripts/init.sh --scope /opt/my-app
+docker compose up -d --build
+bash scripts/verify.sh
+bash scripts/setup-integrated-auth.sh
 bash scripts/connect-chatgpt.sh</code></pre>
       </div>
-      <p>The setup script asks locally for the dedicated OAuth operator email and password, then handles the rest: existing Traefik detection or bundled edge on a clean VPS, TLS, ZITADEL + PostgreSQL, dedicated operator identity, MCP-only resource audience, private token introspection, DCR, PKCE discovery, Gateway/Broker identity binding and public verification.</p>
-      <p><strong>No VPS or SSH credentials are given to ChatGPT.</strong> The supported installation never requires a VPS password, private SSH key or unrestricted remote admin access to be shared with ChatGPT or a maintainer.</p>
-      <p><code>connect-chatgpt.sh</code> does not declare victory when it merely prints instructions. It waits until ChatGPT actually calls <code>system.info</code> and the Broker audit confirms the authenticated request. Only then does it print <code>INSTALLATION COMPLETE</code>.</p>
+      <p><strong>No VPS or SSH credentials are given to ChatGPT.</strong> The dedicated OAuth operator credential belongs to the integrated identity service and is entered locally through the supported auth flow.</p>
+      <p><code>connect-chatgpt.sh</code> waits for a new authenticated <code>system.info</code> event from the expected subject and validates Broker audit before printing <code>INSTALLATION COMPLETE</code>.</p>
+    </section>
+
+    <section class="grid three">
+      <article>
+        <p class="eyebrow">Operations</p>
+        <h2>Diagnose.</h2>
+        <pre><code>bash scripts/diagnose.sh status
+bash scripts/diagnose.sh health
+bash scripts/diagnose.sh bundle</code></pre>
+      </article>
+      <article>
+        <p class="eyebrow">Lifecycle</p>
+        <h2>Update or remove.</h2>
+        <pre><code>bash scripts/update.sh
+bash scripts/remove.sh safe</code></pre>
+        <p>Stable SemVer tags are the default update channel. Backup, migration validation and rollback stay in the existing updater.</p>
+      </article>
+      <article>
+        <p class="eyebrow">Maturity</p>
+        <h2>Scoped first.</h2>
+        <p>The Scoped path has automated and real ChatGPT E2E evidence. Full/R5 remains an advanced path and is not presented as production-ready.</p>
+      </article>
     </section>
 
     <section class="grid two">
-      <article><p class="eyebrow">Operations</p><h2>Terminal-first after day one.</h2><pre><code>bash scripts/diagnose.sh status
-bash scripts/update.sh
-bash scripts/remove.sh safe</code></pre></article>
-      <article><p class="eyebrow">Validation</p><h2>CI exercises the host path, not just mocks.</h2><p>Clean Ubuntu runners test Docker package health, auth denial, scoped filesystem and shell behavior, real systemd and Docker restarts, Compose lifecycle, elevation rules and audit integrity.</p></article>
+      <article>
+        <p class="eyebrow">Privacy</p>
+        <h2>Self-hosted, no marketing telemetry.</h2>
+        <p>State, policy, audit and identity data stay on the VPS unless the operator exports them. Diagnostic bundles redact configured secrets. See the repository privacy document for details.</p>
+      </article>
+      <article>
+        <p class="eyebrow">Release integrity</p>
+        <h2>SemVer, checksums, SBOM and provenance.</h2>
+        <p>Release tags must match <code>VERSION</code>. GHCR images are built for amd64/arm64 with SBOM/provenance; source packages carry SHA-256 checksums. Dedicated project-managed signing is not yet claimed.</p>
+      </article>
     </section>
   </main>
 
-  <footer><span>Apache-2.0</span><a href="https://github.com/josemirmoura/mcp-vps-agent-gateway">Repository and technical documentation →</a></footer>
+  <footer>
+    <span>Apache-2.0 · pre-release productization candidate</span>
+    <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway">Repository and documentation →</a>
+  </footer>
 </body>
 </html>
