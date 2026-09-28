@@ -25,6 +25,18 @@ The dedicated OAuth operator password is different: it is a service credential r
 
 See [installation-contract.md](installation-contract.md) for the normative boundary between supported installation and development-only procedures.
 
+## Guided entry point
+
+The normal user starts with:
+
+~~~bash
+bash scripts/install.sh
+~~~
+
+This script is an orchestration layer, not a second installer implementation. It calls the same transparent components described below, shows the effective authority before runtime startup, pauses only for unavoidable operator decisions, and can be rerun after an interrupted phase.
+
+Advanced operators can still execute the phases individually.
+
 ## Phase 1 — Bootstrap
 
 ~~~bash
