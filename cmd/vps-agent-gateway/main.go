@@ -1,8 +1,7 @@
 package main
 
 import (
-	"context"
-	"log/slog"
+		"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -74,7 +73,9 @@ func main() {
 		if resource == "" || issuer == "" {
 			slog.Error("integrated_auth_config_invalid", "reason", "OAuth resource/public URL and issuer required"); os.Exit(1)
 		}
-		verifier, err := gateway.NewIntegratedOIDCVerifier(context.Background(), issuer)
+		userInfoURL := os.Getenv("VPS_AGENT_INTEGRATED_USERINFO_URL")
+		userInfoHost := os.Getenv("VPS_AGENT_INTEGRATED_USERINFO_HOST")
+		verifier, err := gateway.NewIntegratedOIDCVerifier(userInfoURL, userInfoHost)
 		if err != nil {
 			slog.Error("integrated_auth_config_failed", "error", err); os.Exit(1)
 		}
