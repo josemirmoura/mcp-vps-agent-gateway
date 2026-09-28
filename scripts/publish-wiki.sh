@@ -49,13 +49,7 @@ fi
 wiki_remote="${VPS_AGENT_WIKI_REMOTE:-}"
 if [ -z "$wiki_remote" ]; then
   case "$origin_url" in
-    git@github.com:*.git)
-      wiki_remote="${origin_url%.git}.wiki.git"
-      ;;
-    https://github.com/*.git)
-      wiki_remote="${origin_url%.git}.wiki.git"
-      ;;
-    ssh://git@github.com/*.git)
+    git@github.com:*|https://github.com/*|ssh://git@github.com/*)
       wiki_remote="${origin_url%.git}.wiki.git"
       ;;
     *)
