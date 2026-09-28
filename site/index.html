@@ -70,13 +70,13 @@ bash scripts/verify.sh</code></pre>
     <section id="connect-chatgpt" class="quick">
       <p class="eyebrow">Step 2 · Connect ChatGPT</p>
       <h2>One domain, integrated OAuth, real proof.</h2>
-      <p>Create a DNS A/AAAA record such as <code>mcp.example.com</code> pointing to the VPS. Then run:</p>
+      <p>Create a DNS A/AAAA record such as <code>mcp.example.com</code> pointing to the VPS. Then run the block below; the setup asks for the domain, operator email and password interactively:</p>
       <div class="code-block">
         <button class="copy-button" type="button" data-copy-target="integrated-auth-code" aria-label="Copy integrated auth commands" title="Copy commands">
           <svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h10v10H9z"></path><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg>
           <svg class="check-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>
         </button>
-        <pre><code id="integrated-auth-code">bash scripts/setup-integrated-auth.sh --domain mcp.example.com &&
+        <pre><code id="integrated-auth-code">bash scripts/setup-integrated-auth.sh &&
 bash scripts/connect-chatgpt.sh</code></pre>
       </div>
       <p>The setup script asks for the operator email and password, then handles the rest: existing Traefik detection or bundled edge on a clean VPS, TLS, ZITADEL + PostgreSQL, dedicated operator identity, DCR, PKCE discovery, Gateway/Broker identity binding and public verification.</p>
