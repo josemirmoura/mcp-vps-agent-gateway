@@ -59,6 +59,12 @@ The bootstrap creates random local secrets, a stable instance ID, local state an
 
 Local verification proves health, invalid-token denial, a real MCP system.info call and audit-chain integrity. **Installation is still not complete.**
 
+### Supported installation boundary
+
+The documented user flow is self-service on the user's own VPS. Temporary commands used by maintainers during development or acceptance are not installation requirements. The supported tutorial never asks the user to expose a VPS password, private SSH key, unrestricted remote administrative access, or unrelated secrets to ChatGPT or to a maintainer.
+
+The integrated OAuth operator password is entered locally into the setup script because it is a credential of this service. It is not a VPS/SSH credential and is not given to ChatGPT. See [the installation contract](docs/installation-contract.md).
+
 ### Whole-host filesystem authority
 
 Scoped is the default. To deliberately expose the whole host filesystem to the Broker, use the explicit override:
@@ -162,6 +168,7 @@ VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge
 Safe removal preserves configuration and audit state. Purge requires explicit confirmation and removes only MCP-owned artifacts. Updates back up operator configuration/state, use fast-forward Git updates, verify the new runtime, and roll back code/state on verification failure.
 ## Documentation
 
+- [Installation contract](docs/installation-contract.md)
 - [Product model](docs/product-model.md)
 - [Docker first-run flow](docs/installer-flow.md)
 - [Architecture](docs/architecture.md)
