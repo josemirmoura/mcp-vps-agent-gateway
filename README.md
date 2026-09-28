@@ -76,7 +76,7 @@ The supported public path is self-hosted OAuth/OIDC inside this package. No thir
 Before running the next command, create a DNS A/AAAA record for a hostname you control and point it at the VPS. Then run:
 
 ~~~bash
-bash scripts/setup-integrated-auth.sh --domain mcp.example.com
+bash scripts/setup-integrated-auth.sh
 ~~~
 
 The script:
