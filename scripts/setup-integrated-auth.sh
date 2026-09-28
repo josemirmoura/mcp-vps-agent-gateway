@@ -274,7 +274,6 @@ upsert_env VPS_AGENT_AUTH_MODE integrated
 upsert_env VPS_AGENT_OIDC_ISSUER "https://$DOMAIN"
 upsert_env VPS_AGENT_OAUTH_RESOURCE "https://$DOMAIN/mcp"
 upsert_env VPS_AGENT_RESOURCE_METADATA_URL "https://$DOMAIN/.well-known/oauth-protected-resource"
-upsert_env VPS_AGENT_REQUIRED_SCOPES openid
 upsert_env VPS_AGENT_EDGE_NETWORK "$EDGE_NETWORK"
 upsert_env VPS_AGENT_TRAEFIK_CERTRESOLVER "$CERTRESOLVER"
 upsert_env VPS_AGENT_BUNDLED_PROXY "$BUNDLED_PROXY"
@@ -548,22 +547,22 @@ PY
       --data '{"name":"MCP VPS Agent Introspector","authMethodType":"API_AUTH_METHOD_TYPE_BASIC"}' \
       >"$APP_RESPONSE"
 
-    read -r INTROSPECTION_APP_ID INTROSPECTION_CLIENT_ID INTROSPECTION_CLIENT_SECRET < <(
+    readarray -t APP_VALUES < <(
       python3 - "$APP_RESPONSE" <<'PY'
-import json,shlex,sys
+import json,sys
 x=json.load(open(sys.argv[1]))
-app=x.get("appId","")
-client=x.get("clientId","")
-secret=x.get("clientSecret","")
-assert app and client and secret, x
-print(shlex.quote(app), shlex.quote(client), shlex.quote(secret))
+values=[x.get("appId",""), x.get("clientId",""), x.get("clientSecret","")]
+assert all(values), x
+for value in values:
+    if "\n" in value or "\r" in value:
+        raise SystemExit("newline in generated OAuth credential")
+    print(value)
 PY
     )
-    # The generated identifiers/secrets contain no shell whitespace; reject
-    # anything surprising instead of silently mangling credentials.
-    for value in "$INTROSPECTION_APP_ID" "$INTROSPECTION_CLIENT_ID" "$INTROSPECTION_CLIENT_SECRET"; do
-      [[ "$value" != *[[:space:]]* ]] || { echo "ERROR: unexpected whitespace in generated OAuth credential." >&2; exit 1; }
-    done
+    [ "${#APP_VALUES[@]}" -eq 3 ] || { echo "ERROR: incomplete introspection client response." >&2; exit 1; }
+    INTROSPECTION_APP_ID="${APP_VALUES[0]}"
+    INTROSPECTION_CLIENT_ID="${APP_VALUES[1]}"
+    INTROSPECTION_CLIENT_SECRET="${APP_VALUES[2]}"
     rm -f "$APP_RESPONSE"
 
     upsert_env VPS_AGENT_INTEGRATED_INTROSPECTION_APP_ID "$INTROSPECTION_APP_ID"
