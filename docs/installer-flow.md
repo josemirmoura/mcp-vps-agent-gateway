@@ -15,6 +15,16 @@ Both are local operator state. config/policy.yaml is created from the versioned 
 
 Then Docker Compose starts the package. No separate wizard or native installer owns the configuration.
 
+## Supported user installation boundary
+
+This document describes the supported end-user installation. It does not require a developer, a remote shell controlled by ChatGPT, or disclosure of VPS credentials.
+
+The user runs the documented commands directly on the VPS. The tutorial never requires the VPS password, a private SSH key, unrestricted remote administrative access, or unrelated secrets to be supplied to ChatGPT or to the project maintainers.
+
+The dedicated OAuth operator password is different: it is a service credential required by the integrated identity stack. It is entered locally into `setup-integrated-auth.sh` without terminal echo and is not supplied to ChatGPT.
+
+See [installation-contract.md](installation-contract.md) for the normative boundary between supported installation and development-only procedures.
+
 ## Phase 1 — Bootstrap
 
 ~~~bash
@@ -68,7 +78,9 @@ A local verification success means the runtime is ready. It does **not** mean in
 
 ChatGPT needs a reachable remote HTTPS MCP endpoint, but the operator should not have to assemble an identity provider by hand.
 
-Create a DNS A/AAAA record pointing a hostname at the VPS, then run:
+The package does not control the user's DNS provider, so DNS is an unavoidable manual platform action. Create a DNS A/AAAA record pointing a hostname at the VPS. The setup script validates that the hostname resolves before it proceeds, and the public verifier later confirms valid HTTPS.
+
+Then run:
 
 ~~~bash
 bash scripts/setup-integrated-auth.sh
@@ -90,7 +102,7 @@ The script refuses to replace an unknown service already occupying 80/443.
 bash scripts/connect-chatgpt.sh
 ~~~
 
-The script displays endpoint, authentication mode, expected subject, and the current connection steps.
+The ChatGPT product UI is an unavoidable manual platform action: the user must create/select the MCP app and complete the OAuth browser login. The script displays the endpoint, authentication mode, expected subject, and the current connection steps. The user signs in with the dedicated OAuth operator account, never with VPS/SSH credentials.
 
 At this point:
 
@@ -124,6 +136,14 @@ INSTALLATION COMPLETE
 ~~~
 
 If the call does not arrive or fails authorization, installation remains incomplete.
+
+## Development-only procedures
+
+Development and acceptance may use temporary probes, ephemeral runners, project-specific self-hosted runners, ad-hoc curl/openssl diagnostics, development branches, or a human operator who runs commands because the development session has no VPS execution channel.
+
+Those are **not installation steps**. They belong in PR/issue evidence or development notes and must not be copied into the supported user tutorial.
+
+The release review runs `python3 scripts/check-installation-contract.py` to detect environment-specific development artifacts and prohibited credential-sharing instructions in the supported installation documents.
 
 ## Updates
 
