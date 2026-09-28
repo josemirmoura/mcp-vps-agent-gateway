@@ -280,16 +280,12 @@ Therefore:
 The primary operator flow is intentionally terminal- and AI-friendly:
 
 ~~~bash
-sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 /opt/vps-agent-sandbox
-bash scripts/init.sh --scope /opt/vps-agent-sandbox
-# optionally refine config/policy.yaml and .env
-docker compose up -d --build
-bash scripts/verify.sh
-bash scripts/setup-integrated-auth.sh
-bash scripts/connect-chatgpt.sh
+bash scripts/install.sh
 ~~~
 
-There is no separate proprietary installer or alternate native-install product flow. The supported installation boundary is defined by [installation-contract.md](installation-contract.md): development-session access workarounds are not user installation requirements, and deterministic setup work should be automated by the package.
+`scripts/install.sh` is a transparent orchestration layer over the existing bootstrap, Docker Compose, verification, integrated OAuth and ChatGPT connection scripts. It exposes Project, Custom and Whole Host choices, displays effective authority before startup, and can be rerun after an interrupted phase.
+
+The individual commands remain available for inspection and advanced operation. There is no proprietary installer or alternate native-install product flow. The supported installation boundary is defined by [installation-contract.md](installation-contract.md): development-session access workarounds are not user installation requirements, and deterministic setup work should be automated by the package.
 
 ## Installation is not complete until ChatGPT connectivity is verified
 
