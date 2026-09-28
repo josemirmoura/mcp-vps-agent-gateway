@@ -28,17 +28,7 @@ jobs:
           set -euo pipefail
           gh api "repos/$GITHUB_REPOSITORY/actions/runs?branch=$HEAD_BRANCH&per_page=100" > /tmp/runs.json
           mapfile -t stale_ids < <(
-            python3 - "$CURRENT_SHA" <<'PY'
-import json,sys
-current=sys.argv[1]
-data=json.load(open("/tmp/runs.json"))
-for run in data.get("workflow_runs", []):
-    if run.get("head_sha") == current:
-        continue
-    if run.get("status") not in {"queued","in_progress"}:
-        continue
-    print(run["id"])
-PY
+            python3 -c 'import json,os; d=json.load(open("/tmp/runs.json")); current=os.environ["CURRENT_SHA"]; [print(r["id"]) for r in d.get("workflow_runs",[]) if r.get("head_sha") != current and r.get("status") in {"queued","in_progress"}]'
           )
 
           if [ "${#stale_ids[@]}" -eq 0 ]; then
