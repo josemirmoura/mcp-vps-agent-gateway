@@ -90,7 +90,7 @@ The orchestration is deliberately thin and transparent. The individual `init.sh`
 
 The supported user flow is self-service on the user's own VPS. It never asks the user to expose a VPS password, private SSH key, unrestricted remote administrative access or unrelated secrets to ChatGPT or a maintainer.
 
-For the release-candidate period, `main` remains development. After the final human gate freezes `v0.1.0`, normal installs should use the tagged release checkout rather than `main`.
+For the release-candidate period, `main` remains development. After the final operator acceptance gate freezes `v0.1.0`, normal installs should use the tagged release checkout rather than `main`.
 
 ## Toolbox
 

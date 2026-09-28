@@ -8,8 +8,8 @@ The project follows Semantic Versioning. Pre-release versions may change while t
 
 ### Planned
 
-- final clean-install human gate before the first stable release
-- freeze `v0.1.0` after the human gate passes
+- final clean-install operator acceptance gate before the first stable release
+- freeze `v0.1.0` after the operator acceptance gate passes
 
 ## [0.1.0-rc.3] - 2026-09-28
 
@@ -26,7 +26,7 @@ The project follows Semantic Versioning. Pre-release versions may change while t
 
 ### Scope
 
-No runtime, authorization, installation or security-boundary behavior changed from RC2. RC3 exists so the human acceptance gate tests the exact source tree intended for stable promotion, including the canonical license correction and final public product presentation.
+No runtime, authorization, installation or security-boundary behavior changed from RC2. RC3 exists so the operator acceptance gate tests the exact source tree intended for stable promotion, including the canonical license correction and final public product presentation.
 
 ## [0.1.0-rc.2] - 2026-09-28
 

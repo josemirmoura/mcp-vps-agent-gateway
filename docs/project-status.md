@@ -97,4 +97,4 @@ Prefer:
 
 The implementation has clean-room evidence through the broad Scoped toolbox and Docker packaging, plus a completed real ChatGPT Web OAuth end-to-end gate on 2026-09-28.
 
-The current milestone is **public productization of the Scoped path**: synchronize documentation, sanitize the repository, provide a guided terminal flow, formalize versioning/releases and compatibility, complete pre-release security hardening, and prepare a release candidate for the owner's final clean-install human gate. Long-running reliability remains a later production-maturity requirement. See [implementation-validation.md](implementation-validation.md).
+The current milestone is **public productization of the Scoped path**: synchronize documentation, sanitize the repository, provide a guided terminal flow, formalize versioning/releases and compatibility, complete pre-release security hardening, and prepare a release candidate for the owner's final clean-install operator acceptance gate. Long-running reliability remains a later production-maturity requirement. See [implementation-validation.md](implementation-validation.md).

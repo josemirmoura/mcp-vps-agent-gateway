@@ -50,8 +50,8 @@ This document tracks the public-productization checklist against the current rel
 
 ## Deliberately not completed here
 
-- [ ] stable `v0.1.0` tag/release. It must follow the owner's final human gate.
-- [ ] final clean-install human gate on the owner's target environment.
+- [ ] stable `v0.1.0` tag/release. It must follow the owner's final operator acceptance gate.
+- [ ] final clean-install operator acceptance gate on the owner's target environment.
 - [ ] long-running R4 production reliability evidence.
 - [ ] Full/R5 production maturity.
 - [ ] separate project-managed cryptographic release signing key.

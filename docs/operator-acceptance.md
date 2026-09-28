@@ -1,4 +1,4 @@
-# Final human acceptance gate
+# Final operator acceptance gate
 
 This gate is intentionally owner-operated. It is the last acceptance step before freezing the first stable `v0.1.0` release.
 
@@ -156,14 +156,14 @@ Confirm:
 
 ## Pass criteria
 
-The human gate passes only when every applicable step above succeeds without weakening the documented security model.
+The operator acceptance gate passes only when every applicable step above succeeds without weakening the documented security model.
 
 If a problem appears:
 
 1. record the failing step without secrets;
 2. fix the product;
 3. rerun the affected automated tests;
-4. repeat the necessary human section;
+4. repeat the necessary operator acceptance section;
 5. only then promote/freeze `v0.1.0`.
 
 Full/R5 maturity and long-running R4 reliability remain separate from this first stable Scoped release decision unless explicitly claimed.
