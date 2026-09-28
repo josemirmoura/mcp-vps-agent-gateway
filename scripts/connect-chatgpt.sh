@@ -40,13 +40,14 @@ Expected authenticated subject:
   ${VPS_AGENT_SUBJECT:-operator}
 
 Current OpenAI product gate (checked 2026-09-28):
-- Full custom MCP, including write/modify actions: ChatGPT Business, Enterprise and Edu.
-- ChatGPT Pro: custom MCP is limited to read/fetch and does not certify this project's full write-capable surface.
-- If your current account/workspace does not expose Developer Mode + Apps -> Create, stop here. The VPS/public OAuth side remains ready; installation cannot be marked complete on that account.
+- Do not infer custom MCP availability from the subscription name alone.
+- Use the actual ChatGPT feature surface as the source of truth for this installation.
+- If the account exposes Developer Mode / Plugins and "Create MCP app", continue.
+- If that UI is absent, stop here and recheck current official OpenAI documentation for that account/workspace.
 
 Current OpenAI connection flow:
 1. Open ChatGPT on the web.
-2. If custom MCP apps are available on your account/workspace, enable Developer Mode as permitted by your role.
+2. Confirm that Developer Mode / Plugins exposes the option to create an MCP app.
 3. Open Settings / Workspace Settings -> Apps -> Create.
 4. Enter the remote HTTPS MCP endpoint above.
 5. Choose OAuth authentication. ChatGPT discovers the Authorization Server and registers its client automatically.
