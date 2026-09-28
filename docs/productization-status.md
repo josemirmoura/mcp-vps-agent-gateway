@@ -44,7 +44,7 @@ This document tracks the public-productization checklist against the current rel
 - [ ] lifecycle acceptance including guided install green;
 - [ ] full ephemeral Scoped acceptance green;
 - [ ] ephemeral VPS proof green;
-- [ ] simultaneous multi-VPS acceptance green;
+- [ ] simultaneous independent-instance acceptance green;
 - [ ] final cross-review after CI evidence.
 
 ## Deliberately not completed here
