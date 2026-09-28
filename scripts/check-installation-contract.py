@@ -7,6 +7,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 SUPPORTED = [
     "README.md",
     "README.pt-BR.md",
+    "docs/quick-start.md",
     "docs/installer-flow.md",
     "docs/chatgpt-integration.md",
     "site/index.html",
@@ -62,8 +63,9 @@ for rel in SUPPORTED:
             errors.append(f"{rel}: prohibited credential/remote-access instruction matched: {pattern.pattern}")
 
 required_flow = {
-    "README.md": ["scripts/setup-integrated-auth.sh", "scripts/connect-chatgpt.sh"],
-    "README.pt-BR.md": ["scripts/setup-integrated-auth.sh", "scripts/connect-chatgpt.sh"],
+    "docs/quick-start.md": ["scripts/install.sh", "INSTALLATION COMPLETE"],
+    "README.md": ["scripts/install.sh"],
+    "README.pt-BR.md": ["scripts/install.sh"],
     "docs/installer-flow.md": [
         "scripts/setup-integrated-auth.sh",
         "scripts/verify-public.sh",
@@ -81,6 +83,7 @@ for rel, markers in required_flow.items():
             errors.append(f"{rel}: required supported-flow marker missing: {marker}")
 
 completion_files = [
+    "docs/quick-start.md",
     "README.md",
     "README.pt-BR.md",
     "docs/installer-flow.md",
