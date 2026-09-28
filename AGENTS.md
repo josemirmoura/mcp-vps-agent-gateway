@@ -26,18 +26,20 @@ Use the precedence rules in docs/README.md if documents appear to conflict.
 
 Do not implement the full north-star architecture before the corresponding gate is earned.
 
-Current ladder:
+Historical implementation ladder:
 
 ~~~text
-Gate -1   adopt / adapt / build
-Gate 0A   prove target ChatGPT product surface
-Gate 0B   safe MCP POC
-Gate 1    one typed privileged action
-Gate 2    one real Scoped stack
-Gate 3    durable state/jobs/secrets
-Gate 4    broader validated writes
-Gate 5    optional temporary elevation
+Gate -1   adopt / adapt / build                 complete
+Gate 0A   prove target ChatGPT product surface  complete 2026-09-28
+Gate 0B   safe MCP POC                          complete
+Gate 1    one typed privileged action           complete
+Gate 2    Scoped path                           implemented and under productization
+Gate 3    durable state/jobs/secrets             implemented
+Gate 4    broader validated writes               implemented
+Gate 5    optional temporary elevation           implemented but not a Full/R5 production claim
 ~~~
+
+The current task is productization of the validated Scoped path. Do not reopen completed gates or redesign the runtime without concrete evidence.
 
 ## Reference implementation
 
@@ -147,9 +149,9 @@ Examples:
 
 ChatGPT plan/surface capability is not inferred from architecture.
 
-Before privileged implementation, Gate 0A must record the actual supported route for the target ChatGPT surface.
+Gate 0A was completed on 2026-09-28 for the integrated OAuth + ChatGPT Web route. Keep the integration documentation version-sensitive and revalidate the actual feature surface at release/setup time.
 
-If Plus Web cannot execute the required custom write path, do not hack around the platform restriction. Continue protocol work with MCP Inspector or change the supported distribution route.
+If a future target ChatGPT surface cannot register the required MCP app, do not hack around the platform restriction. Change only the supported distribution route or stop at the product boundary.
 
 ## Definition of progress
 
