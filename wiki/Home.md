@@ -23,7 +23,7 @@
 - [Privacy](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/privacy.md)
 - [Releases and version channels](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/releases.md)
 - [Support boundaries](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/support.md)
-- [Final operator acceptance](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/human-acceptance.md)
+- [Final operator acceptance](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/operator-acceptance.md)
 
 ## Developer and security evidence
 
