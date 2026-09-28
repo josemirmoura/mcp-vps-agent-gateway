@@ -268,6 +268,8 @@ upsert_env VPS_AGENT_DOMAIN "$DOMAIN"
 upsert_env VPS_AGENT_PUBLIC_URL "https://$DOMAIN/mcp"
 upsert_env VPS_AGENT_AUTH_MODE integrated
 upsert_env VPS_AGENT_OIDC_ISSUER "https://$DOMAIN"
+upsert_env VPS_AGENT_INTEGRATED_USERINFO_URL "http://zitadel-auth-internal:8080/oidc/v1/userinfo"
+upsert_env VPS_AGENT_INTEGRATED_USERINFO_HOST "$DOMAIN"
 upsert_env VPS_AGENT_OAUTH_RESOURCE "https://$DOMAIN/mcp"
 upsert_env VPS_AGENT_RESOURCE_METADATA_URL "https://$DOMAIN/.well-known/oauth-protected-resource"
 upsert_env VPS_AGENT_REQUIRED_SCOPES openid
