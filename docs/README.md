@@ -19,6 +19,7 @@ Start here:
 11. [privacy.md](privacy.md) — data, logs, secrets and telemetry.
 12. [releases.md](releases.md) — SemVer and stable/RC/development channels.
 13. [support.md](support.md) — support boundaries.
+14. [human-acceptance.md](human-acceptance.md) — owner-operated final acceptance gate before the first stable release.
 
 ## Developer / security
 
