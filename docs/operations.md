@@ -70,6 +70,15 @@ The bundle includes runtime/version information, health, audit status/tail, rece
 
 The bundle is created mode 0600 and CI checks configured token values are absent. Treat it as sensitive operational data anyway and review before sharing.
 
+## Version and update availability
+
+~~~bash
+bash scripts/version.sh
+bash scripts/version.sh --check
+~~~
+
+The first command shows the installed product version. `--check` refreshes release tags when possible and reports whether the checkout is current, ahead of stable, divergent or has a stable update available.
+
 ## Update
 
 ~~~bash
