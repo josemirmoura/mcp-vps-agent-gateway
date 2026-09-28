@@ -74,7 +74,7 @@ Create a DNS A/AAAA record pointing a hostname at the VPS, then run:
 bash scripts/setup-integrated-auth.sh
 ~~~
 
-The script reuses a single existing Traefik when one is present. If none is present and ports 80/443 are free, it starts the bundled Traefik. It then starts ZITADEL + PostgreSQL, creates the dedicated non-admin operator identity, enables MCP-compatible Dynamic Client Registration, configures the Gateway/Broker identity binding and runs the public verification.
+The script reuses a single existing Traefik when one is present. If none is present and ports 80/443 are free, it starts the bundled Traefik. It then starts ZITADEL + PostgreSQL, creates the dedicated non-admin operator identity, creates an MCP-only OAuth resource audience plus a private introspection client, enables MCP-compatible Dynamic Client Registration, configures the Gateway/Broker identity binding and runs the public verification.
 
 A successful phase ends with:
 
