@@ -99,7 +99,7 @@ O script:
 
 O script pede e-mail e senha do operador de forma interativa. A senha é enviada somente à API local de bootstrap do ZITADEL e não é armazenada pelo instalador.
 
-Antes da etapa do ChatGPT, confirme que a conta/workspace de destino oferece o nível necessário de MCP personalizado. Conforme a documentação oficial da OpenAI verificada em 28/09/2026, MCP personalizado completo com ações de escrita/modificação está disponível em Business, Enterprise e Edu. No Pro, o MCP personalizado fica limitado a leitura/fetch e não certifica a superfície completa de escrita deste projeto.
+Antes da etapa do ChatGPT, confirme que a conta/workspace de destino realmente mostra Modo de Desenvolvedor / Plugins com a opção de criar um aplicativo MCP personalizado. Não deduza a disponibilidade apenas pelo nome do plano; os rollouts de produto da OpenAI podem mudar independentemente deste projeto.
 
 Depois:
 
