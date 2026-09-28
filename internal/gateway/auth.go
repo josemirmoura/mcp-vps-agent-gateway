@@ -96,30 +96,43 @@ func staticVerifier(token, subject string) mcpauth.TokenVerifier {
 	}
 }
 
-// NewIntegratedOIDCVerifier is deliberately specific to the bundled ZITADEL
-// deployment. ZITADEL DCR issues opaque bearer access tokens for this flow,
-// so the resource server validates each token online through ZITADEL UserInfo.
-// The backchannel URL is private to the Docker identity network; the public
-// issuer is still advertised through protected-resource/OIDC metadata.
-func NewIntegratedOIDCVerifier(userInfoURL, forwardedHost string) (mcpauth.TokenVerifier, error) {
-	if strings.TrimSpace(userInfoURL) == "" {
-		return nil, errors.New("integrated userinfo URL is required")
+// NewIntegratedOIDCVerifier validates opaque ZITADEL access tokens through a
+// private RFC 7662 introspection backchannel. The introspection client belongs
+// to a dedicated resource project. ZITADEL itself rejects tokens whose aud
+// does not contain that client or project, and we independently require the
+// expected issuer, resource-project audience and advertised scopes.
+func NewIntegratedOIDCVerifier(introspectionURL, forwardedHost, clientID, clientSecret, expectedIssuer, expectedAudience string) (mcpauth.TokenVerifier, error) {
+	if strings.TrimSpace(introspectionURL) == "" {
+		return nil, errors.New("integrated introspection URL is required")
 	}
-	u, err := url.Parse(userInfoURL)
+	u, err := url.Parse(introspectionURL)
 	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
-		return nil, errors.New("integrated userinfo URL must be http(s)")
+		return nil, errors.New("integrated introspection URL must be http(s)")
 	}
-	client := &http.Client{Timeout: 5 * time.Second}
+	if clientID == "" || clientSecret == "" {
+		return nil, errors.New("integrated introspection client credentials are required")
+	}
+	expectedIssuer = strings.TrimRight(strings.TrimSpace(expectedIssuer), "/")
+	if expectedIssuer == "" {
+		return nil, errors.New("integrated expected issuer is required")
+	}
+	if strings.TrimSpace(expectedAudience) == "" {
+		return nil, errors.New("integrated expected audience is required")
+	}
 
+	client := &http.Client{Timeout: 5 * time.Second}
 	return func(ctx context.Context, raw string, _ *http.Request) (*mcpauth.TokenInfo, error) {
 		if strings.TrimSpace(raw) == "" {
 			return nil, mcpauth.ErrInvalidToken
 		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, userInfoURL, nil)
+
+		form := url.Values{"token": []string{raw}}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, introspectionURL, strings.NewReader(form.Encode()))
 		if err != nil {
 			return nil, mcpauth.ErrInvalidToken
 		}
-		req.Header.Set("Authorization", "Bearer "+raw)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.SetBasicAuth(clientID, clientSecret)
 		if forwardedHost != "" {
 			req.Host = forwardedHost
 			req.Header.Set("X-Forwarded-Proto", "https")
@@ -135,21 +148,55 @@ func NewIntegratedOIDCVerifier(userInfoURL, forwardedHost string) (mcpauth.Token
 			return nil, mcpauth.ErrInvalidToken
 		}
 
-		var info struct {
-			Subject string `json:"sub"`
+		var token struct {
+			Active     bool            `json:"active"`
+			Subject    string          `json:"sub"`
+			Scope      string          `json:"scope"`
+			Expiration int64           `json:"exp"`
+			Issuer     string          `json:"iss"`
+			Audience   json.RawMessage `json:"aud"`
 		}
 		dec := json.NewDecoder(io.LimitReader(resp.Body, 64<<10))
-		if err := dec.Decode(&info); err != nil || strings.TrimSpace(info.Subject) == "" {
+		if err := dec.Decode(&token); err != nil {
+			return nil, mcpauth.ErrInvalidToken
+		}
+		if !token.Active || strings.TrimSpace(token.Subject) == "" {
+			return nil, mcpauth.ErrInvalidToken
+		}
+		if strings.TrimRight(token.Issuer, "/") != expectedIssuer {
+			return nil, mcpauth.ErrInvalidToken
+		}
+		if token.Expiration <= time.Now().Unix() {
+			return nil, mcpauth.ErrInvalidToken
+		}
+		if !audienceContains(token.Audience, expectedAudience) {
 			return nil, mcpauth.ErrInvalidToken
 		}
 
-		// RequireBearerToken needs a non-expired TokenInfo. UserInfo validates
-		// the opaque token online for every request, so this local expiration is
-		// intentionally short and never replaces issuer-side revocation checks.
 		return &mcpauth.TokenInfo{
-			UserID:     info.Subject,
-			Scopes:     []string{"openid"},
-			Expiration: time.Now().Add(time.Minute),
+			UserID:     token.Subject,
+			Scopes:     strings.Fields(token.Scope),
+			Expiration: time.Unix(token.Expiration, 0),
 		}, nil
 	}, nil
+}
+
+func audienceContains(raw json.RawMessage, expected string) bool {
+	if len(raw) == 0 {
+		return false
+	}
+	var one string
+	if err := json.Unmarshal(raw, &one); err == nil {
+		return one == expected
+	}
+	var many []string
+	if err := json.Unmarshal(raw, &many); err != nil {
+		return false
+	}
+	for _, candidate := range many {
+		if candidate == expected {
+			return true
+		}
+	}
+	return false
 }
