@@ -45,7 +45,7 @@ The script generates the identity-stack secrets, reuses an existing Traefik when
 
 The operator password is read without terminal echo. It is never written to `.env` or the state marker.
 
-The ZITADEL bootstrap IAM credential is short-lived and removed from the bootstrap volume after DCR and operator creation. The internal login-client PAT remains in the private Docker volume because ZITADEL Login requires it.
+The temporary bootstrap human IAM owner is deleted after the dedicated operator is created. The bootstrap machine PAT is then removed from the bootstrap volume. The internal login-client PAT remains in the private Docker volume because ZITADEL Login requires it.
 
 ## MCP protected-resource metadata
 
@@ -93,7 +93,7 @@ The setup script creates a dedicated regular human user for the VPS operator and
 VPS_AGENT_SUBJECT=<operator-user-id>
 ~~~
 
-The bootstrap IAM owner is separate, random-password protected and is not the identity accepted by the Broker.
+The bootstrap IAM owner exists only during first-instance setup and is removed before installation proceeds. It is never the identity accepted by the Broker.
 
 ## Fail-closed rules
 
