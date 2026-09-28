@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/josemirmoura/mcp-vps-agent-gateway/security
+    about: Use the repository Security area for private reporting when available. Do not publish exploit details in an issue.
