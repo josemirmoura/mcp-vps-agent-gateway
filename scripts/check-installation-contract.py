@@ -11,6 +11,7 @@ SUPPORTED = [
     "docs/installer-flow.md",
     "docs/chatgpt-integration.md",
     "site/index.html",
+    "site/pt-BR/index.html",
 ]
 
 DEVELOPMENT_ONLY_LITERALS = [
@@ -99,7 +100,19 @@ required_flow = {
         "Development-only procedures",
     ],
     "docs/chatgpt-integration.md": ["scripts/connect-chatgpt.sh"],
-    "site/index.html": ["scripts/setup-integrated-auth.sh", "scripts/connect-chatgpt.sh"],
+    "site/index.html": [
+        "scripts/setup-integrated-auth.sh",
+        "scripts/connect-chatgpt.sh",
+        'hreflang="pt-BR"',
+        'href="pt-BR/"',
+    ],
+    "site/pt-BR/index.html": [
+        "scripts/setup-integrated-auth.sh",
+        "scripts/connect-chatgpt.sh",
+        'lang="pt-BR"',
+        'hreflang="en"',
+        'href="../"',
+    ],
 }
 
 for rel, markers in required_flow.items():
@@ -115,6 +128,7 @@ completion_files = [
     "docs/installer-flow.md",
     "docs/chatgpt-integration.md",
     "site/index.html",
+    "site/pt-BR/index.html",
 ]
 for rel in completion_files:
     text = texts.get(rel, "")
