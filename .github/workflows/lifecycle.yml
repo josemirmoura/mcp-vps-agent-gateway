@@ -138,3 +138,47 @@ jobs:
         run: |
           docker compose down -v --remove-orphans || true
           sudo rm -rf /opt/my-app /opt/vps-agent-lifecycle-scope
+
+  guided-install:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Run guided Project installation to local checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf /opt/vps-agent-guided-scope
+          bash scripts/install.sh \
+            --profile project \
+            --scope /opt/vps-agent-guided-scope \
+            --create-scope \
+            --local-only \
+            --yes | tee /tmp/guided-install.txt
+          grep -q 'LOCAL CHECKPOINT COMPLETE' /tmp/guided-install.txt
+          grep -q 'Installation is NOT complete' /tmp/guided-install.txt
+          test -f .env
+          test -f config/policy.yaml
+          test -f state/state.db
+          bash scripts/diagnose.sh status | tee /tmp/guided-status.txt
+          grep -q 'MCP VPS Agent Gateway' /tmp/guided-status.txt
+          python3 scripts/authority-summary.py | tee /tmp/guided-authority.txt
+          grep -q 'Whole-host mount override:   no' /tmp/guided-authority.txt
+
+      - name: Safe remove after guided installation
+        run: |
+          bash scripts/remove.sh safe
+          test -f .env
+          test -f config/policy.yaml
+          test -f state/state.db
+          test -z "$(docker ps -q --filter label=com.docker.compose.project=mcp-vps-agent)"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v --remove-orphans || true
+          sudo rm -rf /opt/vps-agent-guided-scope
+
