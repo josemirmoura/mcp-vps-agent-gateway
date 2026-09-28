@@ -62,6 +62,28 @@ for rel in SUPPORTED:
         if pattern.search(text):
             errors.append(f"{rel}: prohibited credential/remote-access instruction matched: {pattern.pattern}")
 
+
+# Repository-wide public sanitization guard. The literal definitions above live
+# in this file by design, so this checker excludes itself from the scan.
+for path in ROOT.rglob("*"):
+    if not path.is_file():
+        continue
+    rel = path.relative_to(ROOT).as_posix()
+    if rel == "scripts/check-installation-contract.py":
+        continue
+    if rel.startswith((".git/", "state/", "backups/", "diagnostics/", "dist/", "evidence/")):
+        continue
+    try:
+        text = path.read_text(errors="replace")
+    except OSError:
+        continue
+    for literal in DEVELOPMENT_ONLY_LITERALS:
+        if literal.lower() in text.lower():
+            errors.append(f"{rel}: development-only literal leaked into repository: {literal}")
+    for pattern in DANGEROUS_PATTERNS[:3]:
+        if pattern.search(text):
+            errors.append(f"{rel}: sensitive credential material matched repository guard")
+
 required_flow = {
     "docs/quick-start.md": ["scripts/install.sh", "INSTALLATION COMPLETE"],
     "README.md": ["scripts/install.sh"],
