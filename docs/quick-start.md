@@ -4,7 +4,7 @@ The supported installation is terminal-first and uses the repository's transpare
 
 ## Release candidate
 
-Until the first stable tag is frozen after the final human gate:
+Until the first stable tag is frozen after the final operator acceptance gate:
 
 ~~~bash
 git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
