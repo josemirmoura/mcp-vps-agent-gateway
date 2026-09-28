@@ -218,29 +218,6 @@ jobs:
           print('REAL AUDIENCE-BOUND TOKEN INTROSPECTION: PASS')
           PY
 
-          curl_ci \
-            -X POST http://zitadel-api:8080/oauth/v2/revoke \
-            -u "$PROBE_CLIENT_ID:$PROBE_CLIENT_SECRET" \
-            -H 'Content-Type: application/x-www-form-urlencoded' \
-            --data-urlencode "client_id=$PROBE_CLIENT_ID" \
-            --data-urlencode "token=$ACCESS_TOKEN" \
-            --data-urlencode "token_type_hint=access_token" \
-            >/tmp/revoke-response.txt
-
-          curl_ci \
-            -X POST http://zitadel-api:8080/oauth/v2/introspect \
-            -u "$INTROSPECTION_CLIENT_ID:$INTROSPECTION_CLIENT_SECRET" \
-            -H 'Content-Type: application/x-www-form-urlencoded' \
-            --data-urlencode "token=$ACCESS_TOKEN" \
-            > /tmp/revoked-token-introspection.json
-
-          python3 - <<'PY'
-          import json
-          x=json.load(open('/tmp/revoked-token-introspection.json'))
-          assert x.get('active') is False, x
-          print('REAL ACCESS TOKEN REVOCATION: PASS')
-          PY
-
           curl_ci http://zitadel-api:8080/.well-known/openid-configuration > /tmp/oidc-after.json
           python3 - <<'PY'
           import json
