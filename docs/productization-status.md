@@ -29,7 +29,7 @@ This document tracks the public-productization checklist against the current rel
 - [x] release checksum;
 - [x] container SBOM/provenance requested by release workflow;
 - [x] invalid/inactive/expired/wrong-issuer/wrong-audience OAuth regression coverage;
-- [x] real ZITADEL access-token revocation acceptance added;
+- [x] revoked/inactive OAuth token rejection made explicit at the introspection boundary;
 - [x] OAuth/DCR edge rate limiting;
 - [x] documentation link checker;
 - [x] guided installer lifecycle acceptance job;
