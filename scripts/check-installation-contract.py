@@ -23,6 +23,10 @@ DEVELOPMENT_ONLY_LITERALS = [
     "public-endpoint-probe",
     "real-vps-preflight",
     "TRAEFIK DEFAULT CERT",
+    "josemir-proof",
+    "josemir-human-proof",
+    "/opt/josemir-agradece-seu-gpt",
+    "Josemir agradece seu GPT",
 ]
 
 DANGEROUS_PATTERNS = [
