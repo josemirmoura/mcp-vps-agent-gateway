@@ -2,7 +2,7 @@
 
 Plano de controle MCP orientado a segurança para permitir que ChatGPT ou outro cliente MCP trabalhe numa VPS Linux com a autoridade escolhida explicitamente pelo dono da VPS.
 
-> **Status: candidato a release no que depende de aceitação automatizada.** Os workflows em Ubuntu 24.04 validam o pacote Docker de ponta a ponta. O gate restante é o OAuth integrado e auto-hospedado mais uma chamada real auditada do ChatGPT contra a VPS.
+> **Status: candidato em productização pré-release.** Os workflows em Ubuntu 24.04 validam o pacote de ponta a ponta, e o caminho OAuth integrado e auto-hospedado foi verificado por uma chamada real auditada de `system.info` feita pelo ChatGPT Web em 28/09/2026. Ainda faltam a primeira release pública estável, uma promessa formal de compatibilidade e evidência de confiabilidade prolongada em produção.
 
 ## A ideia
 
