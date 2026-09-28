@@ -40,7 +40,9 @@ A completed public installation requires:
 - a DNS A/AAAA record controlled by the operator;
 - public TCP 80/443 availability through an existing compatible Traefik edge or the bundled Traefik path;
 - a valid HTTPS certificate;
-- for the supported write-capable product path, a ChatGPT Business or Enterprise/Edu workspace whose current web product surface exposes Developer Mode / custom MCP app registration; read-only MCP availability on other plans is not equivalent to the full product path.
+- a ChatGPT Plus or higher account whose current ChatGPT Web surface actually exposes Developer Mode / custom MCP app registration.
+
+OpenAI controls plan availability and rollout. The project's minimum product expectation is therefore **Plus or higher with the feature visibly available in the account**, not merely a subscription label. Current OpenAI documentation describes full MCP support, including write/modify actions, for Business, Enterprise and Edu. Accounts whose ChatGPT surface exposes only read/fetch capabilities remain limited to those capabilities; the VPS package cannot elevate ChatGPT-side permissions.
 
 The package uses one public hostname for MCP protected-resource metadata and the integrated OAuth/OIDC issuer.
 
