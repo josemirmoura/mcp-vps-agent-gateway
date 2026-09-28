@@ -130,6 +130,10 @@ A remoção segura preserva configuração e auditoria. O purge exige confirmaç
 - [Integração ChatGPT](docs/chatgpt-integration.md)
 - [Matriz de segurança do release](docs/security-release.md)
 
+## Contribuição
+
+Veja [CONTRIBUTING.md](CONTRIBUTING.md) para princípios de engenharia e validação e [SECURITY.md](SECURITY.md) para orientação de reporte privado de vulnerabilidades.
+
 ## Licença
 
 Apache-2.0. Veja [LICENSE](LICENSE).
