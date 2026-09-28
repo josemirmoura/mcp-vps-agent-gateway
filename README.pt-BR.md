@@ -76,7 +76,7 @@ O caminho público suportado é OAuth/OIDC auto-hospedado dentro deste pacote. N
 Antes do próximo comando, crie um registro DNS A/AAAA para um domínio ou subdomínio seu apontando para a VPS. Depois rode:
 
 ~~~bash
-bash scripts/setup-integrated-auth.sh --domain mcp.exemplo.com
+bash scripts/setup-integrated-auth.sh
 ~~~
 
 O script:
