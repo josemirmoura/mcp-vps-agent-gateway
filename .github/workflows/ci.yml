@@ -26,7 +26,25 @@ jobs:
       - name: Resolve module graph
         run: go mod download
       - name: Validate shell scripts
-        run: bash -n scripts/*.sh
+        run: |
+          bash -n scripts/*.sh
+          bash -n scripts/lib/*.sh
+      - name: Validate integrated OAuth scope matching
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/lib/oauth-scopes.sh
+          audience='urn:zitadel:iam:org:project:id:123456:aud'
+          vps_agent_scope_list_contains "openid $audience" openid
+          vps_agent_scope_list_contains "openid $audience" "$audience"
+          if vps_agent_scope_list_contains "openid" "$audience"; then
+            echo "audience scope unexpectedly accepted when missing" >&2
+            exit 1
+          fi
+          if vps_agent_scope_list_contains "$audience" openid; then
+            echo "openid unexpectedly accepted when missing" >&2
+            exit 1
+          fi
       - name: Validate supported installation documentation
         run: python3 scripts/check-installation-contract.py
       - name: Validate integrated-auth Compose model
