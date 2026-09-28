@@ -24,10 +24,11 @@ As checked on 2026-09-28, OpenAI documents full MCP support with write/modify ac
 
 Before starting public setup:
 
-1. use a ChatGPT Business or Enterprise/Edu workspace for the supported full path;
-2. ensure an admin/owner has enabled Developer Mode / custom apps as required by the workspace;
+1. use ChatGPT Plus or higher and confirm that the current ChatGPT Web account actually exposes Developer Mode / custom MCP app creation;
+2. on managed workspaces, ensure an admin/owner has enabled Developer Mode / custom apps as required by the workspace;
 3. confirm the account can create a custom app and provide the HTTPS `/mcp` endpoint;
-4. if OpenAI changes plan availability or UI, recheck the current official documentation before proceeding.
+4. understand the account's effective MCP permissions: OpenAI currently documents full write/modify MCP support for Business, Enterprise and Edu, while narrower plan capabilities remain narrower;
+5. if OpenAI changes plan availability or UI, recheck the current official documentation before proceeding.
 
 Official references checked for this release candidate:
 

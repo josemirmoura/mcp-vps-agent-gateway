@@ -12,7 +12,8 @@ Do not run it casually on an important existing MCP installation. Prefer a clean
 - provide at least 2 GB RAM for the bundled ZITADEL path;
 - control DNS for the public MCP hostname;
 - have public TCP 80/443 available through the supported edge path;
-- use a ChatGPT Business or Enterprise/Edu web workspace for the supported full write-capable MCP path.
+- use ChatGPT Plus or higher and confirm Developer Mode / custom MCP app creation is actually available in ChatGPT Web for the account;
+- for acceptance of write/modify capabilities, confirm that the account's current ChatGPT plan/product surface exposes those actions; OpenAI currently documents full MCP write/modify support for Business, Enterprise and Edu.
 
 Record:
 

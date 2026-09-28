@@ -60,9 +60,22 @@ Linux / systemd / Docker / arquivos
 
 Docker é o mecanismo de empacotamento. O Broker continua sendo um componente privilegiado e deve ser tratado como equivalente a root na porção delegada. A policy server-side é autoritativa.
 
-## Começo rápido
+## Requisitos
 
-Requisitos: VPS Linux suportada, Docker Engine + Docker Compose v2, Git, OpenSSL, Python 3 e curl. Veja [compatibilidade](docs/compatibility.md).
+Antes de iniciar a instalação guiada, tenha:
+
+- uma VPS Linux; Ubuntu 24.04 LTS é o alvo validado no release candidate;
+- Docker Engine 24+ com Docker Compose v2;
+- pelo menos 2 GB de RAM para o caminho OAuth integrado com ZITADEL;
+- Git, OpenSSL, Python 3 e curl;
+- um domínio/DNS público apontando para a VPS, portas TCP 80/443 disponíveis e HTTPS válido;
+- **ChatGPT Plus ou superior**, com Modo de Desenvolvedor e criação de app MCP personalizado realmente disponíveis no ChatGPT Web da conta.
+
+As capacidades por plano são controladas pela OpenAI e podem mudar conforme plano, conta e rollout. A documentação atual da OpenAI descreve suporte MCP completo, incluindo ações de escrita/alteração, para Business, Enterprise e Edu. Se uma conta expuser apenas capacidades MCP mais restritas de leitura/busca, o MCP VPS Agent Gateway não pode elevar essa permissão do lado do ChatGPT.
+
+Veja [compatibilidade](docs/compatibility.md) para a matriz suportada/testada.
+
+## Começo rápido
 
 ~~~bash
 git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
