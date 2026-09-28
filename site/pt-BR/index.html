@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Conecte o ChatGPT Web diretamente à sua VPS Linux via MCP, com OAuth auto-hospedado, política definida pelo operador, autorização privilegiada no Broker e auditoria.">
+  <link rel="canonical" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/pt-BR/">
+  <link rel="alternate" hreflang="en" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/">
+  <link rel="alternate" hreflang="pt-BR" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/pt-BR/">
+  <link rel="alternate" hreflang="x-default" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/">
+  <meta property="og:title" content="Conecte o ChatGPT Web à sua VPS Linux | MCP VPS Agent Gateway">
+  <meta property="og:description" content="Uma ponte MCP auto-hospedada e auditável entre o ChatGPT Web e sua VPS Linux. Você escolhe o perímetro e as capacidades; o Broker aplica a política a cada operação privilegiada.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://josemirmoura.github.io/mcp-vps-agent-gateway/pt-BR/">
+  <meta property="og:locale" content="pt_BR">
+  <meta property="og:locale:alternate" content="en_US">
+  <title>Conecte o ChatGPT Web à sua VPS Linux | MCP VPS Agent Gateway</title>
+  <link rel="stylesheet" href="../styles.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "name": "MCP VPS Agent Gateway",
+    "description": "Ponte open source e auto-hospedada que conecta o ChatGPT Web a uma VPS Linux pelo Model Context Protocol (MCP), com OAuth, política definida pelo operador, autorização privilegiada no Broker e auditoria.",
+    "codeRepository": "https://github.com/josemirmoura/mcp-vps-agent-gateway",
+    "programmingLanguage": ["Go", "Shell"],
+    "runtimePlatform": "Linux com Docker Engine e Docker Compose v2",
+    "license": "https://www.apache.org/licenses/LICENSE-2.0",
+    "inLanguage": "pt-BR"
+  }
+  </script>
+  <script src="../app.js" defer></script>
+</head>
+<body>
+  <header class="hero">
+    <nav>
+      <strong>MCP VPS Agent Gateway</strong>
+      <div>
+        <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway">GitHub</a>
+        <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/README.pt-BR.md">Docs</a>
+        <a href="../" lang="en" hreflang="en">EN</a>
+      </div>
+    </nav>
+    <div class="hero-copy">
+      <p class="eyebrow">v0.1.0-rc.3 · MCP auto-hospedado · política aplicada · auditável</p>
+      <h1>Conecte o ChatGPT Web diretamente à sua VPS Linux.</h1>
+      <p class="lede">O MCP VPS Agent Gateway cria um caminho seguro para o ChatGPT inspecionar e operar sua VPS dentro da autoridade que você definir. O OAuth autentica o cliente. Um Broker local privilegiado reautoriza cada operação no host e registra evidências de auditoria.</p>
+      <div class="actions">
+        <a class="button" href="#quick-start">Começo rápido</a>
+        <a class="button secondary" href="#problem-solution">Veja como funciona</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="problem-solution" class="solution-section">
+      <p class="eyebrow">Problema → Solução</p>
+      <h2>Pare de copiar comandos entre o ChatGPT e o terminal.</h2>
+      <p class="section-lede">O ChatGPT consegue raciocinar sobre um servidor, mas sem um caminho confiável de execução ele não enxerga o estado real, não executa a ação autorizada, não inspeciona o resultado e não continua a partir da mesma conversa. O MCP VPS Agent Gateway fecha esse ciclo.</p>
+
+      <div class="grid two problem-solution-grid">
+        <article>
+          <p class="eyebrow">A fricção</p>
+          <h3>O trabalho manual no servidor quebra a conversa em pedaços.</h3>
+          <ul class="feature-list">
+            <li>O ChatGPT sugere um comando, mas não consegue ver o que aconteceu depois.</li>
+            <li>Você troca de janela, copia comandos, cola logs de volta e reconstrói o contexto.</li>
+            <li>O diagnóstico vira um revezamento entre chat, terminal e painéis.</li>
+            <li>Dar à IA um acesso amplo no estilo SSH cria um problema de confiança muito maior.</li>
+          </ul>
+        </article>
+        <article class="solution-card">
+          <p class="eyebrow">A ponte</p>
+          <h3>Deixe o ChatGPT trabalhar na VPS dentro das regras que você definiu.</h3>
+          <p>Pela própria conversa, o ChatGPT pode inspecionar arquivos, diagnosticar serviços, analisar logs, trabalhar com Docker e executar outras operações que você habilitar explicitamente.</p>
+          <p><strong>Project, Custom ou Whole Host</strong> define o perímetro físico. Filesystem, shell, systemd, Docker, rede e capacidades administrativas continuam sendo decisões separadas de política.</p>
+        </article>
+      </div>
+
+      <div class="runtime-strip" aria-label="Fluxo de execução">
+        <span>ChatGPT Web</span><b>→</b><span>OAuth</span><b>→</b><span>MCP Gateway</span><b>→</b><span>Policy Broker</span><b>→</b><span>Sua VPS</span>
+      </div>
+
+      <div class="grid two trust-grid">
+        <div class="trust-copy">
+          <p class="eyebrow">O papel do GitHub</p>
+          <h3>Distribuição e código-fonte, sem ficar no caminho da operação.</h3>
+          <p>O GitHub hospeda o projeto open source, a documentação, as releases e a fonte de atualização. Depois da instalação, o GitHub fica fora do caminho operacional entre o ChatGPT Web e sua VPS.</p>
+        </div>
+        <ul class="assurance-list">
+          <li>Nenhuma senha da VPS é entregue ao ChatGPT.</li>
+          <li>Nenhuma chave SSH privada é entregue ao ChatGPT.</li>
+          <li>O Docker socket não é exposto ao modelo.</li>
+          <li>Operações privilegiadas são reautorizadas pelo Broker e ficam auditáveis.</li>
+        </ul>
+      </div>
+
+      <p class="closing-line">Conecte. Pergunte. Inspecione. Opere. Audite.</p>
+    </section>
+
+    <section class="grid three">
+      <article>
+        <p class="eyebrow">Autoridade</p>
+        <h2>Você escolhe o perímetro delegado.</h2>
+        <p>Project, Custom e Whole Host definem o teto físico do filesystem. Filesystem, shell, systemd, Docker, rede e capacidades administrativas permanecem decisões separadas de política.</p>
+      </article>
+      <article>
+        <p class="eyebrow">Privilégio</p>
+        <h2>O root permanece atrás do Broker.</h2>
+        <p>O Gateway roda sem root e não recebe <code>/host</code> nem o Docker socket. O Broker é local, privilegiado e responsável por aplicar a política.</p>
+      </article>
+      <article>
+        <p class="eyebrow">Conclusão</p>
+        <h2>Prova antes de declarar “instalado”.</h2>
+        <p>Containers saudáveis são um checkpoint. A instalação só termina depois que uma chamada MCP real e autenticada do ChatGPT atravessa política, execução e auditoria do Broker.</p>
+      </article>
+    </section>
+
+    <section>
+      <p class="eyebrow">Arquitetura</p>
+      <h2>Superfície pública pequena, fronteiras de confiança explícitas.</h2>
+      <div class="architecture">
+        <div class="node"><strong>ChatGPT Web</strong><span>OAuth + MCP por HTTPS</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><strong>Gateway</strong><span>sem root</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><strong>Broker</strong><span>fronteira local privilegiada</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><strong>VPS</strong><span>Linux · systemd · Docker · arquivos</span></div>
+      </div>
+    </section>
+
+    <section class="grid two">
+      <article>
+        <p class="eyebrow">Segurança</p>
+        <h2>O modelo de linguagem não é o motor de autorização.</h2>
+        <p>Política deny-by-default, resolução segura de caminhos, shell/jobs isolados, limites de requisição, validação exata de subject, journals de operação, locks/fencing e uma cadeia de auditoria sob controle do Broker mantêm a autoridade no código do servidor.</p>
+      </article>
+      <article>
+        <p class="eyebrow">Identidade</p>
+        <h2>OAuth integrado e auto-hospedado.</h2>
+        <p>O caminho público suportado executa ZITADEL + PostgreSQL junto do serviço, com operador dedicado, audience MCP, introspecção privada RFC 7662, DCR e PKCE. A telemetria do ZITADEL fica desabilitada.</p>
+      </article>
+    </section>
+
+    <section id="quick-start" class="quick">
+      <p class="eyebrow">Começo rápido</p>
+      <h2>Três comandos para entrar no fluxo guiado.</h2>
+      <div class="code-block">
+        <button class="copy-button" type="button" data-copy-target="quick-start-code" aria-label="Copiar começo rápido" title="Copiar comandos">
+          <svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h10v10H9z"></path><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg>
+          <svg class="check-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>
+        </button>
+        <pre><code id="quick-start-code">git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
+cd mcp-vps-agent-gateway
+bash scripts/install.sh</code></pre>
+      </div>
+      <p>O terminal verifica requisitos, pergunta por Project / Custom / Whole Host, mostra a autoridade efetiva, inicia o runtime, valida o funcionamento, configura o OAuth público e então espera a chamada real de conclusão feita pelo ChatGPT.</p>
+      <p><strong>Project é o padrão recomendado.</strong> Whole Host define <code>/</code> como teto do filesystem, mas não habilita Full nem rede irrestrita.</p>
+    </section>
+
+    <section id="connect-chatgpt" class="quick">
+      <p class="eyebrow">Componentes transparentes</p>
+      <h2>O fluxo guiado não esconde a maquinaria.</h2>
+      <p>Operadores avançados podem executar os mesmos componentes individualmente:</p>
+      <div class="code-block">
+        <button class="copy-button" type="button" data-copy-target="components-code" aria-label="Copiar comandos dos componentes" title="Copiar comandos">
+          <svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h10v10H9z"></path><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg>
+          <svg class="check-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>
+        </button>
+        <pre><code id="components-code">bash scripts/init.sh --scope /opt/my-app
+docker compose up -d --build
+bash scripts/verify.sh
+bash scripts/setup-integrated-auth.sh
+bash scripts/connect-chatgpt.sh</code></pre>
+      </div>
+      <p><strong>Nenhuma credencial de VPS ou SSH é entregue ao ChatGPT.</strong> A credencial dedicada do operador OAuth pertence ao serviço de identidade integrado e é informada localmente pelo fluxo de autenticação suportado.</p>
+      <p><code>connect-chatgpt.sh</code> espera um novo evento autenticado de <code>system.info</code> para o subject esperado e valida a auditoria do Broker antes de imprimir <code>INSTALLATION COMPLETE</code>.</p>
+    </section>
+
+    <section class="grid three">
+      <article>
+        <p class="eyebrow">Operação</p>
+        <h2>Diagnostique.</h2>
+        <pre><code>bash scripts/diagnose.sh status
+bash scripts/diagnose.sh health
+bash scripts/diagnose.sh bundle</code></pre>
+      </article>
+      <article>
+        <p class="eyebrow">Ciclo de vida</p>
+        <h2>Atualize ou remova.</h2>
+        <pre><code>bash scripts/update.sh
+bash scripts/remove.sh safe</code></pre>
+        <p>Tags SemVer estáveis são o canal padrão de atualização. Backup, validação de migração e rollback permanecem no atualizador existente.</p>
+      </article>
+      <article>
+        <p class="eyebrow">Maturidade</p>
+        <h2>Scoped primeiro.</h2>
+        <p>O caminho Scoped tem evidências automatizadas e E2E real com ChatGPT. Full/R5 continua sendo um caminho avançado e ainda não é apresentado como pronto para produção.</p>
+      </article>
+    </section>
+
+    <section class="grid two">
+      <article>
+        <p class="eyebrow">Privacidade</p>
+        <h2>Auto-hospedado, sem telemetria de marketing.</h2>
+        <p>Estado, política, auditoria e dados de identidade permanecem na VPS, salvo quando o operador decide exportá-los. Bundles de diagnóstico ocultam segredos configurados. Consulte o documento de privacidade do repositório para detalhes.</p>
+      </article>
+      <article>
+        <p class="eyebrow">Integridade da release</p>
+        <h2>SemVer, checksums, SBOM e provenance.</h2>
+        <p>As tags de release precisam corresponder ao arquivo <code>VERSION</code>. Imagens no GHCR são construídas para amd64/arm64 com SBOM/provenance; pacotes de código-fonte recebem checksums SHA-256. Assinatura criptográfica dedicada do projeto ainda não é reivindicada.</p>
+      </article>
+    </section>
+  </main>
+
+  <footer>
+    <span>Apache-2.0 · candidato de productização pré-release</span>
+    <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway">Repositório e documentação →</a>
+  </footer>
+</body>
+</html>
