@@ -1,6 +1,6 @@
 # Pre-release security hardening matrix
 
-Reviewed for `0.1.0-rc.1` on 2026-09-28.
+Reviewed for `0.1.0-rc.2` on 2026-09-28.
 
 This matrix records concrete pre-release controls. A checked item means the control exists in code/tests or is intentionally documented. Final release readiness still depends on PR CI and the owner's clean-install human gate.
 

@@ -13,7 +13,7 @@ jobs:
   validate:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: actions/setup-go@v7
@@ -31,6 +31,7 @@ jobs:
           }
       - name: Validate source and installation contract
         run: |
+          set -euo pipefail
           go mod tidy
           go test -race -count=1 ./...
           bash -n scripts/*.sh
@@ -38,7 +39,8 @@ jobs:
           python3 scripts/check-installation-contract.py
           python3 scripts/check-doc-links.py
           bash scripts/version.sh
-          docker compose config -q
+          bash scripts/validate-compose-model.sh
+
 
   images:
     needs: validate
@@ -51,7 +53,7 @@ jobs:
           - target: broker
             image: mcp-vps-agent-broker
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -73,7 +75,7 @@ jobs:
     needs: images
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Build complete source package

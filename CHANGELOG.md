@@ -11,6 +11,18 @@ The project follows Semantic Versioning. Pre-release versions may change while t
 - final clean-install human gate before the first stable release
 - freeze `v0.1.0` after the human gate passes
 
+## [0.1.0-rc.2] - 2026-09-28
+
+### Fixed
+
+- release validation now supplies deterministic non-secret Compose configuration instead of depending on a local .env
+- release validation checks the integrated OAuth Compose model used by the supported public path
+- release workflow uses the Go version declared by go.mod and marks prerelease tags as GitHub pre-releases
+
+### Release engineering note
+
+The `v0.1.0-rc.1` tag was created, but its release workflow stopped before image publication or GitHub Release creation because Compose validation lacked required environment values. The tag is retained as immutable history and is not the acceptance candidate.
+
 ## [0.1.0-rc.1] - 2026-09-28
 
 ### Added
@@ -39,5 +51,6 @@ The project follows Semantic Versioning. Pre-release versions may change while t
 - Full remains disabled by default and is not claimed as production-ready
 - unrestricted networking remains a separate capability
 
-[Unreleased]: https://github.com/josemirmoura/mcp-vps-agent-gateway/compare/v0.1.0-rc.1...HEAD
-[0.1.0-rc.1]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.1
+[Unreleased]: https://github.com/josemirmoura/mcp-vps-agent-gateway/compare/v0.1.0-rc.2...HEAD
+[0.1.0-rc.2]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.2
+[0.1.0-rc.1]: https://github.com/josemirmoura/mcp-vps-agent-gateway/tree/v0.1.0-rc.1
