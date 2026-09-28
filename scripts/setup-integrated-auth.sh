@@ -441,8 +441,34 @@ with open(path,"w") as f:
 PY
   chmod 600 "$MARKER"
 
-  # The short-lived bootstrap IAM-owner PAT is no longer needed.
-  docker run --rm     -v mcp-vps-agent_zitadel-bootstrap:/zitadel/bootstrap     alpine:3.22     rm -f /zitadel/bootstrap/bootstrap-admin.pat     >/dev/null 2>&1 || true
+  # Remove the bootstrap human IAM owner before discarding the short-lived PAT.
+  curl_zitadel_internal --fail --request POST --url "http://127.0.0.1:8080/v2/users" --header "Authorization: Bearer $BOOTSTRAP_PAT" --header 'Content-Type: application/json' --data '{}' >/tmp/vps-agent-users.json
+
+  BOOTSTRAP_USER_ID="$(python3 - "$DOMAIN" <<'PY'
+import json,sys
+domain=sys.argv[1]
+data=json.load(open("/tmp/vps-agent-users.json"))
+target=f"bootstrap-admin@{domain}".lower()
+matches=[]
+for user in data.get("result", []):
+    human=user.get("human") or {}
+    email=(human.get("email") or {}).get("email","").lower()
+    username=user.get("username","").lower()
+    if email == target or username == target or username.startswith("bootstrap-admin@"):
+        uid=user.get("userId","")
+        if uid:
+            matches.append(uid)
+if len(matches) != 1:
+    raise SystemExit(f"expected exactly one bootstrap human user, found {len(matches)}")
+print(matches[0])
+PY
+  )"
+
+  curl_zitadel_internal --fail --request DELETE --url "http://127.0.0.1:8080/v2/users/$BOOTSTRAP_USER_ID" --header "Authorization: Bearer $BOOTSTRAP_PAT" >/tmp/vps-agent-delete-bootstrap-user.json
+  echo "Bootstrap human IAM owner removed."
+
+  # The short-lived bootstrap machine PAT is no longer needed.
+  docker run --rm -v mcp-vps-agent_zitadel-bootstrap:/zitadel/bootstrap alpine:3.22 rm -f /zitadel/bootstrap/bootstrap-admin.pat >/dev/null 2>&1 || true
 fi
 
 echo "Confirming OAuth dynamic-client discovery..."
