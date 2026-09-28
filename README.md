@@ -99,7 +99,7 @@ The script:
 
 The script asks for the operator email and password interactively. The password is sent only to the local ZITADEL bootstrap API and is not stored by the installer.
 
-Before the ChatGPT step, confirm the target account/workspace supports the intended custom-MCP capability. As checked against current OpenAI documentation on 2026-09-28, full custom MCP with write/modify actions is available on Business, Enterprise and Edu. Pro is limited to read/fetch custom MCP and does not certify this project's full write-capable surface.
+Before the ChatGPT step, confirm the target account/workspace actually exposes Developer Mode / Plugins with the option to create a custom MCP app. Do not infer availability from the plan name alone; OpenAI product rollouts can change independently from this project.
 
 Then:
 
