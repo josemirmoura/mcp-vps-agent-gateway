@@ -287,6 +287,12 @@ type rootAccessRevokeInput struct {
 	OperationID string `json:"operation_id,omitempty" jsonschema:"stable retry identity when the client can preserve one"`
 }
 
+type rootAccessConfirmInput struct {
+	RequestID     string `json:"request_id" jsonschema:"pending root approval request identifier"`
+	ApprovalToken string `json:"approval_token" jsonschema:"one-time approval token supplied only to the approval UI"`
+	Decision      string `json:"decision" jsonschema:"approve or deny"`
+}
+
 type elevationInput struct {
 	Capabilities []string `json:"capabilities" jsonschema:"explicit capabilities requested for temporary elevation"`
 	TTLSeconds   int64    `json:"ttl_seconds" jsonschema:"requested grant lifetime in seconds"`
@@ -298,7 +304,18 @@ func NewMCPServer(exec Executor) *mcp.Server {
 
 func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 	s := &Server{Executor: exec, Metrics: metrics}
-	server := mcp.NewServer(&mcp.Implementation{Name: "mcp-vps-agent-gateway", Version: "v0.1.0"}, nil)
+	server := mcp.NewServer(
+		&mcp.Implementation{Name: "mcp-vps-agent-gateway", Version: "v0.1.0"},
+		&mcp.ServerOptions{Capabilities: &mcp.ServerCapabilities{
+			Logging: &mcp.LoggingCapabilities{},
+			Extensions: map[string]any{
+				"io.modelcontextprotocol/ui": map[string]any{
+					"mimeTypes": []string{"text/html;profile=mcp-app"},
+				},
+			},
+		}},
+	)
+	registerRootApprovalWidget(server)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "system.info", Description: "Return non-sensitive host/runtime information."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, systemInfoOutput, error) {
@@ -779,7 +796,16 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "permissions.request_root_access",
-		Description: "Request access to an additional filesystem root inside the server's physical scope. This creates a pending request only; it cannot approve or activate its own authority.",
+		Description: "Request access to an additional filesystem root inside the server's physical scope. The request renders an approval card; authority is activated only after the authenticated user presses Authorize.",
+		Meta: mcp.Meta{
+			"ui": map[string]any{
+				"resourceUri": rootApprovalWidgetURI,
+				"visibility": []string{"model", "app"},
+			},
+			"openai/outputTemplate": rootApprovalWidgetURI,
+			"openai/toolInvocation/invoking": "Preparing root access request…",
+			"openai/toolInvocation/invoked": "Root access request ready.",
+		},
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint: false, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
 		},
@@ -788,6 +814,33 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			var out map[string]any
 			args, _ := json.Marshal(in)
 			if err := s.call(ctx, "permissions.request_root_access", in.Root, "request", args, &out, true, in.OperationID); err != nil {
+				return nil, out, err
+			}
+			approvalToken, _ := out["approval_token"].(string)
+			delete(out, "approval_token")
+			return &mcp.CallToolResult{Meta: mcp.Meta{
+				"vps-agent/approvalToken": approvalToken,
+			}}, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "permissions.confirm_root_access",
+		Description: "Approve or deny a pending root delegation from the interactive approval card. This tool is app-only and requires a one-time token hidden from the model.",
+		Meta: mcp.Meta{
+			"ui": map[string]any{
+				"visibility": []string{"app"},
+			},
+			"openai/widgetAccessible": true,
+			"openai/visibility": "private",
+		},
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint: false, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
+		},
+	},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in rootAccessConfirmInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(in)
+			if err := s.call(ctx, "permissions.confirm_root_access", in.RequestID, in.Decision, args, &out, true, in.RequestID+":"+in.Decision); err != nil {
 				return nil, out, err
 			}
 			return nil, out, nil
