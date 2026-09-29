@@ -36,7 +36,7 @@ whole filesystem:  /
 
 Filesystem scope is only one dimension. The policy separately controls shell roots, systemd units, Docker/Compose resources, network, packages, users/groups, firewall, and temporary administration.
 
-For multi-project hosts, a broader physical ceiling such as `/opt` can contain several explicitly delegated roots. Widening the ceiling does not authorize it. `scripts/delegate-root.sh` adds, lists or revokes logical project roots and can reload the Broker with `--apply`.
+For multi-project hosts, a broader physical ceiling such as `/opt` can contain several explicitly delegated roots. Widening the ceiling does not authorize it. Static roots remain in `config/policy.yaml`; production runtime delegation can be requested through MCP, approved through the Broker's separate operator boundary, listed from chat, and revoked from chat without rewriting policy or restarting the Broker. The local `scripts/delegate-root.sh` helper remains available for bootstrap and operator-managed static roots.
 
 **The LLM is never the security boundary. The server decides.**
 
@@ -111,7 +111,7 @@ For the release-candidate period, `main` remains development. After the final op
 
 The current reference implementation includes complete scoped filesystem CRUD, durable sandboxed shell/jobs, typed systemd, Docker/Compose, diagnostics, packages, users/groups, UFW, out-of-band elevation, Broker-owned SQLite, operation journaling, fencing locks, and tamper-evident audit.
 
-Capabilities existing in the package does not mean they are enabled. config/policy.yaml decides.
+Capabilities existing in the package does not mean they are enabled. `config/policy.yaml` sets the static baseline. Broker-owned dynamic root delegations may add narrower runtime resource authority only after an explicit approval request; they never widen the physical ceiling or enable actions absent from the static capability policy.
 
 Destructive actions such as recursive delete, chmod/chown, package management, user management, firewall changes, unrestricted network, and administrative shell are explicit policy choices. file.chmod can set 0777 when the owner enables that capability.
 
