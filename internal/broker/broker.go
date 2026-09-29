@@ -978,6 +978,24 @@ func (b *Broker) startShellJob(ctx context.Context, req wire.Request, admin bool
 	if runtimeRequested > runtimeLimit {
 		return deny(req.ID, "permission_denied", "requested runtime exceeds shell policy")
 	}
+	if !b.Policy.CanShellCWD(in.CWD) {
+		delegations, err := b.activeRootDelegations(ctx, req.Subject)
+		if err != nil {
+			return deny(req.ID, "state_error", err.Error())
+		}
+		for _, d := range delegations {
+			if (d.Access == "work" || d.Access == "compose") && pathWithinRoot(d.Root, in.CWD) && d.ExpiresAt != nil {
+				remaining := time.Until(*d.ExpiresAt)
+				if remaining <= 0 {
+					return deny(req.ID, "permission_denied", "root delegation has expired")
+				}
+				if runtimeRequested > remaining {
+					runtimeRequested = remaining
+				}
+				break
+			}
+		}
+	}
 	memory := in.MemoryBytes
 	if memory <= 0 {
 		memory = b.Policy.ShellMemoryLimit()
@@ -1288,10 +1306,29 @@ func (b *Broker) revokeRootAccess(ctx context.Context, req wire.Request) wire.Re
 		_ = b.State.AbortOperation(context.Background(), req.InvocationID)
 		return deny(req.ID, "state_error", err.Error())
 	}
+	cancelledJobs := 0
+	if count > 0 && b.Jobs != nil {
+		active, listErr := b.State.ListActiveJobs(ctx)
+		if listErr != nil {
+			_ = b.State.AbortOperation(context.Background(), req.InvocationID)
+			return deny(req.ID, "state_error", "delegation revoked but active jobs could not be listed: "+listErr.Error())
+		}
+		for _, rec := range active {
+			if rec.Subject != req.Subject || !pathWithinRoot(root, rec.Resource) || b.Policy.CanShellCWD(rec.Resource) {
+				continue
+			}
+			if err := b.Jobs.Cancel(ctx, rec.Subject, rec.ID); err != nil {
+				_ = b.State.AbortOperation(context.Background(), req.InvocationID)
+				return deny(req.ID, "revoke_incomplete", "delegation revoked but dependent job cancellation failed: "+err.Error())
+			}
+			cancelledJobs++
+		}
+	}
 	result, _ := json.Marshal(map[string]any{
 		"root": root,
 		"revoked": count > 0,
 		"revoked_dynamic_delegations": count,
+		"cancelled_dependent_jobs": cancelledJobs,
 	})
 	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
 		return deny(req.ID, "state_error", "delegation revoked but operation journal update failed: "+err.Error())
@@ -1406,7 +1443,9 @@ func (b *Broker) revokeAllElevatedAccess(ctx context.Context) (int, error) {
 	cancelled := 0
 	failed := make([]string, 0)
 	for _, rec := range active {
-		if rec.GrantID == "" {
+		dependedOnElevation := rec.GrantID != ""
+		dependedOnDynamicRoot := rec.Resource != "" && !b.Policy.CanShellCWD(rec.Resource)
+		if !dependedOnElevation && !dependedOnDynamicRoot {
 			continue
 		}
 		if err := b.Jobs.Cancel(ctx, rec.Subject, rec.ID); err != nil {
