@@ -16,15 +16,38 @@ type Approval struct {
 	Status       string
 	CreatedAt    time.Time
 	ExpiresAt    time.Time
+	Kind         string
+	Resource     string
+	Access       string
 }
 
 func (s *Store) CreateApproval(ctx context.Context, subject string, capabilities []string, ttl, requestLifetime time.Duration) (Approval, error) {
-	if subject == "" || ttl <= 0 || requestLifetime <= 0 {
-		return Approval{}, errors.New("subject and positive durations are required")
+	if ttl <= 0 {
+		return Approval{}, errors.New("positive ttl is required")
+	}
+	return s.createApproval(ctx, subject, capabilities, ttl, requestLifetime, "capability", "", "")
+}
+
+func (s *Store) CreateRootApproval(ctx context.Context, subject, root, access string, ttl, requestLifetime time.Duration) (Approval, error) {
+	if root == "" || access == "" {
+		return Approval{}, errors.New("root and access are required")
+	}
+	if ttl < 0 {
+		return Approval{}, errors.New("ttl cannot be negative")
+	}
+	return s.createApproval(ctx, subject, nil, ttl, requestLifetime, "root", root, access)
+}
+
+func (s *Store) createApproval(ctx context.Context, subject string, capabilities []string, ttl, requestLifetime time.Duration, kind, resource, access string) (Approval, error) {
+	if subject == "" || requestLifetime <= 0 {
+		return Approval{}, errors.New("subject and positive request lifetime are required")
 	}
 	caps := canonicalCaps(capabilities)
-	if len(caps) == 0 {
+	if kind == "capability" && len(caps) == 0 {
 		return Approval{}, errors.New("capabilities are required")
+	}
+	if kind != "capability" && kind != "root" {
+		return Approval{}, errors.New("unsupported approval kind")
 	}
 	id, err := randomID("apr_")
 	if err != nil {
@@ -34,21 +57,25 @@ func (s *Store) CreateApproval(ctx context.Context, subject string, capabilities
 	exp := now.Add(requestLifetime)
 	raw, _ := json.Marshal(caps)
 	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO approvals(request_id,subject,capabilities,ttl_ns,status,created_at,expires_at)
-		 VALUES(?,?,?,?, 'pending', ?, ?)`,
-		id, subject, string(raw), ttl.Nanoseconds(), now.UnixNano(), exp.UnixNano())
+		`INSERT INTO approvals(request_id,subject,capabilities,ttl_ns,status,created_at,expires_at,kind,resource,access)
+		 VALUES(?,?,?,?, 'pending', ?, ?, ?, ?, ?)`,
+		id, subject, string(raw), ttl.Nanoseconds(), now.UnixNano(), exp.UnixNano(), kind, resource, access)
 	if err != nil {
 		return Approval{}, err
 	}
-	return Approval{ID: id, Subject: subject, Capabilities: caps, TTL: ttl, Status: "pending", CreatedAt: now, ExpiresAt: exp}, nil
+	return Approval{
+		ID: id, Subject: subject, Capabilities: caps, TTL: ttl, Status: "pending",
+		CreatedAt: now, ExpiresAt: exp, Kind: kind, Resource: resource, Access: access,
+	}, nil
 }
 
 func (s *Store) GetApproval(ctx context.Context, id string) (Approval, error) {
-	var subject, rawCaps, status string
+	var subject, rawCaps, status, kind string
+	var resource, access sql.NullString
 	var ttlNS, created, expires int64
 	err := s.db.QueryRowContext(ctx,
-		`SELECT subject,capabilities,ttl_ns,status,created_at,expires_at FROM approvals WHERE request_id=?`, id).
-		Scan(&subject, &rawCaps, &ttlNS, &status, &created, &expires)
+		`SELECT subject,capabilities,ttl_ns,status,created_at,expires_at,kind,resource,access FROM approvals WHERE request_id=?`, id).
+		Scan(&subject, &rawCaps, &ttlNS, &status, &created, &expires, &kind, &resource, &access)
 	if err != nil {
 		return Approval{}, err
 	}
@@ -59,6 +86,7 @@ func (s *Store) GetApproval(ctx context.Context, id string) (Approval, error) {
 	return Approval{
 		ID: id, Subject: subject, Capabilities: caps, TTL: time.Duration(ttlNS),
 		Status: status, CreatedAt: time.Unix(0, created), ExpiresAt: time.Unix(0, expires),
+		Kind: kind, Resource: resource.String, Access: access.String,
 	}, nil
 }
 
@@ -72,11 +100,12 @@ func (s *Store) DecideApproval(ctx context.Context, id, decision string) (Approv
 	}
 	defer tx.Rollback()
 
-	var subject, rawCaps, status string
+	var subject, rawCaps, status, kind string
+	var resource, access sql.NullString
 	var ttlNS, created, expires int64
 	err = tx.QueryRowContext(ctx,
-		`SELECT subject,capabilities,ttl_ns,status,created_at,expires_at FROM approvals WHERE request_id=?`, id).
-		Scan(&subject, &rawCaps, &ttlNS, &status, &created, &expires)
+		`SELECT subject,capabilities,ttl_ns,status,created_at,expires_at,kind,resource,access FROM approvals WHERE request_id=?`, id).
+		Scan(&subject, &rawCaps, &ttlNS, &status, &created, &expires, &kind, &resource, &access)
 	if err != nil {
 		return Approval{}, err
 	}
@@ -106,12 +135,13 @@ func (s *Store) DecideApproval(ctx context.Context, id, decision string) (Approv
 	return Approval{
 		ID: id, Subject: subject, Capabilities: caps, TTL: time.Duration(ttlNS),
 		Status: decision, CreatedAt: time.Unix(0, created), ExpiresAt: time.Unix(0, expires),
+		Kind: kind, Resource: resource.String, Access: access.String,
 	}, nil
 }
 
 func (s *Store) ListPendingApprovals(ctx context.Context) ([]Approval, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT request_id,subject,capabilities,ttl_ns,status,created_at,expires_at
+		`SELECT request_id,subject,capabilities,ttl_ns,status,created_at,expires_at,kind,resource,access
 		  FROM approvals WHERE status='pending' ORDER BY created_at`)
 	if err != nil {
 		return nil, err
@@ -121,8 +151,9 @@ func (s *Store) ListPendingApprovals(ctx context.Context) ([]Approval, error) {
 	for rows.Next() {
 		var a Approval
 		var rawCaps string
+		var resource, access sql.NullString
 		var ttlNS, created, expires int64
-		if err := rows.Scan(&a.ID, &a.Subject, &rawCaps, &ttlNS, &a.Status, &created, &expires); err != nil {
+		if err := rows.Scan(&a.ID, &a.Subject, &rawCaps, &ttlNS, &a.Status, &created, &expires, &a.Kind, &resource, &access); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal([]byte(rawCaps), &a.Capabilities); err != nil {
@@ -131,6 +162,8 @@ func (s *Store) ListPendingApprovals(ctx context.Context) ([]Approval, error) {
 		a.TTL = time.Duration(ttlNS)
 		a.CreatedAt = time.Unix(0, created)
 		a.ExpiresAt = time.Unix(0, expires)
+		a.Resource = resource.String
+		a.Access = access.String
 		out = append(out, a)
 	}
 	return out, rows.Err()
