@@ -1310,15 +1310,13 @@ func (b *Broker) revokeRootAccess(ctx context.Context, req wire.Request) wire.Re
 	if count > 0 && b.Jobs != nil {
 		active, listErr := b.State.ListActiveJobs(ctx)
 		if listErr != nil {
-			_ = b.State.AbortOperation(context.Background(), req.InvocationID)
-			return deny(req.ID, "state_error", "delegation revoked but active jobs could not be listed: "+listErr.Error())
+			return deny(req.ID, "revoke_incomplete", "delegation revoked but active jobs could not be listed: "+listErr.Error())
 		}
 		for _, rec := range active {
 			if rec.Subject != req.Subject || !pathWithinRoot(root, rec.Resource) || b.Policy.CanShellCWD(rec.Resource) {
 				continue
 			}
 			if err := b.Jobs.Cancel(ctx, rec.Subject, rec.ID); err != nil {
-				_ = b.State.AbortOperation(context.Background(), req.InvocationID)
 				return deny(req.ID, "revoke_incomplete", "delegation revoked but dependent job cancellation failed: "+err.Error())
 			}
 			cancelledJobs++
