@@ -86,31 +86,54 @@ func TestDynamicRootApprovalActivatesAndRevokesWithoutPolicyReload(t *testing.T)
 		t.Fatalf("root request failed: %+v", request)
 	}
 	var pending struct {
-		RequestID string `json:"request_id"`
-		Status    string `json:"status"`
+		RequestID     string `json:"request_id"`
+		Status        string `json:"status"`
+		ApprovalToken string `json:"approval_token"`
 	}
 	if err := json.Unmarshal(request.Result, &pending); err != nil {
 		t.Fatal(err)
 	}
-	if pending.RequestID == "" || pending.Status != "pending" {
+	if pending.RequestID == "" || pending.Status != "pending" || pending.ApprovalToken == "" {
 		t.Fatalf("unexpected pending request: %+v", pending)
 	}
 
-	approveArgs, _ := json.Marshal(map[string]any{"request_id": pending.RequestID})
-	selfApprove := b.Handle(ctx, wire.Request{
-		ID: "self-approve", Subject: "alice", Tool: "admin.approval.approve",
-		AdminToken: "wrong", Args: approveArgs,
+	badConfirmArgs, _ := json.Marshal(map[string]any{
+		"request_id": pending.RequestID,
+		"approval_token": "model-does-not-have-the-token",
+		"decision": "approve",
 	})
-	if selfApprove.OK {
-		t.Fatal("MCP subject approved its own root expansion")
+	badConfirm := b.Handle(ctx, wire.Request{
+		ID: "bad-confirm", Subject: "alice", Tool: "permissions.confirm_root_access",
+		Args: badConfirmArgs,
+	})
+	if badConfirm.OK {
+		t.Fatal("root expansion succeeded without the hidden approval token")
 	}
 
+	otherSubjectArgs, _ := json.Marshal(map[string]any{
+		"request_id": pending.RequestID,
+		"approval_token": pending.ApprovalToken,
+		"decision": "approve",
+	})
+	otherSubject := b.Handle(ctx, wire.Request{
+		ID: "other-subject", Subject: "mallory", Tool: "permissions.confirm_root_access",
+		Args: otherSubjectArgs,
+	})
+	if otherSubject.OK {
+		t.Fatal("another authenticated subject approved alice's root request")
+	}
+
+	confirmArgs, _ := json.Marshal(map[string]any{
+		"request_id": pending.RequestID,
+		"approval_token": pending.ApprovalToken,
+		"decision": "approve",
+	})
 	approved := b.Handle(ctx, wire.Request{
-		ID: "approve", Tool: "admin.approval.approve",
-		AdminToken: "operator-secret", Args: approveArgs,
+		ID: "approve", Subject: "alice", Tool: "permissions.confirm_root_access",
+		Args: confirmArgs,
 	})
 	if !approved.OK {
-		t.Fatalf("operator approval failed: %+v", approved)
+		t.Fatalf("widget approval failed: %+v", approved)
 	}
 
 	after := b.Handle(ctx, wire.Request{
