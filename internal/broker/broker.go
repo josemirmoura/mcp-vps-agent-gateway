@@ -1056,6 +1056,249 @@ func (b *Broker) startShellJob(ctx context.Context, req wire.Request, admin bool
 	return wire.Response{ID: req.ID, OK: true, Result: result}
 }
 
+func pathWithinRoot(root, target string) bool {
+	if !filepath.IsAbs(root) || !filepath.IsAbs(target) {
+		return false
+	}
+	root = filepath.Clean(root)
+	target = filepath.Clean(target)
+	rel, err := filepath.Rel(root, target)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel))
+}
+
+func (b *Broker) activeRootDelegations(ctx context.Context, subject string) ([]state.RootDelegation, error) {
+	if b.State == nil || subject == "" {
+		return nil, nil
+	}
+	return b.State.ListActiveRootDelegations(ctx, subject)
+}
+
+func (b *Broker) effectiveFileRoots(ctx context.Context, subject string) ([]string, []string, error) {
+	if b.Policy == nil {
+		return nil, nil, errors.New("policy is not configured")
+	}
+	readRoots := append([]string(nil), b.Policy.Filesystem.Read...)
+	writeRoots := append([]string(nil), b.Policy.Filesystem.Write...)
+	delegations, err := b.activeRootDelegations(ctx, subject)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, d := range delegations {
+		switch d.Access {
+		case "read":
+			readRoots = append(readRoots, d.Root)
+		case "work", "compose":
+			readRoots = append(readRoots, d.Root)
+			writeRoots = append(writeRoots, d.Root)
+		}
+	}
+	return uniqueStrings(readRoots), uniqueStrings(writeRoots), nil
+}
+
+func (b *Broker) effectiveFS(ctx context.Context, subject string) (*securefs.Manager, error) {
+	readRoots, writeRoots, err := b.effectiveFileRoots(ctx, subject)
+	if err != nil {
+		return nil, err
+	}
+	return securefs.NewWithHostRoot(
+		readRoots,
+		writeRoots,
+		securefs.DefaultMaxBytes,
+		os.Getenv("VPS_AGENT_HOST_ROOT"),
+	)
+}
+
+func (b *Broker) canShellCWD(ctx context.Context, subject, cwd string) (bool, error) {
+	if b.Policy == nil || !b.Policy.Shell.Enabled {
+		return false, nil
+	}
+	if b.Policy.CanShellCWD(cwd) {
+		return true, nil
+	}
+	delegations, err := b.activeRootDelegations(ctx, subject)
+	if err != nil {
+		return false, err
+	}
+	for _, d := range delegations {
+		if (d.Access == "work" || d.Access == "compose") && pathWithinRoot(d.Root, cwd) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (b *Broker) canCompose(ctx context.Context, subject, projectDir, action string) (bool, error) {
+	if b.Policy == nil || !b.Policy.CanComposeAction(action) {
+		return false, nil
+	}
+	if b.Policy.CanCompose(projectDir, action) {
+		return true, nil
+	}
+	delegations, err := b.activeRootDelegations(ctx, subject)
+	if err != nil {
+		return false, err
+	}
+	projectDir = filepath.Clean(projectDir)
+	for _, d := range delegations {
+		if d.Access == "compose" && filepath.Clean(d.Root) == projectDir {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (b *Broker) normalizeDelegatedRoot(root, access string) (string, string, error) {
+	if strings.TrimSpace(root) == "" || !filepath.IsAbs(root) {
+		return "", "", errors.New("root must be an absolute path")
+	}
+	root = filepath.Clean(root)
+	access = strings.ToLower(strings.TrimSpace(access))
+	switch access {
+	case "read", "work", "compose":
+	default:
+		return "", "", errors.New("access must be read, work, or compose")
+	}
+	physical := os.Getenv("VPS_AGENT_PHYSICAL_SCOPE_ROOT")
+	if physical == "" || !filepath.IsAbs(physical) {
+		return "", "", errors.New("physical scope root is not configured")
+	}
+	physical = filepath.Clean(physical)
+	if !pathWithinRoot(physical, root) {
+		return "", "", fmt.Errorf("root %q is outside physical scope %q", root, physical)
+	}
+	if root == physical {
+		return "", "", errors.New("dynamic delegation of the entire physical ceiling is not allowed")
+	}
+	if _, err := securefs.NewWithHostRoot(
+		[]string{root},
+		[]string{root},
+		securefs.DefaultMaxBytes,
+		os.Getenv("VPS_AGENT_HOST_ROOT"),
+	); err != nil {
+		return "", "", fmt.Errorf("unsafe delegated root: %w", err)
+	}
+	return root, access, nil
+}
+
+func (b *Broker) requestRootAccess(ctx context.Context, req wire.Request) wire.Response {
+	if b.State == nil {
+		return deny(req.ID, "state_required", "root delegation requires durable state")
+	}
+	if req.InvocationID == "" {
+		return deny(req.ID, "invocation_required", "root delegation request requires invocation id")
+	}
+	var in struct {
+		Root       string `json:"root"`
+		Access     string `json:"access"`
+		TTLSeconds int64  `json:"ttl_seconds"`
+	}
+	if err := json.Unmarshal(req.Args, &in); err != nil {
+		return deny(req.ID, "invalid_args", err.Error())
+	}
+	root, access, err := b.normalizeDelegatedRoot(in.Root, in.Access)
+	if err != nil {
+		return deny(req.ID, "permission_denied", err.Error())
+	}
+	if in.TTLSeconds < 0 {
+		return deny(req.ID, "invalid_ttl", "ttl_seconds cannot be negative")
+	}
+	ttl := time.Duration(in.TTLSeconds) * time.Second
+	if ttl > 0 && ttl > b.Policy.MaxGrantTTL() {
+		return deny(req.ID, "invalid_ttl", "temporary delegation ttl exceeds policy")
+	}
+	requestHash, err := state.HashRequest(map[string]any{
+		"subject": req.Subject, "tool": req.Tool, "root": root, "access": access, "ttl_seconds": in.TTLSeconds,
+	})
+	if err != nil {
+		return deny(req.ID, "hash_error", err.Error())
+	}
+	decision, cached, err := b.State.BeginOperation(ctx, req.InvocationID, req.Subject, req.Tool, requestHash)
+	if err != nil {
+		return deny(req.ID, "state_error", err.Error())
+	}
+	switch decision {
+	case state.OperationCached:
+		return wire.Response{ID: req.ID, OK: true, Result: cached}
+	case state.OperationConflict:
+		return deny(req.ID, "idempotency_conflict", "invocation id reused with different root delegation request")
+	case state.OperationReconcile:
+		return deny(req.ID, "reconcile_required", "previous root delegation request outcome is uncertain")
+	}
+	a, err := b.State.CreateRootApproval(ctx, req.Subject, root, access, ttl, 10*time.Minute)
+	if err != nil {
+		_ = b.State.AbortOperation(context.Background(), req.InvocationID)
+		return deny(req.ID, "state_error", err.Error())
+	}
+	result, _ := json.Marshal(map[string]any{
+		"request_id": a.ID,
+		"status": a.Status,
+		"root": root,
+		"access": access,
+		"permanent": ttl == 0,
+		"delegation_ttl_seconds": in.TTLSeconds,
+		"approval_expires_at": a.ExpiresAt,
+		"approval_required": true,
+	})
+	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
+		return deny(req.ID, "state_error", "approval request created but operation journal update failed: "+err.Error())
+	}
+	return wire.Response{ID: req.ID, OK: true, Result: result}
+}
+
+func (b *Broker) revokeRootAccess(ctx context.Context, req wire.Request) wire.Response {
+	if b.State == nil {
+		return deny(req.ID, "state_required", "root delegation revocation requires durable state")
+	}
+	if req.InvocationID == "" {
+		return deny(req.ID, "invocation_required", "root delegation revocation requires invocation id")
+	}
+	var in struct {
+		Root string `json:"root"`
+	}
+	if err := json.Unmarshal(req.Args, &in); err != nil {
+		return deny(req.ID, "invalid_args", err.Error())
+	}
+	if strings.TrimSpace(in.Root) == "" || !filepath.IsAbs(in.Root) {
+		return deny(req.ID, "invalid_args", "root must be an absolute path")
+	}
+	root := filepath.Clean(in.Root)
+	requestHash, err := state.HashRequest(map[string]any{
+		"subject": req.Subject, "tool": req.Tool, "root": root,
+	})
+	if err != nil {
+		return deny(req.ID, "hash_error", err.Error())
+	}
+	decision, cached, err := b.State.BeginOperation(ctx, req.InvocationID, req.Subject, req.Tool, requestHash)
+	if err != nil {
+		return deny(req.ID, "state_error", err.Error())
+	}
+	switch decision {
+	case state.OperationCached:
+		return wire.Response{ID: req.ID, OK: true, Result: cached}
+	case state.OperationConflict:
+		return deny(req.ID, "idempotency_conflict", "invocation id reused with different revocation request")
+	case state.OperationReconcile:
+		return deny(req.ID, "reconcile_required", "previous root delegation revocation outcome is uncertain")
+	}
+	count, err := b.State.RevokeRootDelegation(ctx, req.Subject, root)
+	if err != nil {
+		_ = b.State.AbortOperation(context.Background(), req.InvocationID)
+		return deny(req.ID, "state_error", err.Error())
+	}
+	result, _ := json.Marshal(map[string]any{
+		"root": root,
+		"revoked": count > 0,
+		"revoked_dynamic_delegations": count,
+	})
+	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
+		return deny(req.ID, "state_error", "delegation revoked but operation journal update failed: "+err.Error())
+	}
+	return wire.Response{ID: req.ID, OK: true, Result: result}
+}
+
 func (b *Broker) requestElevation(ctx context.Context, req wire.Request) wire.Response {
 	if b.State == nil {
 		return deny(req.ID, "state_required", "elevation requires durable state")
@@ -1095,19 +1338,43 @@ func (b *Broker) decideApproval(ctx context.Context, req wire.Request, decision 
 	if err := json.Unmarshal(req.Args, &in); err != nil {
 		return deny(req.ID, "invalid_args", err.Error())
 	}
+	pending, err := b.State.GetApproval(ctx, in.RequestID)
+	if err != nil {
+		return deny(req.ID, "state_error", err.Error())
+	}
+	if decision == "approved" && pending.Kind == "root" {
+		root, access, err := b.normalizeDelegatedRoot(pending.Resource, pending.Access)
+		if err != nil {
+			return deny(req.ID, "permission_denied", "root approval no longer satisfies the physical security boundary: "+err.Error())
+		}
+		pending.Resource = root
+		pending.Access = access
+	}
 	a, err := b.State.DecideApproval(ctx, in.RequestID, decision)
 	if err != nil {
 		return deny(req.ID, "state_error", err.Error())
 	}
 	if decision == "denied" {
-		return ok(req.ID, map[string]any{"request_id": a.ID, "status": "denied"})
+		return ok(req.ID, map[string]any{"request_id": a.ID, "status": "denied", "kind": a.Kind})
+	}
+	if a.Kind == "root" {
+		d, err := b.State.IssueRootDelegation(ctx, a.Subject, a.Resource, a.Access, a.ID, a.TTL)
+		if err != nil {
+			return deny(req.ID, "state_error", err.Error())
+		}
+		return ok(req.ID, map[string]any{
+			"request_id": a.ID,
+			"status": "approved",
+			"kind": "root",
+			"delegation": d,
+		})
 	}
 	g, err := b.State.IssueGrant(ctx, a.Subject, a.Capabilities, a.TTL)
 	if err != nil {
 		return deny(req.ID, "state_error", err.Error())
 	}
 	return ok(req.ID, map[string]any{
-		"request_id": a.ID, "status": "approved", "grant_id": g.ID,
+		"request_id": a.ID, "status": "approved", "kind": "capability", "grant_id": g.ID,
 		"subject": g.Subject, "capabilities": g.Capabilities, "expires_at": g.ExpiresAt,
 	})
 }
