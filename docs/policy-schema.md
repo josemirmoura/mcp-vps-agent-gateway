@@ -121,5 +121,10 @@ network.unrestricted is never implicitly added.
 - wildcard administrative capabilities require Full feature enabled plus a valid human-approved grant
 - unrestricted network requires separate explicit approval
 - TTL above server maximum: reject
-- policy activation requires an authoritative Broker reload/activation path
+- static policy activation requires an authoritative Broker reload/activation path
 - editing a policy file through an agent does not automatically activate it
+- dynamic root delegations must remain inside the physical filesystem ceiling
+- dynamic root delegation changes resource scope only; static action capability lists still apply
+- permission-expanding dynamic roots require a pending approval plus a separate operator approval
+- dynamic revocation may occur in-band because it reduces authority
+- temporary delegation expiry is enforced by Broker state
