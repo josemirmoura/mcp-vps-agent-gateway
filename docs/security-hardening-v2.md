@@ -27,7 +27,9 @@ The MCP client may request a new filesystem root inside the preconfigured physic
 
 Active dynamic root delegations are Broker-owned state. They do not edit `policy.yaml`, do not widen the physical ceiling and do not enable actions absent from the static policy. Revocation may be initiated in-band because it only reduces the requesting subject's dynamic authority. Temporary delegation expiry is enforced server-side, and shell jobs depending on a temporary root cannot outlive that delegation.
 
-MCP tool annotations and ChatGPT confirmation cards are useful UX signals. They are not accepted as proof that the Broker-side approval occurred.
+Generic MCP tool annotations and host confirmation policy remain UX signals rather than the Broker security boundary.
+
+For MCP Apps-compatible clients, root delegation uses a stronger in-chat confirmation flow: the pending request returns a one-time HMAC approval token only in tool-result `_meta`. The model receives the visible request details but not that token. The inline app card calls an app-only confirmation tool with the hidden token after a user presses Authorize or Deny. The Broker binds the token to request ID, authenticated subject, root, access profile and approval expiry, and accepts it only while that request is still pending.
 
 ### Administrative elevation
 
