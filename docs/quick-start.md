@@ -80,6 +80,17 @@ bash scripts/delegate-root.sh remove /opt/project-a --apply
 
 The helper refuses to delegate the entire physical ceiling unless `--allow-ceiling` is explicitly supplied.
 
+After installation, runtime delegation can use the MCP tools instead of editing `policy.yaml`:
+
+~~~text
+permissions.request_root_access  -> creates a pending approval only
+operator approval                -> activates the root in Broker state
+permissions.list_root_access     -> shows static + dynamic authority
+permissions.revoke_root_access   -> revokes dynamic authority immediately
+~~~
+
+Dynamic roots can be permanent or time-limited and take effect without restarting the Broker. The authenticated MCP subject cannot approve its own expansion. ChatGPT may show its own confirmation UI for write actions, but Broker activation still requires the separate operator approval boundary.
+
 ### Whole Host
 
 Whole Host changes the Broker's **physical filesystem ceiling** to `/`.
