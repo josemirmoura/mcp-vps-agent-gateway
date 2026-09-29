@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"runtime"
 	"strconv"
@@ -172,20 +173,22 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			"full_enabled": b.Policy.Features.FullModeEnabled && b.Policy.Enabled,
 		})
 	case "file.read", "file.read_test":
-		if b.FS == nil {
-			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		fs, fsErr := b.effectiveFS(ctx, req.Subject)
+		if fsErr != nil {
+			return deny(req.ID, "filesystem_unavailable", fsErr.Error())
 		}
 		if !b.Policy.CanFilesystem("read") {
 			return deny(req.ID, "permission_denied", "file read is disabled by policy")
 		}
-		data, err := b.FS.ReadFile(req.Resource)
+		data, err := fs.ReadFile(req.Resource)
 		if err != nil {
 			return deny(req.ID, "permission_denied", err.Error())
 		}
 		return ok(req.ID, map[string]any{"content": string(data), "bytes": len(data)})
 	case "file.list":
-		if b.FS == nil {
-			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		fs, fsErr := b.effectiveFS(ctx, req.Subject)
+		if fsErr != nil {
+			return deny(req.ID, "filesystem_unavailable", fsErr.Error())
 		}
 		if !b.Policy.CanFilesystem("list") {
 			return deny(req.ID, "permission_denied", "file list is disabled by policy")
@@ -198,38 +201,41 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 				return deny(req.ID, "invalid_args", err.Error())
 			}
 		}
-		entries, err := b.FS.List(req.Resource, in.Limit)
+		entries, err := fs.List(req.Resource, in.Limit)
 		if err != nil {
 			return deny(req.ID, "permission_denied", err.Error())
 		}
 		return ok(req.ID, map[string]any{"path": req.Resource, "entries": entries})
 	case "file.stat":
-		if b.FS == nil {
-			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		fs, fsErr := b.effectiveFS(ctx, req.Subject)
+		if fsErr != nil {
+			return deny(req.ID, "filesystem_unavailable", fsErr.Error())
 		}
 		if !b.Policy.CanFilesystem("stat") {
 			return deny(req.ID, "permission_denied", "file stat is disabled by policy")
 		}
-		st, err := b.FS.Stat(req.Resource, false)
+		st, err := fs.Stat(req.Resource, false)
 		if err != nil {
 			return deny(req.ID, "permission_denied", err.Error())
 		}
 		return ok(req.ID, st)
 	case "file.hash":
-		if b.FS == nil {
-			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		fs, fsErr := b.effectiveFS(ctx, req.Subject)
+		if fsErr != nil {
+			return deny(req.ID, "filesystem_unavailable", fsErr.Error())
 		}
 		if !b.Policy.CanFilesystem("hash") {
 			return deny(req.ID, "permission_denied", "file hash is disabled by policy")
 		}
-		sum, err := b.FS.Hash(req.Resource)
+		sum, err := fs.Hash(req.Resource)
 		if err != nil {
 			return deny(req.ID, "permission_denied", err.Error())
 		}
 		return ok(req.ID, map[string]any{"path": req.Resource, "sha256": sum})
 	case "file.mkdir":
-		if b.FS == nil {
-			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		fs, fsErr := b.effectiveFS(ctx, req.Subject)
+		if fsErr != nil {
+			return deny(req.ID, "filesystem_unavailable", fsErr.Error())
 		}
 		if !b.Policy.CanFilesystem("mkdir") {
 			return deny(req.ID, "permission_denied", "mkdir is disabled by policy")
@@ -237,10 +243,11 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if req.InvocationID == "" {
 			return deny(req.ID, "invocation_required", "mkdir requires invocation id")
 		}
-		return b.mkdir(ctx, req)
+		return b.mkdir(ctx, req, fs)
 	case "file.write", "file.write_test":
-		if b.FS == nil {
-			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		fs, fsErr := b.effectiveFS(ctx, req.Subject)
+		if fsErr != nil {
+			return deny(req.ID, "filesystem_unavailable", fsErr.Error())
 		}
 		if !b.Policy.CanFilesystem("write") {
 			return deny(req.ID, "permission_denied", "file write is disabled by policy")
@@ -254,10 +261,11 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if req.InvocationID == "" {
 			return deny(req.ID, "invocation_required", "write requires invocation id")
 		}
-		return b.writeFile(ctx, req, []byte(in.Content))
+		return b.writeFile(ctx, req, []byte(in.Content), fs)
 	case "file.patch":
-		if b.FS == nil {
-			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		fs, fsErr := b.effectiveFS(ctx, req.Subject)
+		if fsErr != nil {
+			return deny(req.ID, "filesystem_unavailable", fsErr.Error())
 		}
 		if !b.Policy.CanFilesystem("patch") {
 			return deny(req.ID, "permission_denied", "file patch is disabled by policy")
@@ -274,12 +282,13 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "invalid_args", err.Error())
 		}
 		return b.fileMutation(ctx, req, in, func() (any, error) {
-			sum, err := b.FS.Patch(req.Resource, in.OldText, in.NewText, in.ExpectedSHA256)
+			sum, err := fs.Patch(req.Resource, in.OldText, in.NewText, in.ExpectedSHA256)
 			return map[string]any{"path": req.Resource, "sha256": sum, "patched": err == nil}, err
 		})
 	case "file.copy":
-		if b.FS == nil {
-			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		fs, fsErr := b.effectiveFS(ctx, req.Subject)
+		if fsErr != nil {
+			return deny(req.ID, "filesystem_unavailable", fsErr.Error())
 		}
 		if !b.Policy.CanFilesystem("copy") {
 			return deny(req.ID, "permission_denied", "file copy is disabled by policy")
@@ -294,12 +303,13 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "invalid_args", "destination is required")
 		}
 		return b.fileMutation(ctx, req, in, func() (any, error) {
-			err := b.FS.CopyFile(req.Resource, in.Destination)
+			err := fs.CopyFile(req.Resource, in.Destination)
 			return map[string]any{"source": req.Resource, "destination": in.Destination, "copied": err == nil}, err
 		})
 	case "file.move":
-		if b.FS == nil {
-			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		fs, fsErr := b.effectiveFS(ctx, req.Subject)
+		if fsErr != nil {
+			return deny(req.ID, "filesystem_unavailable", fsErr.Error())
 		}
 		if !b.Policy.CanFilesystem("move") {
 			return deny(req.ID, "permission_denied", "file move is disabled by policy")
@@ -314,12 +324,13 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "invalid_args", "destination is required")
 		}
 		return b.fileMutation(ctx, req, in, func() (any, error) {
-			err := b.FS.Move(req.Resource, in.Destination)
+			err := fs.Move(req.Resource, in.Destination)
 			return map[string]any{"source": req.Resource, "destination": in.Destination, "moved": err == nil}, err
 		})
 	case "file.remove":
-		if b.FS == nil {
-			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		fs, fsErr := b.effectiveFS(ctx, req.Subject)
+		if fsErr != nil {
+			return deny(req.ID, "filesystem_unavailable", fsErr.Error())
 		}
 		if req.InvocationID == "" {
 			return deny(req.ID, "invocation_required", "remove requires invocation id")
@@ -340,12 +351,13 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "permission_denied", action+" is disabled by policy")
 		}
 		return b.fileMutation(ctx, req, in, func() (any, error) {
-			err := b.FS.Remove(req.Resource, in.Recursive)
+			err := fs.Remove(req.Resource, in.Recursive)
 			return map[string]any{"path": req.Resource, "removed": err == nil, "recursive": in.Recursive}, err
 		})
 	case "file.chmod":
-		if b.FS == nil {
-			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		fs, fsErr := b.effectiveFS(ctx, req.Subject)
+		if fsErr != nil {
+			return deny(req.ID, "filesystem_unavailable", fsErr.Error())
 		}
 		if !b.Policy.CanFilesystem("chmod") {
 			return deny(req.ID, "permission_denied", "chmod is disabled by policy")
@@ -360,12 +372,13 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "invalid_args", "mode must be an integer between 0 and 0777")
 		}
 		return b.fileMutation(ctx, req, in, func() (any, error) {
-			err := b.FS.Chmod(req.Resource, os.FileMode(in.Mode))
+			err := fs.Chmod(req.Resource, os.FileMode(in.Mode))
 			return map[string]any{"path": req.Resource, "mode": in.Mode, "changed": err == nil}, err
 		})
 	case "file.chown":
-		if b.FS == nil {
-			return deny(req.ID, "filesystem_unavailable", "filesystem manager is not configured")
+		fs, fsErr := b.effectiveFS(ctx, req.Subject)
+		if fsErr != nil {
+			return deny(req.ID, "filesystem_unavailable", fsErr.Error())
 		}
 		if !b.Policy.CanFilesystem("chown") {
 			return deny(req.ID, "permission_denied", "chown is disabled by policy")
@@ -381,7 +394,7 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "invalid_args", err.Error())
 		}
 		return b.fileMutation(ctx, req, in, func() (any, error) {
-			err := b.FS.Chown(req.Resource, in.UID, in.GID)
+			err := fs.Chown(req.Resource, in.UID, in.GID)
 			return map[string]any{"path": req.Resource, "uid": in.UID, "gid": in.GID, "changed": err == nil}, err
 		})
 	case "service.list":
@@ -520,7 +533,11 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if b.Docker == nil {
 			return deny(req.ID, "docker_unavailable", "docker manager is not configured")
 		}
-		if !b.Policy.CanCompose(req.Resource, "validate") {
+		composeOK, composeErr := b.canCompose(ctx, req.Subject, req.Resource, "validate")
+		if composeErr != nil {
+			return deny(req.ID, "state_error", composeErr.Error())
+		}
+		if !composeOK {
 			return deny(req.ID, "permission_denied", "compose project is outside policy")
 		}
 		if err := b.Docker.ComposeValidate(ctx, req.Resource); err != nil {
@@ -532,7 +549,11 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			return deny(req.ID, "docker_unavailable", "docker manager is not configured")
 		}
 		action := strings.TrimPrefix(req.Tool, "compose.")
-		if !b.Policy.CanCompose(req.Resource, action) {
+		composeOK, composeErr := b.canCompose(ctx, req.Subject, req.Resource, action)
+		if composeErr != nil {
+			return deny(req.ID, "state_error", composeErr.Error())
+		}
+		if !composeOK {
 			return deny(req.ID, "permission_denied", "compose action is outside policy")
 		}
 		if req.InvocationID == "" {
@@ -720,6 +741,29 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		return b.adminMutation(ctx, req, "firewall", func() (any, error) {
 			out, err := firewallAction(ctx, in.Action, in.Port, in.Protocol, in.Source)
 			return map[string]any{"action": in.Action, "port": in.Port, "protocol": in.Protocol, "source": in.Source, "output": out}, err
+		})
+	case "permissions.request_root_access":
+		return b.requestRootAccess(ctx, req)
+	case "permissions.revoke_root_access":
+		return b.revokeRootAccess(ctx, req)
+	case "permissions.list_root_access":
+		if b.State == nil {
+			return deny(req.ID, "state_required", "root delegation listing requires durable state")
+		}
+		delegations, err := b.State.ListActiveRootDelegations(ctx, req.Subject)
+		if err != nil {
+			return deny(req.ID, "state_error", err.Error())
+		}
+		return ok(req.ID, map[string]any{
+			"physical_scope_root": os.Getenv("VPS_AGENT_PHYSICAL_SCOPE_ROOT"),
+			"static": map[string]any{
+				"filesystem_read": b.Policy.Filesystem.Read,
+				"filesystem_write": b.Policy.Filesystem.Write,
+				"shell_cwd_roots": b.Policy.Shell.CWDRoots,
+				"compose_inspect": b.Policy.Compose.Inspect,
+				"compose_manage": b.Policy.Compose.Manage,
+			},
+			"dynamic": delegations,
 		})
 	case "permissions.request_elevation":
 		return b.requestElevation(ctx, req)
@@ -918,7 +962,11 @@ func (b *Broker) startShellJob(ctx context.Context, req wire.Request, admin bool
 	if strings.TrimSpace(in.Command) == "" || in.CWD == "" {
 		return deny(req.ID, "invalid_args", "command and cwd are required")
 	}
-	if !b.Policy.CanShellCWD(in.CWD) {
+	shellOK, shellErr := b.canShellCWD(ctx, req.Subject, in.CWD)
+	if shellErr != nil {
+		return deny(req.ID, "state_error", shellErr.Error())
+	}
+	if !shellOK {
 		return deny(req.ID, "permission_denied", "shell cwd is outside policy or shell is disabled")
 	}
 
@@ -964,8 +1012,11 @@ func (b *Broker) startShellJob(ctx context.Context, req wire.Request, admin bool
 		return deny(req.ID, "reconcile_required", "previous job start outcome is uncertain; inspect job state")
 	}
 
-	readOnly := append([]string(nil), b.Policy.Filesystem.Read...)
-	readWrite := append([]string(nil), b.Policy.Filesystem.Write...)
+	readOnly, readWrite, rootsErr := b.effectiveFileRoots(ctx, req.Subject)
+	if rootsErr != nil {
+		_ = b.State.AbortOperation(context.Background(), req.InvocationID)
+		return deny(req.ID, "state_error", rootsErr.Error())
+	}
 	inaccessible := []string(nil)
 	if !b.Policy.ShellMayReadHost() {
 		inaccessible = scopedInaccessiblePaths()
@@ -1150,7 +1201,7 @@ func (b *Broker) fileMutation(ctx context.Context, req wire.Request, fingerprint
 	return wire.Response{ID: req.ID, OK: true, Result: result}
 }
 
-func (b *Broker) mkdir(ctx context.Context, req wire.Request) wire.Response {
+func (b *Broker) mkdir(ctx context.Context, req wire.Request, fs *securefs.Manager) wire.Response {
 	if b.State == nil {
 		return deny(req.ID, "state_required", "mkdir requires durable state")
 	}
@@ -1173,7 +1224,7 @@ func (b *Broker) mkdir(ctx context.Context, req wire.Request) wire.Response {
 		return deny(req.ID, "reconcile_required", "previous mkdir outcome is uncertain")
 	}
 
-	if err := b.FS.MkdirAll(req.Resource, 0o750); err != nil {
+	if err := fs.MkdirAll(req.Resource, 0o750); err != nil {
 		_ = b.State.AbortOperation(context.Background(), req.InvocationID)
 		return deny(req.ID, "permission_denied", err.Error())
 	}
@@ -1186,7 +1237,7 @@ func (b *Broker) mkdir(ctx context.Context, req wire.Request) wire.Response {
 	return wire.Response{ID: req.ID, OK: true, Result: result}
 }
 
-func (b *Broker) writeFile(ctx context.Context, req wire.Request, data []byte) wire.Response {
+func (b *Broker) writeFile(ctx context.Context, req wire.Request, data []byte, fs *securefs.Manager) wire.Response {
 	requestHash, err := state.HashRequest(map[string]any{
 		"subject": req.Subject, "tool": req.Tool, "resource": req.Resource,
 		"content": string(data),
@@ -1208,7 +1259,7 @@ func (b *Broker) writeFile(ctx context.Context, req wire.Request, data []byte) w
 			return deny(req.ID, "reconcile_required", "previous attempt outcome is uncertain")
 		}
 	}
-	if err := b.FS.WriteFileAtomic(req.Resource, data); err != nil {
+	if err := fs.WriteFileAtomic(req.Resource, data); err != nil {
 		if b.State != nil {
 			_ = b.State.AbortOperation(context.Background(), req.InvocationID)
 		}
