@@ -48,6 +48,9 @@ docker.action
 service.status
 service.action
 job.status
+permissions.list_root_access
+permissions.request_root_access
+permissions.revoke_root_access
 permissions.request_elevation
 ~~~
 
