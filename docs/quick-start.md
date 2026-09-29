@@ -83,13 +83,13 @@ The helper refuses to delegate the entire physical ceiling unless `--allow-ceili
 After installation, runtime delegation can use the MCP tools instead of editing `policy.yaml`:
 
 ~~~text
-permissions.request_root_access  -> creates a pending approval only
-operator approval                -> activates the root in Broker state
+permissions.request_root_access  -> creates a pending request + in-chat approval card
+user presses Authorize           -> app-only one-time token activates the root
 permissions.list_root_access     -> shows static + dynamic authority
 permissions.revoke_root_access   -> revokes dynamic authority immediately
 ~~~
 
-Dynamic roots can be permanent or time-limited and take effect without restarting the Broker. The authenticated MCP subject cannot approve its own expansion. ChatGPT may show its own confirmation UI for write actions, but Broker activation still requires the separate operator approval boundary.
+Dynamic roots can be permanent or time-limited and take effect without restarting the Broker. On MCP Apps-compatible clients such as ChatGPT, the request renders an inline approval card. The one-time approval token is delivered in tool-result `_meta`, which is available to the app UI but hidden from the model. The app-only confirmation tool requires that token and the same authenticated subject. A model-only call therefore cannot approve its own expansion. Clients without MCP Apps UI can fall back to the separate operator admin approval path.
 
 ### Whole Host
 
