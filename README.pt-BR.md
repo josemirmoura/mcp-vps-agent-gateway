@@ -36,6 +36,8 @@ filesystem inteiro: /
 
 Filesystem é só uma dimensão. A policy controla separadamente shell, units systemd, recursos Docker/Compose, rede, pacotes, usuários/grupos, firewall e administração temporária.
 
+Em hosts com vários projetos, um teto físico mais amplo como `/opt` pode conter várias raízes delegadas explicitamente. Ampliar o teto não autoriza o teto inteiro. O `scripts/delegate-root.sh` adiciona, lista ou revoga as raízes lógicas dos projetos e pode recarregar o Broker com `--apply`.
+
 **O LLM nunca é a fronteira de segurança. O servidor decide.**
 
 ## Runtime
