@@ -4,17 +4,22 @@ cd "$(dirname "$0")/.."
 
 usage() {
   cat <<'EOF'
-usage: bash scripts/init.sh [--scope /absolute/existing/path]
+usage: bash scripts/init.sh [--scope /absolute/existing/path] [--migrate-policy-root]
 
 Options:
   --scope PATH   Set the physical Scoped filesystem ceiling in .env.
-                 If the policy still references the previous scope, those
-                 paths are migrated to the new scope.
+                 Existing operator policy roots are preserved by default.
+  --migrate-policy-root
+                 Replace references to the previous scope in policy.yaml.
+                 Intended for an explicit project-root move, not for widening
+                 the physical ceiling around existing delegated roots.
   -h, --help     Show this help.
 EOF
 }
 
 SCOPE_OVERRIDE=""
+MIGRATE_POLICY_ROOT=0
+POLICY_CREATED=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --scope)
@@ -24,6 +29,10 @@ while [ "$#" -gt 0 ]; do
       fi
       SCOPE_OVERRIDE="$2"
       shift 2
+      ;;
+    --migrate-policy-root)
+      MIGRATE_POLICY_ROOT=1
+      shift
       ;;
     -h|--help)
       usage
@@ -63,6 +72,7 @@ chmod 700 state
 if [ ! -f config/policy.yaml ]; then
   cp config/policy.example.yaml config/policy.yaml
   chmod 600 config/policy.yaml
+  POLICY_CREATED=1
   echo "Created config/policy.yaml from the versioned template."
 else
   echo "config/policy.yaml already exists; preserving operator policy."
@@ -119,7 +129,8 @@ path.write_text("\n".join(out) + "\n")
 PY
 
   if [ -n "$OLD_SCOPE_ROOT" ] && [ "$OLD_SCOPE_ROOT" != "$SCOPE_OVERRIDE" ]; then
-    python3 - "config/policy.yaml" "$OLD_SCOPE_ROOT" "$SCOPE_OVERRIDE" <<'PY'
+    if [ "$POLICY_CREATED" -eq 1 ] || [ "$MIGRATE_POLICY_ROOT" -eq 1 ]; then
+      python3 - "config/policy.yaml" "$OLD_SCOPE_ROOT" "$SCOPE_OVERRIDE" <<'PY'
 import pathlib
 import sys
 
@@ -134,6 +145,11 @@ if old != "/" and old in text:
 else:
     print("Policy did not contain the previous scoped root; leaving policy paths unchanged.")
 PY
+    else
+      echo "Physical ceiling changed from $OLD_SCOPE_ROOT to $SCOPE_OVERRIDE."
+      echo "Existing logical policy roots were preserved."
+      echo "Use scripts/delegate-root.sh to add or revoke delegated roots."
+    fi
   fi
 
   VPS_AGENT_SCOPE_ROOT="$SCOPE_OVERRIDE"
