@@ -36,6 +36,8 @@ whole filesystem:  /
 
 Filesystem scope is only one dimension. The policy separately controls shell roots, systemd units, Docker/Compose resources, network, packages, users/groups, firewall, and temporary administration.
 
+For multi-project hosts, a broader physical ceiling such as `/opt` can contain several explicitly delegated roots. Widening the ceiling does not authorize it. `scripts/delegate-root.sh` adds, lists or revokes logical project roots and can reload the Broker with `--apply`.
+
 **The LLM is never the security boundary. The server decides.**
 
 ## Runtime

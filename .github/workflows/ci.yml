@@ -47,6 +47,8 @@ jobs:
           fi
       - name: Validate supported installation documentation
         run: python3 scripts/check-installation-contract.py
+      - name: Validate delegated root policy helper
+        run: bash scripts/test-delegated-roots.sh
       - name: Validate productization metadata and documentation links
         shell: bash
         run: |

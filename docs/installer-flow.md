@@ -52,12 +52,25 @@ The user supplies the scoped root explicitly. The bootstrap checks Docker Compos
 
 The default `compose.yaml` bind-mounts only `VPS_AGENT_SCOPE_ROOT` into the Broker under `/host`. The Broker validates that filesystem, shell cwd and Compose paths in policy remain inside that physical root. A policy escape makes the Broker fail closed.
 
+Changing `VPS_AGENT_SCOPE_ROOT` on an existing installation changes only this physical ceiling. Existing logical roots in `config/policy.yaml` are preserved by default, so widening a ceiling such as `/opt/vps-agent-sandbox` to `/opt` does not silently authorize all of `/opt`. `scripts/init.sh --migrate-policy-root` is an explicit opt-in for a real project-root move.
+
 For deliberate whole-host filesystem authority, set `VPS_AGENT_WHOLE_HOST=1` in `.env` **and** add `compose.host.yaml`. The persisted flag lets lifecycle commands reuse the same deployment mode; the override sets the Broker's physical root to `/`. Neither is part of the default Scoped command.
 ## Phase 2 — The user chooses MCP authority
 
 The operator may edit config/policy.yaml after bootstrap for finer-grained authority. The user decides exactly which VPS resources are delegated.
 
 One root or several logical roots are valid when they fit under `VPS_AGENT_SCOPE_ROOT`. Whole-host `/` requires the explicit `compose.host.yaml` override.
+
+For routine multi-project delegation, use the policy helper instead of editing the ceiling:
+
+~~~bash
+bash scripts/delegate-root.sh add /opt/project-a --access work --apply
+bash scripts/delegate-root.sh add /opt/project-b --access compose --apply
+bash scripts/delegate-root.sh list
+bash scripts/delegate-root.sh remove /opt/project-a --apply
+~~~
+
+The helper edits only logical policy roots, backs up the previous policy, refuses paths outside the physical ceiling, rejects symlinked ancestors, and refuses to delegate the ceiling itself unless explicitly overridden. The Broker is recreated and verified only when `--apply` is supplied.
 
 systemd, Docker/Compose, shell, network, packages, users/groups, firewall, and temporary elevation are scoped separately.
 
