@@ -59,6 +59,27 @@ Choose a physical filesystem ceiling and edit `config/policy.yaml` to restrict i
 bash scripts/install.sh --profile custom --scope /opt
 ~~~
 
+### Delegated roots under a broader ceiling
+
+For a multi-project VPS, the physical ceiling can be broader than the logical authority. For example, keep the Broker physically bounded by `/opt` while delegating only selected project directories:
+
+~~~bash
+bash scripts/init.sh --scope /opt
+bash scripts/delegate-root.sh add /opt/project-a --access work --apply
+bash scripts/delegate-root.sh add /opt/project-b --access compose --apply
+bash scripts/delegate-root.sh list
+~~~
+
+`work` grants filesystem read/write plus scoped shell cwd for that directory. `compose` adds Compose inspect/manage for the same directory. `read` grants filesystem read only.
+
+Changing the physical ceiling does not authorize the ceiling itself. Existing logical policy roots are preserved. To revoke a project later:
+
+~~~bash
+bash scripts/delegate-root.sh remove /opt/project-a --apply
+~~~
+
+The helper refuses to delegate the entire physical ceiling unless `--allow-ceiling` is explicitly supplied.
+
 ### Whole Host
 
 Whole Host changes the Broker's **physical filesystem ceiling** to `/`.
