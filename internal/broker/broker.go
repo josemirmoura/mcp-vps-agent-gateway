@@ -3,6 +3,7 @@ package broker
 import (
 	"context"
 	"errors"
+	"crypto/hmac"
 	"crypto/subtle"
 	"crypto/sha256"
 	"encoding/hex"
@@ -744,6 +745,8 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		})
 	case "permissions.request_root_access":
 		return b.requestRootAccess(ctx, req)
+	case "permissions.confirm_root_access":
+		return b.confirmRootAccess(ctx, req)
 	case "permissions.revoke_root_access":
 		return b.revokeRootAccess(ctx, req)
 	case "permissions.list_root_access":
@@ -1201,6 +1204,23 @@ func (b *Broker) normalizeDelegatedRoot(root, access string) (string, string, er
 	return root, access, nil
 }
 
+func (b *Broker) rootApprovalToken(a state.Approval) (string, error) {
+	if b.AdminToken == "" {
+		return "", errors.New("operator approval secret is not configured")
+	}
+	mac := hmac.New(sha256.New, []byte(b.AdminToken))
+	_, _ = fmt.Fprintf(mac, "%s\n%s\n%s\n%s\n%d", a.ID, a.Subject, a.Resource, a.Access, a.ExpiresAt.UnixNano())
+	return hex.EncodeToString(mac.Sum(nil)), nil
+}
+
+func (b *Broker) validRootApprovalToken(a state.Approval, token string) bool {
+	expected, err := b.rootApprovalToken(a)
+	if err != nil || token == "" || len(token) != len(expected) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(token), []byte(expected)) == 1
+}
+
 func (b *Broker) requestRootAccess(ctx context.Context, req wire.Request) wire.Response {
 	if b.State == nil {
 		return deny(req.ID, "state_required", "root delegation requires durable state")
@@ -1250,6 +1270,11 @@ func (b *Broker) requestRootAccess(ctx context.Context, req wire.Request) wire.R
 		_ = b.State.AbortOperation(context.Background(), req.InvocationID)
 		return deny(req.ID, "state_error", err.Error())
 	}
+	approvalToken, err := b.rootApprovalToken(a)
+	if err != nil {
+		_ = b.State.AbortOperation(context.Background(), req.InvocationID)
+		return deny(req.ID, "approval_unavailable", err.Error())
+	}
 	result, _ := json.Marshal(map[string]any{
 		"request_id": a.ID,
 		"status": a.Status,
@@ -1259,11 +1284,52 @@ func (b *Broker) requestRootAccess(ctx context.Context, req wire.Request) wire.R
 		"delegation_ttl_seconds": in.TTLSeconds,
 		"approval_expires_at": a.ExpiresAt,
 		"approval_required": true,
+		"approval_token": approvalToken,
 	})
 	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
 		return deny(req.ID, "state_error", "approval request created but operation journal update failed: "+err.Error())
 	}
 	return wire.Response{ID: req.ID, OK: true, Result: result}
+}
+
+func (b *Broker) confirmRootAccess(ctx context.Context, req wire.Request) wire.Response {
+	if b.State == nil {
+		return deny(req.ID, "state_required", "root delegation confirmation requires durable state")
+	}
+	var in struct {
+		RequestID     string `json:"request_id"`
+		ApprovalToken string `json:"approval_token"`
+		Decision      string `json:"decision"`
+	}
+	if err := json.Unmarshal(req.Args, &in); err != nil {
+		return deny(req.ID, "invalid_args", err.Error())
+	}
+	switch in.Decision {
+	case "approve", "deny":
+	default:
+		return deny(req.ID, "invalid_args", "decision must be approve or deny")
+	}
+	a, err := b.State.GetApproval(ctx, in.RequestID)
+	if err != nil {
+		return deny(req.ID, "state_error", err.Error())
+	}
+	if a.Kind != "root" {
+		return deny(req.ID, "permission_denied", "approval request is not a root delegation")
+	}
+	if a.Subject != req.Subject {
+		return deny(req.ID, "identity_mismatch", "approval request belongs to a different authenticated subject")
+	}
+	if !b.validRootApprovalToken(a, in.ApprovalToken) {
+		return deny(req.ID, "permission_denied", "invalid root approval token")
+	}
+	decision := "approved"
+	if in.Decision == "deny" {
+		decision = "denied"
+	}
+	args, _ := json.Marshal(map[string]any{"request_id": in.RequestID})
+	return b.decideApproval(ctx, wire.Request{
+		ID: req.ID, Subject: req.Subject, Tool: "permissions.confirm_root_access", Args: args,
+	}, decision)
 }
 
 func (b *Broker) revokeRootAccess(ctx context.Context, req wire.Request) wire.Response {
