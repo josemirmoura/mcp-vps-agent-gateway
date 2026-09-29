@@ -1442,7 +1442,10 @@ func (b *Broker) revokeAllElevatedAccess(ctx context.Context) (int, error) {
 	failed := make([]string, 0)
 	for _, rec := range active {
 		dependedOnElevation := rec.GrantID != ""
-		dependedOnDynamicRoot := rec.Resource != "" && !b.Policy.CanShellCWD(rec.Resource)
+		dependedOnDynamicRoot := false
+		if b.Policy != nil && rec.Resource != "" {
+			dependedOnDynamicRoot = !b.Policy.CanShellCWD(rec.Resource)
+		}
 		if !dependedOnElevation && !dependedOnDynamicRoot {
 			continue
 		}
