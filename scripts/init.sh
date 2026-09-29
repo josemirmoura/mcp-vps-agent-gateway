@@ -20,6 +20,7 @@ EOF
 SCOPE_OVERRIDE=""
 MIGRATE_POLICY_ROOT=0
 POLICY_CREATED=0
+POLICY_PRISTINE_TEMPLATE=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --scope)
@@ -78,6 +79,10 @@ else
   echo "config/policy.yaml already exists; preserving operator policy."
 fi
 
+if cmp -s config/policy.yaml config/policy.example.yaml; then
+  POLICY_PRISTINE_TEMPLATE=1
+fi
+
 if grep -q 'CHANGE_ME_' .env; then
   echo "ERROR: .env still contains CHANGE_ME values." >&2
   exit 1
@@ -129,7 +134,7 @@ path.write_text("\n".join(out) + "\n")
 PY
 
   if [ -n "$OLD_SCOPE_ROOT" ] && [ "$OLD_SCOPE_ROOT" != "$SCOPE_OVERRIDE" ]; then
-    if [ "$POLICY_CREATED" -eq 1 ] || [ "$MIGRATE_POLICY_ROOT" -eq 1 ]; then
+    if [ "$POLICY_CREATED" -eq 1 ] || [ "$POLICY_PRISTINE_TEMPLATE" -eq 1 ] || [ "$MIGRATE_POLICY_ROOT" -eq 1 ]; then
       python3 - "config/policy.yaml" "$OLD_SCOPE_ROOT" "$SCOPE_OVERRIDE" <<'PY'
 import pathlib
 import sys
