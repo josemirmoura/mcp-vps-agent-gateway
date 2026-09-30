@@ -89,29 +89,29 @@ vps_agent_init_language "$LANG_OVERRIDE"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --profile)
-      [ "$#" -ge 2 ] || { echo "ERROR: --profile needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --profile needs a value.' 'ERRO: --profile precisa de um valor.')" >&2; exit 2; }
       PROFILE="$2"; shift 2 ;;
     --scope)
-      [ "$#" -ge 2 ] || { echo "ERROR: --scope needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --scope needs a value.' 'ERRO: --scope precisa de um valor.')" >&2; exit 2; }
       SCOPE="$2"; shift 2 ;;
     --create-scope) CREATE_SCOPE=1; shift ;;
     --run-as)
-      [ "$#" -ge 2 ] || { echo "ERROR: --run-as needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --run-as needs a value.' 'ERRO: --run-as precisa de um valor.')" >&2; exit 2; }
       RUN_AS="$2"; shift 2 ;;
     --lang)
-      [ "$#" -ge 2 ] || { echo "ERROR: --lang needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --lang needs a value.' 'ERRO: --lang precisa de um valor.')" >&2; exit 2; }
       LANG_OVERRIDE="$2"
       VPS_AGENT_LANG_EXPLICIT=1
       vps_agent_init_language "$LANG_OVERRIDE"
       shift 2 ;;
     --domain)
-      [ "$#" -ge 2 ] || { echo "ERROR: --domain needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --domain needs a value.' 'ERRO: --domain precisa de um valor.')" >&2; exit 2; }
       DOMAIN="$2"; shift 2 ;;
     --operator-email)
-      [ "$#" -ge 2 ] || { echo "ERROR: --operator-email needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --operator-email needs a value.' 'ERRO: --operator-email precisa de um valor.')" >&2; exit 2; }
       OPERATOR_EMAIL="$2"; shift 2 ;;
     --operator-username)
-      [ "$#" -ge 2 ] || { echo "ERROR: --operator-username needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --operator-username needs a value.' 'ERRO: --operator-username precisa de um valor.')" >&2; exit 2; }
       OPERATOR_USERNAME="$2"; shift 2 ;;
     --local-only) LOCAL_ONLY=1; shift ;;
     --yes) ASSUME_YES=1; shift ;;
@@ -319,7 +319,7 @@ if [ "$ASSUME_YES" -ne 1 ]; then
   if vps_agent_is_pt_br; then
     [ "$confirm" = "CONTINUAR" ] || { echo "$(vps_agent_text 'Installation stopped.' 'Instalação interrompida.')"; exit 0; }
   else
-    [ "$confirm" = "CONTINUE" ] || { echo "Installation stopped."; exit 0; }
+    [ "$confirm" = "CONTINUE" ] || { echo "$(vps_agent_text 'Installation stopped.' 'Instalação interrompida.')"; exit 0; }
   fi
 fi
 
