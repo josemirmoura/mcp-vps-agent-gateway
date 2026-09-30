@@ -78,6 +78,8 @@ for path in ROOT.rglob("*"):
         continue
     if rel.startswith((".git/", "state/", "backups/", "diagnostics/", "dist/", "evidence/")):
         continue
+    if "__pycache__/" in rel or rel.endswith((".pyc", ".pyo")):
+        continue
     try:
         text = path.read_text(errors="replace")
     except OSError:
