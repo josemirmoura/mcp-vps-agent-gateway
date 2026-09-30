@@ -87,7 +87,7 @@ After ChatGPT is connected, a project is authorized dynamically:
 permissions.request_root_access
         |
         v
-in-chat Authorize / Deny card
+native MCP client confirmation (elicitation)
         |
         v
 Broker activates read / work / compose for that root
