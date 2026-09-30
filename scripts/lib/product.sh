@@ -92,41 +92,22 @@ vps_agent_text() {
 
 vps_agent_block() {
   local key="$1"
-  local en="$2"
-  local pt="$3"
-  case "${VPS_AGENT_LANG:-en}" in
-    en) printf '%s' "$en" ;;
-    pt-BR) printf '%s' "$pt" ;;
-    *)
-      if command -v python3 >/dev/null 2>&1; then
-        vps_agent_i18n_python block "$key" "$en" "$pt"
-      else
-        printf '%s' "$en"
-      fi
-      ;;
-  esac
+  shift
+  if command -v python3 >/dev/null 2>&1; then
+    vps_agent_i18n_python block "$key" "$@"
+  else
+    printf 'Portico MCP requires Python 3 for localized guided text.\n'
+  fi
 }
 
 vps_agent_msg() {
   local key="$1"
-  local en="$2"
-  local pt="$3"
-  shift 3
-  case "${VPS_AGENT_LANG:-en}" in
-    en)
-      printf '%s' "$en"
-      ;;
-    pt-BR)
-      printf '%s' "$pt"
-      ;;
-    *)
-      if command -v python3 >/dev/null 2>&1; then
-        vps_agent_i18n_python message "$key" "$en" "$pt" "$@"
-      else
-        printf '%s' "$en"
-      fi
-      ;;
-  esac
+  shift
+  if command -v python3 >/dev/null 2>&1; then
+    vps_agent_i18n_python message "$key" "" "" "$@"
+  else
+    printf '%s' "$key"
+  fi
 }
 
 vps_agent_language_label() {
