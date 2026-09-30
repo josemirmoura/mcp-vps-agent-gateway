@@ -74,7 +74,7 @@ if [ "$current" = "$target_sha" ]; then
   exit 0
 fi
 if ! git merge-base --is-ancestor "$current" "$target_sha"; then
-  echo "$(vps_agent_text "Refusing non-fast-forward update: target $target_sha is not a descendant of $current." "Atualização non-fast-forward recusada: o alvo $target_sha não descende de $current.")" >&2
+  echo "$(vps_agent_msg update.non_ff "target=$target_sha" "current=$current")" >&2
   exit 1
 fi
 
@@ -92,7 +92,7 @@ printf '%s\n' "$current" >"$backup_dir/previous-commit"
 printf '%s\n' "$target_sha" >"$backup_dir/target-commit"
 
 rollback() {
-  echo "$(vps_agent_text "Update failed; rolling back to $current..." "Atualização falhou; revertendo para $current...")" >&2
+  echo "$(vps_agent_msg update.rollback "current=$current")" >&2
   "${compose[@]}" stop >/dev/null 2>&1 || true
   git reset --hard "$current"
   rm -rf state
