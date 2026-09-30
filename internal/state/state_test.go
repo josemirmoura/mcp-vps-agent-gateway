@@ -150,3 +150,68 @@ func TestSchemaVersionAndFutureVersionRejection(t *testing.T) {
 	}
 	_ = os.Remove(file)
 }
+
+
+func TestSchemaV1MigratesToV2(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "v1.db")
+	db, err := sql.Open("sqlite", file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmts := []string{
+		`CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value INTEGER NOT NULL)`,
+		`INSERT INTO schema_meta(key,value) VALUES('schema_version', 1)`,
+		`CREATE TABLE approvals (
+			request_id TEXT PRIMARY KEY,
+			subject TEXT NOT NULL,
+			capabilities TEXT NOT NULL,
+			ttl_ns INTEGER NOT NULL,
+			status TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			expires_at INTEGER NOT NULL,
+			decided_at INTEGER
+		)`,
+	}
+	for _, stmt := range stmts {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := Open(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	v, err := s.SchemaVersion(context.Background())
+	if err != nil || v != 2 {
+		t.Fatalf("schema version=%d err=%v", v, err)
+	}
+
+	rows, err := s.db.Query(`PRAGMA table_info(approvals)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	cols := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull, pk int
+		var dflt any
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			t.Fatal(err)
+		}
+		cols[name] = true
+	}
+	for _, name := range []string{"kind", "resource", "access"} {
+		if !cols[name] {
+			t.Fatalf("migrated approvals table missing %s", name)
+		}
+	}
+}

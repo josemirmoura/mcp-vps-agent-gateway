@@ -36,7 +36,7 @@ filesystem inteiro: /
 
 Filesystem é só uma dimensão. A policy controla separadamente shell, units systemd, recursos Docker/Compose, rede, pacotes, usuários/grupos, firewall e administração temporária.
 
-Em hosts com vários projetos, um teto físico mais amplo como `/opt` pode conter várias raízes delegadas explicitamente. Ampliar o teto não autoriza o teto inteiro. O `scripts/delegate-root.sh` adiciona, lista ou revoga as raízes lógicas dos projetos e pode recarregar o Broker com `--apply`.
+Em hosts com vários projetos, um teto físico mais amplo como `/opt` pode conter várias raízes delegadas explicitamente. Ampliar o teto não autoriza o teto inteiro. As raízes estáticas continuam em `config/policy.yaml`; em produção, novas raízes podem ser solicitadas via MCP, aprovadas pela fronteira separada do operador no Broker, listadas pelo chat e revogadas pelo chat sem reescrever a policy nem reiniciar o Broker. O `scripts/delegate-root.sh` continua disponível para bootstrap e raízes estáticas administradas pelo operador.
 
 **O LLM nunca é a fronteira de segurança. O servidor decide.**
 
@@ -111,7 +111,7 @@ Durante o release candidate, `main` continua sendo desenvolvimento. Depois que a
 
 A implementação atual inclui filesystem completo em escopo, shell/jobs sandboxed, systemd tipado, Docker/Compose, diagnósticos, pacotes, usuários/grupos, UFW, elevação fora do canal MCP, SQLite exclusivo do Broker, journal de operações, fencing locks e audit hash-chain.
 
-Uma capability existir no pacote não significa que esteja habilitada. Quem decide é config/policy.yaml.
+Uma capability existir no pacote não significa que esteja habilitada. `config/policy.yaml` define a base estática. Delegações dinâmicas de raízes armazenadas pelo Broker só acrescentam autoridade de recurso após pedido e aprovação explícitos; elas nunca ampliam o teto físico nem habilitam ações ausentes da policy estática.
 
 Delete recursivo, chmod/chown, pacotes, usuários, firewall, rede irrestrita e shell administrativo são escolhas explícitas. file.chmod pode aplicar 0777 se o dono da VPS habilitar essa capability.
 

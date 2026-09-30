@@ -275,6 +275,24 @@ type firewallActionInput struct {
 	OperationID string `json:"operation_id,omitempty"`
 }
 
+type rootAccessRequestInput struct {
+	Root        string `json:"root" jsonschema:"absolute directory inside the server physical scope ceiling"`
+	Access      string `json:"access" jsonschema:"delegation profile: read, work, or compose"`
+	TTLSeconds  int64  `json:"ttl_seconds,omitempty" jsonschema:"delegation lifetime in seconds; 0 requests a permanent delegation"`
+	OperationID string `json:"operation_id,omitempty" jsonschema:"stable retry identity when the client can preserve one"`
+}
+
+type rootAccessRevokeInput struct {
+	Root        string `json:"root" jsonschema:"absolute dynamically delegated root to revoke"`
+	OperationID string `json:"operation_id,omitempty" jsonschema:"stable retry identity when the client can preserve one"`
+}
+
+type rootAccessConfirmInput struct {
+	RequestID     string `json:"request_id" jsonschema:"pending root approval request identifier"`
+	ApprovalToken string `json:"approval_token" jsonschema:"one-time approval token supplied only to the approval UI"`
+	Decision      string `json:"decision" jsonschema:"approve or deny"`
+}
+
 type elevationInput struct {
 	Capabilities []string `json:"capabilities" jsonschema:"explicit capabilities requested for temporary elevation"`
 	TTLSeconds   int64    `json:"ttl_seconds" jsonschema:"requested grant lifetime in seconds"`
@@ -286,7 +304,18 @@ func NewMCPServer(exec Executor) *mcp.Server {
 
 func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 	s := &Server{Executor: exec, Metrics: metrics}
-	server := mcp.NewServer(&mcp.Implementation{Name: "mcp-vps-agent-gateway", Version: "v0.1.0"}, nil)
+	server := mcp.NewServer(
+		&mcp.Implementation{Name: "mcp-vps-agent-gateway", Version: "v0.1.0"},
+		&mcp.ServerOptions{Capabilities: &mcp.ServerCapabilities{
+			Logging: &mcp.LoggingCapabilities{},
+			Extensions: map[string]any{
+				"io.modelcontextprotocol/ui": map[string]any{
+					"mimeTypes": []string{"text/html;profile=mcp-app"},
+				},
+			},
+		}},
+	)
+	registerRootApprovalWidget(server)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "system.info", Description: "Return non-sensitive host/runtime information."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, systemInfoOutput, error) {
@@ -765,7 +794,96 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "permissions.request_elevation", Description: "Create a pending temporary-elevation request. This tool cannot approve its own request."},
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "permissions.request_root_access",
+		Description: "Request access to an additional filesystem root inside the server's physical scope. The request renders an approval card; authority is activated only after the authenticated user presses Authorize.",
+		Meta: mcp.Meta{
+			"ui": map[string]any{
+				"resourceUri": rootApprovalWidgetURI,
+				"visibility": []string{"model", "app"},
+			},
+			"openai/outputTemplate": rootApprovalWidgetURI,
+			"openai/toolInvocation/invoking": "Preparing root access request…",
+			"openai/toolInvocation/invoked": "Root access request ready.",
+		},
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint: false, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
+		},
+	},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in rootAccessRequestInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(in)
+			if err := s.call(ctx, "permissions.request_root_access", in.Root, "request", args, &out, true, in.OperationID); err != nil {
+				return nil, out, err
+			}
+			approvalToken, _ := out["approval_token"].(string)
+			delete(out, "approval_token")
+			return &mcp.CallToolResult{Meta: mcp.Meta{
+				"vps-agent/approvalToken": approvalToken,
+			}}, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "permissions.confirm_root_access",
+		Description: "Approve or deny a pending root delegation from the interactive approval card. This tool is app-only and requires a one-time token hidden from the model.",
+		Meta: mcp.Meta{
+			"ui": map[string]any{
+				"visibility": []string{"app"},
+			},
+			"openai/widgetAccessible": true,
+			"openai/visibility": "private",
+		},
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint: false, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
+		},
+	},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in rootAccessConfirmInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(in)
+			if err := s.call(ctx, "permissions.confirm_root_access", in.RequestID, in.Decision, args, &out, true, in.RequestID+":"+in.Decision); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "permissions.revoke_root_access",
+		Description: "Revoke this authenticated subject's dynamic access to one delegated root. This can only reduce dynamic authority; it cannot remove static policy roots.",
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint: false, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
+		},
+	},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in rootAccessRevokeInput) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			args, _ := json.Marshal(in)
+			if err := s.call(ctx, "permissions.revoke_root_access", in.Root, "revoke", args, &out, true, in.OperationID); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "permissions.list_root_access",
+		Description: "List the physical scope ceiling, static policy roots, and active dynamic root delegations for this authenticated subject.",
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint: true, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
+		},
+	},
+		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
+			var out map[string]any
+			if err := s.call(ctx, "permissions.list_root_access", "", "list", nil, &out, false, ""); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "permissions.request_elevation",
+		Description: "Create a pending temporary-elevation request. This tool cannot approve its own request.",
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint: false, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
+		},
+	},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in elevationInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(in)
@@ -855,6 +973,8 @@ func (s *Server) call(ctx context.Context, tool, resource, action string, args [
 	}
 	return nil
 }
+
+func boolPtr(v bool) *bool { return &v }
 
 func randomID() (string, error) {
 	var b [16]byte

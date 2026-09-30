@@ -212,8 +212,12 @@ func (c *Config) CanFilesystem(action string) bool {
 	return containsAction(c.Filesystem.Actions, action)
 }
 
+func (c *Config) CanComposeAction(action string) bool {
+	return matchAny(c.Compose.Actions, action)
+}
+
 func (c *Config) CanCompose(resource, action string) bool {
-	if !matchAny(c.Compose.Actions, action) {
+	if !c.CanComposeAction(action) {
 		return false
 	}
 	if action == "inspect" || action == "validate" {

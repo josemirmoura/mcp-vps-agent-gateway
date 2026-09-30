@@ -19,9 +19,21 @@ subject
 
 No ambient authority is inherited from a previous tool call or conversation step.
 
-## 2. Elevation is exceptional and out-of-band
+## 2. Permission expansion is requested in-band and approved out-of-band
 
 Routine work uses Scoped.
+
+The MCP client may request a new filesystem root inside the preconfigured physical ceiling. The request itself grants nothing. The Broker stores a typed pending approval containing subject, root, access profile and optional lifetime. Only the separate operator approval boundary may activate it.
+
+Active dynamic root delegations are Broker-owned state. They do not edit `policy.yaml`, do not widen the physical ceiling and do not enable actions absent from the static policy. Revocation may be initiated in-band because it only reduces the requesting subject's dynamic authority. Temporary delegation expiry is enforced server-side, and shell jobs depending on a temporary root cannot outlive that delegation.
+
+Generic MCP tool annotations and host confirmation policy remain UX signals rather than the Broker security boundary.
+
+For MCP Apps-compatible clients, root delegation uses a stronger in-chat confirmation flow: the pending request returns a one-time HMAC approval token only in tool-result `_meta`. The model receives the visible request details but not that token. The inline app card calls an app-only confirmation tool with the hidden token after a user presses Authorize or Deny. The Broker binds the token to request ID, authenticated subject, root, access profile and approval expiry, and accepts it only while that request is still pending.
+
+### Administrative elevation
+
+
 
 If elevation is enabled later:
 

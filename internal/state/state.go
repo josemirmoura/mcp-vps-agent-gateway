@@ -18,7 +18,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const CurrentSchemaVersion = 1
+const CurrentSchemaVersion = 2
 
 type Store struct {
 	db *sql.DB
@@ -66,11 +66,18 @@ func (s *Store) migrate() error {
 	var version int
 	err := s.db.QueryRow(`SELECT value FROM schema_meta WHERE key='schema_version'`).Scan(&version)
 	if errors.Is(err, sql.ErrNoRows) {
-		// Legacy databases created before schema versioning are schema v1.
-		if _, err := s.db.Exec(`INSERT INTO schema_meta(key,value) VALUES('schema_version',?)`, CurrentSchemaVersion); err != nil {
+		var legacyApprovals int
+		if err := s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='approvals'`).Scan(&legacyApprovals); err != nil {
 			return err
 		}
-		version = CurrentSchemaVersion
+		if legacyApprovals > 0 {
+			version = 1
+		} else {
+			version = CurrentSchemaVersion
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_meta(key,value) VALUES('schema_version',?)`, version); err != nil {
+			return err
+		}
 	} else if err != nil {
 		return err
 	}
@@ -117,8 +124,23 @@ func (s *Store) migrate() error {
 			status TEXT NOT NULL,
 			created_at INTEGER NOT NULL,
 			expires_at INTEGER NOT NULL,
-			decided_at INTEGER
+			decided_at INTEGER,
+			kind TEXT NOT NULL DEFAULT 'capability',
+			resource TEXT,
+			access TEXT
 		)`,
+		`CREATE TABLE IF NOT EXISTS root_delegations (
+			delegation_id TEXT PRIMARY KEY,
+			subject TEXT NOT NULL,
+			root TEXT NOT NULL,
+			access TEXT NOT NULL,
+			approval_id TEXT,
+			created_at INTEGER NOT NULL,
+			expires_at INTEGER,
+			revoked_at INTEGER
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_root_delegations_subject_root
+		  ON root_delegations(subject, root)`,
 		`CREATE TABLE IF NOT EXISTS jobs (
 			job_id TEXT PRIMARY KEY,
 			subject TEXT NOT NULL,
@@ -144,6 +166,29 @@ func (s *Store) migrate() error {
 		if _, err := s.db.Exec(stmt); err != nil {
 			return err
 		}
+	}
+	if version == 1 {
+		tx, err := s.db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		for _, stmt := range []string{
+			`ALTER TABLE approvals ADD COLUMN kind TEXT NOT NULL DEFAULT 'capability'`,
+			`ALTER TABLE approvals ADD COLUMN resource TEXT`,
+			`ALTER TABLE approvals ADD COLUMN access TEXT`,
+		} {
+			if _, err := tx.Exec(stmt); err != nil {
+				return fmt.Errorf("migrate state schema v1->v2: %w", err)
+			}
+		}
+		if _, err := tx.Exec(`UPDATE schema_meta SET value=2 WHERE key='schema_version'`); err != nil {
+			return err
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		version = 2
 	}
 	if version < CurrentSchemaVersion {
 		return fmt.Errorf("missing migration path from schema %d to %d", version, CurrentSchemaVersion)
@@ -423,6 +468,10 @@ func (s *Store) RevokeAll(ctx context.Context) error {
 	}
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE approvals SET status='revoked', decided_at=? WHERE status='pending'`, now); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE root_delegations SET revoked_at=? WHERE revoked_at IS NULL`, now); err != nil {
 		return err
 	}
 	return tx.Commit()

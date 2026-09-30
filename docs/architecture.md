@@ -113,6 +113,8 @@ A user may authorize:
 - several selected roots/resources
 - the whole host
 
+For multi-project deployments, the physical ceiling and logical roots are deliberately separate. The static policy supplies the baseline roots. Additional roots can be represented as Broker-owned dynamic delegations bound to the authenticated subject, an access profile (`read`, `work`, or `compose`) and an optional expiry. Creating a pending request is not authorization. On MCP Apps-compatible clients, the request renders an inline approval card whose one-time token is hidden from the model in tool-result metadata; the app-only confirmation call activates the delegation only after the authenticated user acts on that card. The existing admin approval path remains a fallback for clients without interactive MCP Apps UI. Revocation takes effect from Broker state without a container restart.
+
 Filesystem scope is only one dimension. systemd units, Docker resources, shell roots, network destinations and administrative actions are independently scoped.
 
 See [product-model.md](product-model.md).
