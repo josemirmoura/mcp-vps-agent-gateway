@@ -109,13 +109,23 @@ if [ "$remove_source" -eq 1 ] && [ "${VPS_AGENT_REMOVE_SOURCE_CONFIRM:-}" != "RE
   fi
 fi
 
-cat <<EOF
+if vps_agent_is_pt_br; then
+  cat <<EOF
+Modo de remoção: $mode
+Runtime: Gateway + Broker + proxy do pacote (quando configurado)
+Recursos gerenciados da VPS: PRESERVADOS
+Policy/auditoria do operador: $([ "$mode" = "safe" ] && echo PRESERVADAS || echo APAGADAS)
+Checkout do código: $([ "$remove_source" -eq 1 ] && echo APAGAR || echo PRESERVAR)
+EOF
+else
+  cat <<EOF
 Removal mode: $mode
 Runtime: Gateway + Broker + package proxy (when configured)
 Managed VPS resources: PRESERVED
 Operator policy/audit: $([ "$mode" = "safe" ] && echo PRESERVED || echo DELETED)
 Source checkout: $([ "$remove_source" -eq 1 ] && echo DELETE || echo PRESERVED)
 EOF
+fi
 
 project_ids="$(docker ps -aq --filter label=com.docker.compose.project=mcp-vps-agent 2>/dev/null || true)"
 if [ ! -f .env ] && [ -z "$project_ids" ]; then
@@ -203,7 +213,24 @@ if [ -n "${VPS_AGENT_PUBLIC_URL:-}" ]; then
 fi
 
 if [ "$mode" = "safe" ]; then
-  cat <<'EOF'
+  if vps_agent_is_pt_br; then
+    cat <<'EOF'
+
+REMOÇÃO SEGURA CONCLUÍDA
+Removidos:
+  runtime Gateway/Broker/proxy do pacote
+  autorizações temporárias ativas
+Invalidadas:
+  credenciais bearer locais admin/static anteriores
+Preservados:
+  .env (com credenciais locais rotacionadas)
+  config/policy.yaml
+  state/ auditoria e histórico de operações
+  estado da identidade integrada
+  todos os recursos da VPS que o Portico podia gerenciar
+EOF
+  else
+    cat <<'EOF'
 
 SAFE REMOVE COMPLETE
 Removed:
@@ -218,6 +245,7 @@ Preserved:
   integrated identity state on safe remove
   every VPS resource Portico MCP was allowed to manage
 EOF
+  fi
   exit 0
 fi
 
@@ -238,7 +266,23 @@ docker image rm   mcp-vps-agent-gateway:local   mcp-vps-agent-broker:local   >/d
 # a non-empty directory is preserved rather than risking user data.
 remove_legacy_sandbox
 
-cat <<EOF
+if vps_agent_is_pt_br; then
+  cat <<EOF
+
+PURGE COMPLETO CONCLUÍDO
+Artefatos locais do Portico removidos:
+  runtime/volumes
+  imagens locais padrão do Gateway/Broker (quando presentes)
+  .env
+  config/policy.yaml
+  state/
+  backups/
+  /opt/vps-agent-sandbox legado vazio (quando presente)
+Preservados:
+  aplicações, sites, bancos, imagens/contêineres de terceiros, serviços e arquivos delegados
+EOF
+else
+  cat <<EOF
 
 FULL PURGE COMPLETE
 Deleted MCP-owned local artifacts:
@@ -252,6 +296,7 @@ Deleted MCP-owned local artifacts:
 Preserved:
   applications, sites, databases, third-party images/containers, services and delegated files
 EOF
+fi
 
 if [ "$remove_source" -eq 1 ] && [ "$source_verified" -eq 1 ]; then
   parent="$(dirname "$repo_root")"
