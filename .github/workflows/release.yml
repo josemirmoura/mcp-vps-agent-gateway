@@ -4,10 +4,19 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'SemVer tag to publish (must equal v + VERSION)'
+        required: true
+        type: string
 
 permissions:
   contents: write
   packages: write
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
 
 jobs:
   validate:
@@ -20,15 +29,21 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Validate tag matches VERSION
+      - name: Validate release source and VERSION
         shell: bash
         run: |
           set -euo pipefail
           expected="v$(tr -d '[:space:]' < VERSION)"
-          test "$GITHUB_REF_NAME" = "$expected" || {
-            echo "tag $GITHUB_REF_NAME does not match VERSION ($expected)" >&2
+          test "$RELEASE_TAG" = "$expected" || {
+            echo "release tag $RELEASE_TAG does not match VERSION ($expected)" >&2
             exit 1
           }
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            test "$GITHUB_REF_NAME" = "main" || {
+              echo "manual releases must be dispatched from main" >&2
+              exit 1
+            }
+          fi
       - name: Validate source and installation contract
         run: |
           set -euo pipefail
@@ -42,8 +57,35 @@ jobs:
           bash scripts/validate-compose-model.sh
 
 
-  images:
+  prepare-tag:
     needs: validate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Ensure exact release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tagged_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
+            test "$tagged_sha" = "$GITHUB_SHA" || {
+              echo "existing tag $RELEASE_TAG points to $tagged_sha, expected $GITHUB_SHA" >&2
+              exit 1
+            }
+            echo "Release tag already points to this commit."
+          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            git tag "$RELEASE_TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/$RELEASE_TAG"
+            echo "Created release tag $RELEASE_TAG at $GITHUB_SHA."
+          else
+            echo "tag event did not provide a resolvable release tag" >&2
+            exit 1
+          fi
+
+  images:
+    needs: prepare-tag
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -69,7 +111,7 @@ jobs:
           push: true
           sbom: true
           provenance: mode=max
-          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ github.ref_name }}
+          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ env.RELEASE_TAG }}
 
   github-release:
     needs: images
@@ -95,11 +137,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          flags=(--verify-tag --generate-notes --title "Portico MCP ${GITHUB_REF_NAME}")
-          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+          set -euo pipefail
+          flags=(--verify-tag --generate-notes --title "Portico MCP $RELEASE_TAG")
+          if [[ "$RELEASE_TAG" == *-* ]]; then
             flags+=(--prerelease)
           fi
-          gh release create "${GITHUB_REF_NAME}" \
+          gh release create "$RELEASE_TAG" \
             dist/mcp-vps-agent-source-package.tar.gz \
             dist/mcp-vps-agent-source-package.tar.gz.sha256 \
             dist/RELEASE-INTEGRITY.txt \
