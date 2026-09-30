@@ -305,7 +305,7 @@ func NewMCPServer(exec Executor) *mcp.Server {
 func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 	s := &Server{Executor: exec, Metrics: metrics}
 	server := mcp.NewServer(
-		&mcp.Implementation{Name: "mcp-vps-agent-gateway", Version: "v0.1.0"},
+		&mcp.Implementation{Name: "portico-mcp", Version: "v0.1.0"},
 		&mcp.ServerOptions{Capabilities: &mcp.ServerCapabilities{
 			Logging: &mcp.LoggingCapabilities{},
 			Extensions: map[string]any{
