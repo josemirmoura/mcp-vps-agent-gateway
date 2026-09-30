@@ -101,9 +101,7 @@ func BuildSystemdRunArgs(s Spec) ([]string, error) {
 		if !filepath.IsAbs(p) {
 			return nil, fmt.Errorf("inaccessible path must be absolute: %q", p)
 		}
-		if !s.IsolateFilesystem {
-			args = append(args, "--property=InaccessiblePaths="+p)
-		}
+		args = append(args, "--property=InaccessiblePaths=-"+p)
 	}
 	writeSet := make(map[string]bool, len(s.ReadWritePaths))
 	for _, p := range s.ReadWritePaths {
