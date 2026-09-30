@@ -356,6 +356,7 @@ func (b *Broker) requestSensitiveAccess(ctx context.Context, req wire.Request) w
 		"delegation_ttl_seconds": int64(ttl / time.Second),
 		"approval_expires_at": a.ExpiresAt,
 		"approval_required": true,
+		"physical_ceiling": filepath.Clean(os.Getenv("VPS_AGENT_PHYSICAL_SCOPE_ROOT")),
 		"approval_token": token,
 	})
 	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
