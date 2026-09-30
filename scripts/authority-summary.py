@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Human-readable policy summary.
+"""Human-readable Portico authority summary.
 
 This is presentation only. The Broker's policy parser remains authoritative.
+Machine-readable policy/protocol values are not localized.
 """
 
 from __future__ import annotations
@@ -9,6 +10,10 @@ from __future__ import annotations
 import argparse
 import pathlib
 import shlex
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "lib"))
+from i18n import is_pt_br, none_label, t, yes_no  # noqa: E402
 
 
 def env_values(path: pathlib.Path) -> dict[str, str]:
@@ -24,7 +29,7 @@ def env_values(path: pathlib.Path) -> dict[str, str]:
             parts = shlex.split(value)
             result[key] = parts[0] if parts else ""
         except ValueError:
-            result[key] = value.strip("'\"")
+            result[key] = value.strip("'"")
     return result
 
 
@@ -35,7 +40,7 @@ def inline_list(value: str) -> list[str]:
     inner = value[1:-1].strip()
     if not inner:
         return []
-    return [x.strip().strip("'\"") for x in inner.split(",") if x.strip()]
+    return [x.strip().strip("'"") for x in inner.split(",") if x.strip()]
 
 
 def parse_policy(path: pathlib.Path):
@@ -57,7 +62,7 @@ def parse_policy(path: pathlib.Path):
 
         if stripped.startswith("- "):
             key = tuple(x[1] for x in stack)
-            lists.setdefault(key, []).append(stripped[2:].strip().strip("'\""))
+            lists.setdefault(key, []).append(stripped[2:].strip().strip("'""))
             continue
 
         if ":" not in stripped:
@@ -68,7 +73,7 @@ def parse_policy(path: pathlib.Path):
         path_key = tuple(x[1] for x in stack) + (key,)
 
         if value:
-            scalars[path_key] = value.strip("'\"")
+            scalars[path_key] = value.strip("'"")
             values = inline_list(value)
             if values or value == "[]":
                 lists[path_key] = values
@@ -86,17 +91,36 @@ def values(lists, *path):
     return lists.get(tuple(path), [])
 
 
+def human_bool(raw: str) -> str:
+    low = raw.strip().lower()
+    if low == "true":
+        return yes_no(True)
+    if low == "false":
+        return yes_no(False)
+    return raw
+
+
+def human_network(raw: str) -> str:
+    if not is_pt_br():
+        return raw
+    return {
+        "blocked": "bloqueada",
+        "allowlist": "lista permitida",
+        "unrestricted": "irrestrita",
+    }.get(raw, raw)
+
+
 def show_list(label: str, entries: list[str]):
     print(f"{label}:")
     if entries:
         for entry in entries:
             print(f"  - {entry}")
     else:
-        print("  - none")
+        print(f"  - {none_label()}")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument("--env", default=".env")
     parser.add_argument("--policy", default="config/policy.yaml")
     args = parser.parse_args()
@@ -104,44 +128,62 @@ def main() -> int:
     env_path = pathlib.Path(args.env)
     policy_path = pathlib.Path(args.policy)
     if not policy_path.is_file():
-        raise SystemExit(f"policy not found: {policy_path}")
+        raise SystemExit(t(f"policy not found: {policy_path}", f"policy não encontrada: {policy_path}"))
 
     env = env_values(env_path)
     scalars, lists = parse_policy(policy_path)
 
     whole = env.get("VPS_AGENT_WHOLE_HOST", "0") == "1"
-    physical = env.get("VPS_AGENT_SCOPE_ROOT", "(not set)")
+    physical = env.get("VPS_AGENT_SCOPE_ROOT", t("(not set)", "(não definido)"))
     mode = scalar(scalars, "mode")
-    full = scalar(scalars, "features", "full_mode_enabled")
-    network = scalar(scalars, "network", "mode")
-    shell_enabled = scalar(scalars, "shell", "enabled")
+    full = human_bool(scalar(scalars, "features", "full_mode_enabled"))
+    network = human_network(scalar(scalars, "network", "mode"))
+    shell_enabled = human_bool(scalar(scalars, "shell", "enabled"))
 
-    print("Effective authority summary")
+    print(t("Effective authority summary", "Resumo da autoridade efetiva"))
     print("---------------------------")
-    print(f"Physical filesystem ceiling: {physical}")
-    print(f"Whole-host mount override:   {'yes' if whole else 'no'}")
-    print(f"Policy mode:                 {mode}")
-    print(f"Full feature enabled:        {full}")
-    print(f"Network mode:                {network}")
-    print(f"Scoped shell enabled:        {shell_enabled}")
+    print(f"{t('Physical filesystem ceiling', 'Teto físico do filesystem')}: {physical}")
+    print(f"{t('Whole-host mount override', 'Montagem de host inteiro')}: {yes_no(whole)}")
+    print(f"{t('Policy mode', 'Modo da policy')}: {mode}")
+    print(f"{t('Full feature enabled', 'Recurso Full habilitado')}: {full}")
+    print(f"{t('Network mode', 'Modo de rede')}: {network}")
+    print(f"{t('Scoped shell enabled', 'Shell confinado habilitado')}: {shell_enabled}")
     print()
-    show_list("Filesystem read roots", values(lists, "filesystem", "read"))
-    show_list("Filesystem write roots", values(lists, "filesystem", "write"))
-    show_list("Shell cwd roots", values(lists, "shell", "cwd_roots"))
+    show_list(t("Filesystem read roots", "Raízes de leitura do filesystem"), values(lists, "filesystem", "read"))
+    show_list(t("Filesystem write roots", "Raízes de escrita do filesystem"), values(lists, "filesystem", "write"))
+    show_list(t("Shell cwd roots", "Raízes de trabalho do shell"), values(lists, "shell", "cwd_roots"))
     print()
 
+    section_labels = {
+        "services": t("services", "serviços"),
+        "docker": "docker",
+        "compose": "compose",
+        "packages": t("packages", "pacotes"),
+        "users": t("users", "usuários"),
+        "groups": t("groups", "grupos"),
+        "firewall": "firewall",
+    }
     for section in ("services", "docker", "compose", "packages", "users", "groups", "firewall"):
         manage = values(lists, section, "manage")
         actions = values(lists, section, "actions")
         if manage or actions:
-            print(f"{section}:")
-            print("  manage: " + (", ".join(manage) if manage else "none"))
-            print("  actions: " + (", ".join(actions) if actions else "none"))
+            print(f"{section_labels[section]}:")
+            print("  " + t("manage", "gerenciar") + ": " + (", ".join(manage) if manage else none_label()))
+            print("  " + t("actions", "ações") + ": " + (", ".join(actions) if actions else none_label()))
 
     print()
-    print("Filesystem ceiling and capabilities are separate dimensions.")
-    print("Whole Host does not imply Full. Full does not imply unrestricted network.")
-    print("This summary is informational; Broker authorization remains authoritative.")
+    print(t(
+        "Filesystem ceiling and capabilities are separate dimensions.",
+        "O teto do filesystem e as capacidades são dimensões separadas.",
+    ))
+    print(t(
+        "Whole Host does not imply Full. Full does not imply unrestricted network.",
+        "Whole Host não implica Full. Full não implica rede irrestrita.",
+    ))
+    print(t(
+        "This summary is informational; Broker authorization remains authoritative.",
+        "Este resumo é informativo; a autorização do Broker continua sendo a autoridade final.",
+    ))
     return 0
 
 
