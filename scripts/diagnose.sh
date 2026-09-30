@@ -4,9 +4,10 @@ cd "$(dirname "$0")/.."
 
 # shellcheck source=scripts/lib/product.sh
 source scripts/lib/product.sh
+vps_agent_init_language ""
 
 if [ ! -f .env ]; then
-  echo "Missing .env. Run ./scripts/init.sh first." >&2
+  echo "$(vps_agent_text 'Missing .env. Run scripts/init.sh first.' 'Arquivo .env ausente. Execute scripts/init.sh primeiro.')" >&2
   exit 1
 fi
 set -a
@@ -42,9 +43,9 @@ case "$cmd" in
     for service in broker gateway; do
       cid="$("${compose[@]}" ps -q "$service" 2>/dev/null || true)"
       if [ -n "$cid" ]; then
-        printf "%s health: " "$service"
+        printf "%s %s: " "$service" "$(vps_agent_text health saúde)"
         docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid"
-        printf "%s restarts: " "$service"
+        printf "%s %s: " "$service" "$(vps_agent_text restarts reinícios)"
         docker inspect -f '{{.RestartCount}}' "$cid"
       fi
     done
@@ -141,7 +142,7 @@ PY
     echo "$output"
     ;;
   *)
-    echo "usage: $0 [status|health|logs [lines]|audit [limit]|bundle [output.tar.gz]]" >&2
+    echo "$(vps_agent_text "usage: $0 [status|health|logs [lines]|audit [limit]|bundle [output.tar.gz]]" "uso: $0 [status|health|logs [linhas]|audit [limite]|bundle [saida.tar.gz]]")" >&2
     exit 2
     ;;
 esac
