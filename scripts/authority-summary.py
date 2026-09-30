@@ -8,6 +8,7 @@ Machine-readable policy/protocol values are not localized.
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import shlex
 import sys
@@ -131,6 +132,8 @@ def main() -> int:
         raise SystemExit(t(f"policy not found: {policy_path}", f"policy não encontrada: {policy_path}"))
 
     env = env_values(env_path)
+    if not os.environ.get("VPS_AGENT_LANG") and env.get("VPS_AGENT_LANG"):
+        os.environ["VPS_AGENT_LANG"] = env["VPS_AGENT_LANG"]
     scalars, lists = parse_policy(policy_path)
 
     whole = env.get("VPS_AGENT_WHOLE_HOST", "0") == "1"
