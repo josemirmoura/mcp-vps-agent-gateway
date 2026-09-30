@@ -127,7 +127,7 @@ func (b *Broker) guardSensitiveRequest(ctx context.Context, req wire.Request) *w
 			Destination string `json:"destination"`
 		}
 		if json.Unmarshal(req.Args, &in) == nil && in.Destination != "" {
-			readRoots, writeRoots, err := b.effectiveFileRoots(ctx, req.Subject)
+			readRoots, _, err := b.effectiveFileRoots(ctx, req.Subject)
 			if err != nil {
 				resp := deny(req.ID, "sensitive_path_check_failed", err.Error())
 				return &resp
@@ -152,7 +152,6 @@ func (b *Broker) guardSensitiveRequest(ctx context.Context, req wire.Request) *w
 				check{path: req.Resource, write: sourceWrite},
 				check{path: in.Destination, write: true},
 			)
-			_ = writeRoots
 		}
 	default:
 		return nil
