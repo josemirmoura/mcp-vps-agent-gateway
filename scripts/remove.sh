@@ -15,33 +15,11 @@ for arg in "$@"; do
     --purge) mode="--purge" ;;
     --remove-source) remove_source=1 ;;
     -h|--help)
-      if vps_agent_is_pt_br; then
-        cat <<'EOF'
-uso: bash scripts/remove.sh [safe|--purge] [--remove-source]
-
-safe             Para o Portico MCP e gira credenciais locais, preservando
-                 configuração, policy, auditoria e identidade integrada.
---purge          Remove runtime, volumes, estado/configuração local,
-                 imagens locais padrão e estruturas legadas vazias.
---remove-source  Apenas com --purge: remove também este checkout Git após
-                 uma segunda confirmação explícita.
-EOF
-      else
-        cat <<'EOF'
-usage: bash scripts/remove.sh [safe|--purge] [--remove-source]
-
-safe             Stop Portico MCP and rotate local credentials while preserving
-                 configuration, policy, audit state and integrated identity.
---purge          Delete MCP-owned runtime, volumes, local state/configuration,
-                 default local package images and empty legacy scaffolding.
---remove-source  With --purge only: also delete this Git checkout after a
-                 separate explicit confirmation.
-EOF
-      fi
+      vps_agent_block remove.usage >&2
       exit 0
       ;;
     *)
-      echo "$(vps_agent_text "usage: $0 [safe|--purge] [--remove-source]" "uso: $0 [safe|--purge] [--remove-source]")" >&2
+      echo "$(vps_agent_msg remove.usage_line "script=$0")" >&2
       exit 2
       ;;
   esac
@@ -109,23 +87,12 @@ if [ "$remove_source" -eq 1 ] && [ "${VPS_AGENT_REMOVE_SOURCE_CONFIRM:-}" != "RE
   fi
 fi
 
-if vps_agent_is_pt_br; then
-  cat <<EOF
-Modo de remoção: $mode
-Runtime: Gateway + Broker + proxy do pacote (quando configurado)
-Recursos gerenciados da VPS: PRESERVADOS
-Policy/auditoria do operador: $([ "$mode" = "safe" ] && echo PRESERVADAS || echo APAGADAS)
-Checkout do código: $([ "$remove_source" -eq 1 ] && echo APAGAR || echo PRESERVAR)
-EOF
-else
-  cat <<EOF
-Removal mode: $mode
-Runtime: Gateway + Broker + package proxy (when configured)
-Managed VPS resources: PRESERVED
-Operator policy/audit: $([ "$mode" = "safe" ] && echo PRESERVED || echo DELETED)
-Source checkout: $([ "$remove_source" -eq 1 ] && echo DELETE || echo PRESERVED)
-EOF
-fi
+policy_state="$(vps_agent_msg remove.state_preserved)"
+source_state="$(vps_agent_msg remove.state_preserve)"
+if [ "$mode" != "safe" ]; then policy_state="$(vps_agent_msg remove.state_deleted)"; fi
+if [ "$remove_source" -eq 1 ]; then source_state="$(vps_agent_msg remove.state_delete)"; fi
+vps_agent_block remove.summary "mode=$mode" "policy_state=$policy_state" "source_state=$source_state"
+
 
 project_ids="$(docker ps -aq --filter label=com.docker.compose.project=mcp-vps-agent 2>/dev/null || true)"
 if [ ! -f .env ] && [ -z "$project_ids" ]; then
@@ -191,7 +158,7 @@ fi
 
 left="$(docker ps -aq --filter label=com.docker.compose.project=mcp-vps-agent 2>/dev/null || true)"
 if [ -n "$left" ]; then
-  echo "$(vps_agent_text "Removal incomplete: package containers still exist: $left" "Remoção incompleta: ainda existem contêineres do pacote: $left")" >&2
+  echo "$(vps_agent_msg remove.incomplete_containers "containers=$left")" >&2
   exit 1
 fi
 
@@ -202,10 +169,10 @@ if [ -n "${VPS_AGENT_PUBLIC_URL:-}" ]; then
       echo "$(vps_agent_text 'Public MCP endpoint is no longer reachable from this host.' 'O endpoint MCP público não está mais acessível a partir deste host.')"
       ;;
     404|410)
-      echo "$(vps_agent_text "Public MCP route is gone (HTTP $code from the remaining edge proxy)." "A rota MCP pública foi removida (HTTP $code no proxy de borda remanescente).")"
+      echo "$(vps_agent_msg remove.public_route_gone "code=$code")"
       ;;
     *)
-      echo "Removal incomplete: the MCP URL still returned HTTP $code instead of disappearing." >&2
+      echo "$(vps_agent_msg remove.url_still_live "code=$code")" >&2
       echo "$(vps_agent_text 'Check for a stale proxy route before considering removal complete.' 'Verifique uma possível rota antiga no proxy antes de considerar a remoção concluída.')" >&2
       exit 1
       ;;
@@ -213,39 +180,7 @@ if [ -n "${VPS_AGENT_PUBLIC_URL:-}" ]; then
 fi
 
 if [ "$mode" = "safe" ]; then
-  if vps_agent_is_pt_br; then
-    cat <<'EOF'
-
-REMOÇÃO SEGURA CONCLUÍDA
-Removidos:
-  runtime Gateway/Broker/proxy do pacote
-  autorizações temporárias ativas
-Invalidadas:
-  credenciais bearer locais admin/static anteriores
-Preservados:
-  .env (com credenciais locais rotacionadas)
-  config/policy.yaml
-  state/ auditoria e histórico de operações
-  estado da identidade integrada
-  todos os recursos da VPS que o Portico podia gerenciar
-EOF
-  else
-    cat <<'EOF'
-
-SAFE REMOVE COMPLETE
-Removed:
-  Gateway/Broker/package proxy runtime
-  active temporary grants
-Invalidated:
-  previous local admin/static bearer credentials
-Preserved:
-  .env (with rotated local credentials)
-  config/policy.yaml
-  state/ audit and operation history
-  integrated identity state on safe remove
-  every VPS resource Portico MCP was allowed to manage
-EOF
-  fi
+  vps_agent_block remove.safe_complete
   exit 0
 fi
 
@@ -266,41 +201,12 @@ docker image rm   mcp-vps-agent-gateway:local   mcp-vps-agent-broker:local   >/d
 # a non-empty directory is preserved rather than risking user data.
 remove_legacy_sandbox
 
-if vps_agent_is_pt_br; then
-  cat <<EOF
+vps_agent_block remove.purge_complete
 
-PURGE COMPLETO CONCLUÍDO
-Artefatos locais do Portico removidos:
-  runtime/volumes
-  imagens locais padrão do Gateway/Broker (quando presentes)
-  .env
-  config/policy.yaml
-  state/
-  backups/
-  /opt/vps-agent-sandbox legado vazio (quando presente)
-Preservados:
-  aplicações, sites, bancos, imagens/contêineres de terceiros, serviços e arquivos delegados
-EOF
-else
-  cat <<EOF
-
-FULL PURGE COMPLETE
-Deleted MCP-owned local artifacts:
-  runtime/volumes
-  default local Gateway/Broker images (when present)
-  .env
-  config/policy.yaml
-  state/
-  backups/
-  empty legacy /opt/vps-agent-sandbox (when present)
-Preserved:
-  applications, sites, databases, third-party images/containers, services and delegated files
-EOF
-fi
 
 if [ "$remove_source" -eq 1 ] && [ "$source_verified" -eq 1 ]; then
   parent="$(dirname "$repo_root")"
-  echo "$(vps_agent_text "Deleting verified Portico MCP source checkout: $repo_root" "Apagando o checkout verificado do Portico MCP: $repo_root")"
+  echo "$(vps_agent_msg remove.deleting_source "path=$repo_root")"
   cd /
   rm -rf -- "$repo_root"
   if [ "$(basename "$parent")" = "vps-agent-lab" ]; then
