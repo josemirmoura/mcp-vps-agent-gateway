@@ -99,7 +99,7 @@ body {
   background: var(--accent-soft);
   color: var(--accent);
 }
-.icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.icon svg { width: 22px; height: 22px; fill: none; stroke: var(--accent); stroke-width: 1.8; }
 .eyebrow {
   margin: 0 0 3px;
   color: var(--muted);
