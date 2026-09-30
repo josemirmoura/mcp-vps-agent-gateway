@@ -29,7 +29,7 @@ def env_values(path: pathlib.Path) -> dict[str, str]:
             parts = shlex.split(value)
             result[key] = parts[0] if parts else ""
         except ValueError:
-            result[key] = value.strip("'"")
+            result[key] = value.strip("'\"")
     return result
 
 
@@ -40,7 +40,7 @@ def inline_list(value: str) -> list[str]:
     inner = value[1:-1].strip()
     if not inner:
         return []
-    return [x.strip().strip("'"") for x in inner.split(",") if x.strip()]
+    return [x.strip().strip("'\"") for x in inner.split(",") if x.strip()]
 
 
 def parse_policy(path: pathlib.Path):
@@ -62,7 +62,7 @@ def parse_policy(path: pathlib.Path):
 
         if stripped.startswith("- "):
             key = tuple(x[1] for x in stack)
-            lists.setdefault(key, []).append(stripped[2:].strip().strip("'""))
+            lists.setdefault(key, []).append(stripped[2:].strip().strip("'\""))
             continue
 
         if ":" not in stripped:
@@ -73,7 +73,7 @@ def parse_policy(path: pathlib.Path):
         path_key = tuple(x[1] for x in stack) + (key,)
 
         if value:
-            scalars[path_key] = value.strip("'"")
+            scalars[path_key] = value.strip("'\"")
             values = inline_list(value)
             if values or value == "[]":
                 lists[path_key] = values
