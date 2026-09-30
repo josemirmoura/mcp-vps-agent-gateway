@@ -1472,6 +1472,13 @@ func (b *Broker) decideApproval(ctx context.Context, req wire.Request, decision 
 		pending.Resource = root
 		pending.Access = access
 	}
+	if decision == "approved" && pending.Kind == "capability" && len(pending.Capabilities) == 1 {
+		if _, _, ok := decodeSensitiveCapability(pending.Capabilities[0]); ok {
+			if err := b.validateSensitiveApproval(ctx, pending); err != nil {
+				return deny(req.ID, "permission_denied", "protected-file approval no longer satisfies the current authority boundary: "+err.Error())
+			}
+		}
+	}
 	a, err := b.State.DecideApproval(ctx, in.RequestID, decision)
 	if err != nil {
 		return deny(req.ID, "state_error", err.Error())
