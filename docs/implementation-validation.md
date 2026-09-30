@@ -1,6 +1,6 @@
 # Executable implementation validation
 
-Checked: 2026-09-28.
+Checked: 2026-09-30.
 
 This document records evidence from clean GitHub-hosted Ubuntu runners. These runners are disposable machines, so successful runs prove reproducible behavior in a fresh Linux environment without touching a production VPS.
 
@@ -117,6 +117,12 @@ The reference implementation CI validates, on GitHub-hosted Linux runners:
 - systemd unit syntax/hardening verification
 - transient systemd job smoke
 - `govulncheck ./...`
+- gosec and gitleaks source/security scanning
+- bounded fuzzing of secure filesystem root selection and policy parsing
+- request body and concurrency ceilings
+- Docker-package negative `SO_PEERCRED` proof
+- hardlink, symlink and rename-race filesystem adversarial tests
+- Trivy image/OS-package vulnerability scanning and CycloneDX SBOM evidence
 
 Historical clean runs are visible in the Actions history. The latest commit must be green before merge.
 
@@ -158,7 +164,7 @@ ChatGPT Web
 
 The completion flow observed the authenticated `system.info` event for the expected subject and reached the same `CHATGPT WEB CONNECTION VERIFIED` / `INSTALLATION COMPLETE` criterion enforced by `scripts/connect-chatgpt.sh`. Environment-specific hostname, subject and credential values are intentionally not committed as public evidence.
 
-This closes the product-surface Gate 0A for the supported integrated-auth path. It does not by itself establish long-running production reliability or Full/R5 maturity.
+This closes the product-surface Gate 0A for the supported integrated-auth path. The current release-candidate closeout also includes explicit dynamic-root approval, dark/light MCP Apps approval UI coverage, abuse limits and expanded filesystem race tests. It does not by itself establish long-running production reliability or Full/R5 maturity.
 
 ## What this proves
 
