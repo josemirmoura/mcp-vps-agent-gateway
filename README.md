@@ -1,8 +1,8 @@
-# MCP VPS Agent Gateway
+# Portico MCP
 
 **Connect ChatGPT Web directly to your Linux VPS through MCP, with authority you define and the server enforces.**
 
-MCP VPS Agent Gateway is an open-source, self-hosted bridge for letting ChatGPT Web or another MCP client inspect and operate a Linux VPS through the Model Context Protocol. OAuth authenticates the client, a non-root Gateway exposes the MCP surface, and a privileged local Broker re-authorizes host operations against operator-defined policy and records audit evidence.
+Portico MCP is an open-source, self-hosted bridge for letting ChatGPT Web or another MCP client inspect and operate a Linux VPS through the Model Context Protocol. OAuth authenticates the client, a non-root Gateway exposes the MCP surface, and a privileged local Broker re-authorizes host operations against operator-defined policy and records audit evidence.
 
 > **Status: pre-release productization candidate.** Clean Ubuntu 24.04 workflows validate the package end to end, and the integrated self-hosted OAuth path has been verified through a real audited ChatGPT Web `system.info` call on 2026-09-28. A stable public release, compatibility promise, and long-running production reliability claim are still pending.
 
@@ -10,7 +10,7 @@ MCP VPS Agent Gateway is an open-source, self-hosted bridge for letting ChatGPT 
 
 Without a trusted execution path, server work with an AI becomes a manual relay: ChatGPT suggests a command, you switch to a terminal, run it, copy logs back, rebuild context and repeat. Broad SSH-style access would remove some friction while creating a much larger trust problem.
 
-MCP VPS Agent Gateway closes that loop while keeping authorization on the VPS. From the conversation, ChatGPT can inspect files, diagnose services, analyze logs, work with Docker and perform other operations that the VPS owner explicitly enables.
+Portico MCP closes that loop while keeping authorization on the VPS. From the conversation, ChatGPT can inspect files, diagnose services, analyze logs, work with Docker and perform other operations that the VPS owner explicitly enables.
 
 ~~~text
 ChatGPT Web
@@ -73,7 +73,7 @@ Before starting the guided installation, have:
 - a public DNS hostname pointing to the VPS, TCP 80/443 available and valid HTTPS;
 - **ChatGPT Plus or higher**, with Developer Mode and custom MCP app creation actually available in ChatGPT Web for the account.
 
-ChatGPT plan capabilities are controlled by OpenAI and can change by plan, account and rollout. Current OpenAI documentation describes full MCP support, including write/modify actions, for Business, Enterprise and Edu. If an account exposes only narrower read/fetch MCP capabilities, MCP VPS Agent Gateway cannot elevate that ChatGPT-side permission.
+ChatGPT plan capabilities are controlled by OpenAI and can change by plan, account and rollout. Current OpenAI documentation describes full MCP support, including write/modify actions, for Business, Enterprise and Edu. If an account exposes only narrower read/fetch MCP capabilities, Portico MCP cannot elevate that ChatGPT-side permission.
 
 See [compatibility](docs/compatibility.md) for the supported/tested matrix.
 
@@ -89,7 +89,7 @@ The terminal now conducts the supported flow:
 
 ~~~text
 Environment
- -> Scope: Project / Custom / Whole Host
+ -> Scope: Standard / Project / Whole Host
  -> effective authority review
  -> Containers
  -> Local verification
@@ -99,7 +99,7 @@ Environment
  -> INSTALLATION COMPLETE
 ~~~
 
-**Project** is the recommended default. **Whole Host** changes the physical filesystem ceiling to `/`, but it does not enable Full or unrestricted networking. Filesystem and capabilities remain separate policy dimensions.
+**Standard** is the recommended default: `/opt` is the physical ceiling, while project roots start unauthorized and are granted later through explicit approval. **Whole Host** changes the physical filesystem ceiling to `/`, but it does not enable Full or unrestricted networking. Filesystem and capabilities remain separate policy dimensions.
 
 The orchestration is deliberately thin and transparent. The individual `init.sh`, Compose, `verify.sh`, OAuth and ChatGPT scripts remain usable and documented. See the [Quick Start](docs/quick-start.md) and [installation flow](docs/installer-flow.md).
 
