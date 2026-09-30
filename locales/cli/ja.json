@@ -246,6 +246,7 @@
     "error.operator_creation_failed": "エラー: オペレーター作成に失敗しました (curl={curl_status} HTTP={http_code})。",
     "error.public_url_https": "公開 MCP エンドポイントは HTTPS を使用する必要があります: {url}",
     "error.expected_401": "未認証 MCP リクエストは HTTP 401 の想定ですが、{code} が返りました。",
-    "verify.local_call_skipped": "認証モード {mode} ではローカル MCP ツール呼び出しを省略します。公開 OAuth 検証を使用します。"
+    "verify.local_call_skipped": "認証モード {mode} ではローカル MCP ツール呼び出しを省略します。公開 OAuth 検証を使用します。",
+    "connect.email_line": "   アカウントのメール: {email}"
   }
 }
