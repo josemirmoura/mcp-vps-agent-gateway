@@ -316,6 +316,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 		}},
 	)
 	registerRootApprovalWidget(server)
+	registerAuthorityTools(server, s)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "system.info", Description: "Return non-sensitive host/runtime information."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, systemInfoOutput, error) {
