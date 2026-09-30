@@ -142,7 +142,7 @@ PY
     echo "$output"
     ;;
   *)
-    echo "$(vps_agent_text "usage: $0 [status|health|logs [lines]|audit [limit]|bundle [output.tar.gz]]" "uso: $0 [status|health|logs [linhas]|audit [limite]|bundle [saida.tar.gz]]")" >&2
+    echo "$(vps_agent_msg diagnose.usage "script=$0")" >&2
     exit 2
     ;;
 esac
