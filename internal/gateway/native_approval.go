@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
-	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -110,89 +108,7 @@ func nativeApprovalDecision(req *mcp.CallToolRequest, expectedKind string) (nati
 }
 
 func approvalMessage(kind string, values map[string]any) string {
-	pt := strings.EqualFold(strings.TrimSpace(os.Getenv("VPS_AGENT_LANG")), "pt-BR")
-	access := stringValue(values["access"])
-	duration := durationValue(values["delegation_ttl_seconds"], pt)
-	ceiling := stringValue(values["physical_ceiling"])
-
-	if kind == "sensitive" {
-		target := stringValue(values["path"])
-		if pt {
-			return fmt.Sprintf(
-				"Autorizar acesso temporário a um arquivo protegido do Portico MCP?\n\nArquivo: %s\nAcesso: %s\nDuração: %s\nTeto físico: %s\n\nArquivos protegidos, como .env, continuam bloqueados mesmo quando a pasta do projeto está autorizada. Esta exceção vale somente para o arquivo acima e expira automaticamente. Aceite apenas se você realmente quiser liberar esse segredo para a tarefa atual.",
-				target, accessLabel(access, true), duration, ceiling,
-			)
-		}
-		return fmt.Sprintf(
-			"Authorize temporary access to a protected Portico MCP file?\n\nFile: %s\nAccess: %s\nDuration: %s\nPhysical ceiling: %s\n\nProtected files such as .env stay locked even when the project folder is authorized. This exception applies only to the file above and expires automatically. Accept only if you intentionally want to expose this secret for the current task.",
-			target, accessLabel(access, false), duration, ceiling,
-		)
-	}
-
-	target := stringValue(values["root"])
-	ceilingWide, _ := values["ceiling_wide"].(bool)
-	if pt {
-		message := fmt.Sprintf(
-			"Autorizar acesso do Portico MCP?\n\nPasta: %s\nAcesso: %s\nDuração: %s\nTeto físico: %s\n\nO teto físico é o limite máximo da IA; ele não concede acesso por si só. Esta autorização libera somente o perfil acima dentro da pasta solicitada. Arquivos protegidos, como .env, continuam bloqueados.",
-			target, accessLabel(access, true), duration, ceiling,
-		)
-		if ceilingWide {
-			message += "\n\nATENÇÃO: você está autorizando o próprio teto físico. O perfil solicitado passará a valer para todas as pastas atuais e futuras abaixo desse teto enquanto a autorização estiver ativa."
-		}
-		message += "\n\nVocê poderá revogar esta autorização depois."
-		return message
-	}
-	message := fmt.Sprintf(
-		"Authorize Portico MCP access?\n\nFolder: %s\nAccess: %s\nDuration: %s\nPhysical ceiling: %s\n\nThe physical ceiling is the AI's maximum boundary; it grants no access by itself. This authorization enables only the profile above inside the requested folder. Protected files such as .env remain locked.",
-		target, accessLabel(access, false), duration, ceiling,
-	)
-	if ceilingWide {
-		message += "\n\nWARNING: you are authorizing the physical ceiling itself. The requested profile will apply to every current and future folder below that ceiling while the authorization remains active."
-	}
-	message += "\n\nYou can revoke this authorization later."
-	return message
-}
-
-func accessLabel(access string, pt bool) string {
-	switch access {
-	case "read":
-		if pt {
-			return "Somente leitura"
-		}
-		return "Read only"
-	case "work":
-		if pt {
-			return "Trabalho (ler, criar, editar, excluir e usar shell confinado)"
-		}
-		return "Work (read, create, edit, delete, and use confined shell)"
-	case "compose":
-		if pt {
-			return "Trabalho + Compose já permitido pela política"
-		}
-		return "Work + Compose actions already allowed by policy"
-	default:
-		return access
-	}
-}
-
-func durationValue(value any, pt bool) string {
-	seconds := int64Value(value)
-	if seconds <= 0 {
-		if pt {
-			return "Permanente, até revogação"
-		}
-		return "Permanent, until revoked"
-	}
-	if seconds%3600 == 0 {
-		return fmt.Sprintf("%d h", seconds/3600)
-	}
-	if seconds%60 == 0 {
-		return fmt.Sprintf("%d min", seconds/60)
-	}
-	if pt {
-		return fmt.Sprintf("%d s", seconds)
-	}
-	return fmt.Sprintf("%d sec", seconds)
+	return localizedApprovalMessage(kind, values)
 }
 
 func stringValue(value any) string {
