@@ -56,6 +56,10 @@
     "remove.public_route_gone": "A rota MCP pública foi removida (HTTP {code} no proxy de borda remanescente).",
     "remove.url_still_live": "Remoção incompleta: a URL MCP ainda retornou HTTP {code} em vez de desaparecer.",
     "remove.deleting_source": "Apagando o checkout verificado do Portico MCP: {path}",
-    "diagnose.usage": "uso: {script} [status|health|logs [linhas]|audit [limite]|bundle [saida.tar.gz]]"
+    "diagnose.usage": "uso: {script} [status|health|logs [linhas]|audit [limite]|bundle [saida.tar.gz]]",
+    "remove.state_preserved": "PRESERVADOS",
+    "remove.state_deleted": "APAGADAS",
+    "remove.state_delete": "APAGAR",
+    "remove.state_preserve": "PRESERVAR"
   }
 }
