@@ -40,28 +40,28 @@ BUNDLED_PROXY=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --domain)
-      [ "$#" -ge 2 ] || { echo "ERROR: --domain needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --domain needs a value.' 'ERRO: --domain precisa de um valor.')" >&2; exit 2; }
       DOMAIN="$2"; shift 2 ;;
     --operator-email)
-      [ "$#" -ge 2 ] || { echo "ERROR: --operator-email needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --operator-email needs a value.' 'ERRO: --operator-email precisa de um valor.')" >&2; exit 2; }
       OPERATOR_EMAIL="$2"; shift 2 ;;
     --operator-username)
-      [ "$#" -ge 2 ] || { echo "ERROR: --operator-username needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --operator-username needs a value.' 'ERRO: --operator-username precisa de um valor.')" >&2; exit 2; }
       OPERATOR_USERNAME="$2"; OPERATOR_USERNAME_EXPLICIT=1; shift 2 ;;
     --edge-network)
-      [ "$#" -ge 2 ] || { echo "ERROR: --edge-network needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --edge-network needs a value.' 'ERRO: --edge-network precisa de um valor.')" >&2; exit 2; }
       EDGE_NETWORK="$2"; shift 2 ;;
     --certresolver)
-      [ "$#" -ge 2 ] || { echo "ERROR: --certresolver needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --certresolver needs a value.' 'ERRO: --certresolver precisa de um valor.')" >&2; exit 2; }
       CERTRESOLVER="$2"; shift 2 ;;
     --bundled-proxy) BUNDLED_PROXY=1; shift ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "ERROR: unknown argument: $1" >&2; usage >&2; exit 2 ;;
+    *) echo "$(vps_agent_text "ERROR: unknown argument: $1" "ERRO: argumento desconhecido: $1")" >&2; usage >&2; exit 2 ;;
   esac
 done
 
 if [ ! -f .env ] || [ ! -f config/policy.yaml ]; then
-  echo "ERROR: run scripts/init.sh and bash scripts/verify.sh first." >&2
+  echo "$(vps_agent_text 'ERROR: run scripts/init.sh and bash scripts/verify.sh first.' 'ERRO: execute scripts/init.sh e scripts/verify.sh primeiro.')" >&2
   exit 1
 fi
 
@@ -256,7 +256,7 @@ else
       if docker inspect "$id" --format '{{range $name, $cfg := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' |
           grep -Fxq "$EDGE_NETWORK"; then
         if [ -n "$TRAEFIK_ID" ]; then
-          echo "ERROR: more than one Traefik is attached to $EDGE_NETWORK." >&2
+          echo "$(vps_agent_text "ERROR: more than one Traefik is attached to $EDGE_NETWORK." "ERRO: mais de um Traefik está conectado à rede $EDGE_NETWORK.")" >&2
           exit 1
         fi
         TRAEFIK_ID="$id"
@@ -289,8 +289,8 @@ else
           sed '/^$/d'
       )
       if [ "${#NETWORKS[@]}" -ne 1 ]; then
-        echo "ERROR: Traefik has ${#NETWORKS[@]} candidate Docker networks: ${NETWORKS[*]:-none}" >&2
-        echo "Pass --edge-network NETWORK." >&2
+        echo "$(vps_agent_text "ERROR: Traefik has ${#NETWORKS[@]} candidate Docker networks: ${NETWORKS[*]:-none}" "ERRO: o Traefik possui ${#NETWORKS[@]} redes Docker candidatas: ${NETWORKS[*]:-nenhuma}")" >&2
+        echo "$(vps_agent_text 'Pass --edge-network NETWORK.' 'Informe --edge-network REDE.')" >&2
         exit 1
       fi
       EDGE_NETWORK="${NETWORKS[0]}"
@@ -387,13 +387,13 @@ if ! test -s /tmp/vps-agent-oidc.json; then
   "${compose[@]}" ps >&2 || true
   exit 1
 fi
-python3 - "$DOMAIN" <<'PY'
-import json,sys
+VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - "$DOMAIN" <<'PY'
+import json,os,sys
 domain=sys.argv[1]
 data=json.load(open("/tmp/vps-agent-oidc.json"))
 issuer=data.get("issuer","").rstrip("/")
 assert issuer == f"https://{domain}", issuer
-print("OIDC DISCOVERY: PASS")
+print("DESCOBERTA OIDC: OK" if os.environ.get("VPS_AGENT_LANG")=="pt-BR" else "OIDC DISCOVERY: PASS")
 PY
 
 DCR_READY="$(python3 - <<'PY'
@@ -547,7 +547,7 @@ PY
   trap - EXIT
 
   if [ "$CURL_STATUS" -ne 0 ] || { [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; }; then
-    echo "ERROR: operator creation failed (curl=$CURL_STATUS HTTP=${HTTP_CODE:-none})." >&2
+    echo "$(vps_agent_text "ERROR: operator creation failed (curl=$CURL_STATUS HTTP=${HTTP_CODE:-none})." "ERRO: falha ao criar o operador (curl=$CURL_STATUS HTTP=${HTTP_CODE:-nenhum}).")" >&2
     cat /tmp/vps-agent-create-operator.json >&2 2>/dev/null || true
     exit 1
   fi
@@ -622,7 +622,7 @@ for value in values:
     print(value)
 PY
     )
-    [ "${#APP_VALUES[@]}" -eq 3 ] || { echo "ERROR: incomplete introspection client response." >&2; exit 1; }
+    [ "${#APP_VALUES[@]}" -eq 3 ] || { echo "$(vps_agent_text 'ERROR: incomplete introspection client response.' 'ERRO: resposta incompleta do cliente de introspecção.')" >&2; exit 1; }
     INTROSPECTION_APP_ID="${APP_VALUES[0]}"
     INTROSPECTION_CLIENT_ID="${APP_VALUES[1]}"
     INTROSPECTION_CLIENT_SECRET="${APP_VALUES[2]}"
@@ -650,11 +650,11 @@ if [ "$NEEDS_BOOTSTRAP" -eq 1 ]; then
     --header 'Content-Type: application/x-www-form-urlencoded' \
     --data 'token=deliberately-invalid-bootstrap-probe' \
     >/tmp/vps-agent-introspection-probe.json
-  python3 - <<'PY'
-import json
+  VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - <<'PY'
+import json,os
 x=json.load(open("/tmp/vps-agent-introspection-probe.json"))
 assert x.get("active") is False, x
-print("PRIVATE TOKEN INTROSPECTION CLIENT: PASS")
+print("CLIENTE PRIVADO DE INTROSPECÇÃO DE TOKEN: OK" if os.environ.get("VPS_AGENT_LANG")=="pt-BR" else "PRIVATE TOKEN INTROSPECTION CLIENT: PASS")
 PY
 
   # Re-read bootstrap identities while the PAT still works. Remove the human
@@ -747,13 +747,13 @@ PY
   fi
   sleep 2
 done
-python3 - <<'PY'
-import json
+VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - <<'PY'
+import json,os
 x=json.load(open("/tmp/vps-agent-oidc.json"))
 endpoint=x.get("registration_endpoint","")
 assert endpoint.startswith("https://"), x
 assert "S256" in x.get("code_challenge_methods_supported",[]), x
-print("DYNAMIC CLIENT REGISTRATION + PKCE: PASS")
+print("REGISTRO DINÂMICO DE CLIENTE + PKCE: OK" if os.environ.get("VPS_AGENT_LANG")=="pt-BR" else "DYNAMIC CLIENT REGISTRATION + PKCE: PASS")
 PY
 
 echo "$(vps_agent_text 'Switching Gateway and Broker to the integrated operator subject...' 'Alterando Gateway e Broker para o subject do operador integrado...')"
