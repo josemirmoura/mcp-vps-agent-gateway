@@ -348,7 +348,7 @@ auth_args=()
 [ -n "$DOMAIN" ] && auth_args+=(--domain "$DOMAIN")
 [ -n "$OPERATOR_EMAIL" ] && auth_args+=(--operator-email "$OPERATOR_EMAIL")
 [ -n "$OPERATOR_USERNAME" ] && auth_args+=(--operator-username "$OPERATOR_USERNAME")
-printf 'Running: bash scripts/setup-integrated-auth.sh'
+printf '%s' "$(vps_agent_text 'Running: bash scripts/setup-integrated-auth.sh' 'Executando: bash scripts/setup-integrated-auth.sh')"
 printf ' %q' "${auth_args[@]}"
 printf '\n'
 bash scripts/setup-integrated-auth.sh "${auth_args[@]}"
@@ -356,15 +356,17 @@ bash scripts/setup-integrated-auth.sh "${auth_args[@]}"
 vps_agent_step "$(vps_agent_text '7/7 Connect ChatGPT and verify E2E' '7/7 Conectar ao ChatGPT e verificar E2E')"
 if vps_agent_is_pt_br; then
   cat <<'EOF'
-O próximo script mostra as etapas atuais de conexão no ChatGPT e aguarda uma
-chamada system.info autenticada. A instalação só termina quando o Broker
-observar essa chamada real e a cadeia de auditoria continuar válida.
+O próximo script orienta a conexão com o ChatGPT passo a passo.
+Faça a configuração no seu tempo e volte ao terminal para pressionar Enter.
+A instalação só termina quando o Broker confirmar uma chamada system.info real,
+autenticada e registrada na auditoria.
 EOF
 else
   cat <<'EOF'
-The next script shows the current ChatGPT connection steps and waits for a new
-authenticated system.info call. Installation completes only when the Broker
-observes that real call and the audit chain remains valid.
+The next script guides the ChatGPT connection step by step.
+Take your time, then return to the terminal and press Enter to verify.
+Installation completes only after the Broker confirms a real authenticated
+system.info call in the audit trail.
 EOF
 fi
 bash scripts/connect-chatgpt.sh
