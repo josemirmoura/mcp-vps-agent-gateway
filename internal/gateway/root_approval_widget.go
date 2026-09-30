@@ -515,17 +515,17 @@ button:disabled { opacity: .45; cursor: default; }
     const access = request?.access || "";
     const approved = decision === "approve";
     try {
+      const key = kind === "sensitive" ? "vpsAgentSensitiveAccess" : "vpsAgentRootAccess";
+      const detail = {
+        request_id: request?.request_id,
+        access,
+        decision: approved ? "approved" : "denied",
+        result: response?.structuredContent || null
+      };
+      if (kind === "sensitive") detail.path = target;
+      else detail.root = target;
       await rpcRequest("ui/update-model-context", {
-        structuredContent: {
-          vpsAgentAccess: {
-            request_id: request?.request_id,
-            kind,
-            target,
-            access,
-            decision: approved ? "approved" : "denied",
-            result: response?.structuredContent || null
-          }
-        }
+        structuredContent: { [key]: detail }
       });
     } catch (_) {}
 
