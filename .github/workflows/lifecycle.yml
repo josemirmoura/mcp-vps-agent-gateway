@@ -155,6 +155,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          bash -c 'source scripts/lib/product.sh; unset VPS_AGENT_LANG LC_ALL LC_MESSAGES; LANG=pt_BR.UTF-8; vps_agent_init_language ""; test "$VPS_AGENT_LANG" = "pt-BR"'
+          bash -c 'source scripts/lib/product.sh; unset VPS_AGENT_LANG LC_ALL LC_MESSAGES; LANG=en_US.UTF-8; vps_agent_init_language ""; test "$VPS_AGENT_LANG" = "en"'
           bash scripts/install.sh \
             --lang pt-BR \
             --profile custom \
