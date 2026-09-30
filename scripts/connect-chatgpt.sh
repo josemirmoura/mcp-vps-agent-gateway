@@ -55,91 +55,14 @@ BASELINE="$("${wait_tool[@]}" --baseline-only)"
 }
 
 show_tutorial() {
-  echo
-  if vps_agent_is_pt_br; then
-    cat <<EOF
-=== Conectar o Portico MCP ao ChatGPT ===
-
-A VPS está pronta. Agora falta conectar o Portico MCP ao ChatGPT.
-Esta próxima parte acontece no ChatGPT Web.
-
-Endereço MCP:
-  $PUBLIC_URL
-
-1. Abra o ChatGPT no navegador.
-2. Ative o Modo de Desenvolvedor, caso essa opção ainda não esteja ativa.
-3. Vá em Configurações > Aplicativos e escolha criar um novo app MCP.
-4. Quando o ChatGPT pedir o endereço do MCP, use exatamente:
-
-   $PUBLIC_URL
-
-5. Escolha OAuth como autenticação.
-6. Na tela de login do Portico MCP, use:
-
-   Nome de usuário: $operator_username
-EOF
-    if [ -n "$operator_email" ]; then
-      echo "   E-mail da conta:  $operator_email"
-    fi
-    cat <<'EOF'
-
-   Use a senha de operador criada durante a instalação.
-   Não use sua senha SSH/root/Linux da VPS.
-
-7. Revise as ferramentas encontradas e conclua a criação do app.
-8. Abra um novo chat usando o Portico MCP e envie exatamente:
-
-   Call system.info on my VPS MCP and tell me the hostname.
-
-Essa chamada é apenas um teste inofensivo de conectividade.
-Ela confirma que o ChatGPT realmente conseguiu chegar até esta VPS e que a
-chamada foi autenticada e registrada na auditoria do Broker.
-
-Faça essa conexão no seu tempo.
-EOF
-  else
-    cat <<EOF
-=== Connect Portico MCP to ChatGPT ===
-
-The VPS side is ready. The last step is connecting Portico MCP to ChatGPT.
-This next part happens in ChatGPT Web.
-
-MCP endpoint:
-  $PUBLIC_URL
-
-1. Open ChatGPT in your browser.
-2. Enable Developer Mode if that option is not already enabled.
-3. Open Settings > Apps and choose to create a new MCP app.
-4. When ChatGPT asks for the MCP endpoint, use exactly:
-
-   $PUBLIC_URL
-
-5. Choose OAuth authentication.
-6. On the Portico MCP login screen, use:
-
-   Username: $operator_username
-EOF
-    if [ -n "$operator_email" ]; then
-      echo "   Account email: $operator_email"
-    fi
-    cat <<'EOF'
-
-   Use the operator password created during installation.
-   Do not use your VPS SSH/root/Linux password.
-
-7. Review the discovered tools and finish creating the app.
-8. Start a new chat using Portico MCP and send exactly:
-
-   Call system.info on my VPS MCP and tell me the hostname.
-
-This is only a harmless connectivity test. It confirms that ChatGPT reached
-this VPS through authenticated MCP and that the Broker audited the call.
-
-Take as much time as you need to complete the connection.
-EOF
+  local email_line=""
+  if [ -n "$operator_email" ]; then
+    email_line="$(vps_agent_msg connect.email_line "email=$operator_email")"$'\n'
   fi
+  echo
+  vps_agent_msg connect.tutorial     "public_url=$PUBLIC_URL"     "username=$operator_username"     "email_line=$email_line"
+  printf '\n'
 }
-
 verify_now() {
   "${wait_tool[@]}" --after-seq "$BASELINE" --timeout 1s --poll 200ms --quiet
 }
@@ -152,11 +75,7 @@ if [ ! -t 0 ]; then
 else
   while :; do
     echo
-    if vps_agent_is_pt_br; then
-      printf '[Enter] verificar conexão  [T] mostrar tutorial novamente  [S] sair: '
-    else
-      printf '[Enter] verify connection  [T] show tutorial again  [Q] quit: '
-    fi
+    printf '%s' "$(vps_agent_msg connect.prompt)"
     read -r answer
 
     case "$answer" in
@@ -173,34 +92,10 @@ else
           break
         fi
         echo
-        if vps_agent_is_pt_br; then
-          cat <<'EOF'
-Ainda não detectamos a chamada system.info do ChatGPT.
-
-Confira se:
-- o app MCP foi criado;
-- o OAuth foi concluído;
-- o Portico MCP está selecionado no chat;
-- a mensagem de teste foi realmente enviada.
-
-Nada foi perdido. Faça os ajustes necessários e pressione Enter para tentar novamente.
-EOF
-        else
-          cat <<'EOF'
-We have not detected the ChatGPT system.info call yet.
-
-Check that:
-- the MCP app was created;
-- OAuth was completed;
-- Portico MCP is selected in the chat;
-- the test message was actually sent.
-
-Nothing was lost. Fix anything needed and press Enter to try again.
-EOF
-        fi
+        vps_agent_block connect.not_detected
         ;;
       *)
-        echo "$(vps_agent_text 'Choose Enter, T or S.' 'Escolha Enter, T ou S.')"
+        echo "$(vps_agent_msg connect.invalid_choice)"
         ;;
     esac
   done
