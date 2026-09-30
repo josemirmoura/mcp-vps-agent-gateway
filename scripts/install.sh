@@ -18,57 +18,7 @@ ASSUME_YES=0
 ACK_WHOLE_HOST=0
 
 usage() {
-  if vps_agent_is_pt_br; then
-    cat <<'EOF'
-uso: bash scripts/install.sh [opções]
-
-Instalação guiada e transparente do Portico MCP.
-
-Perfis:
-  custom       Padrão recomendado: teto /opt e raízes aprovadas dinamicamente.
-  project      Trava o Portico MCP em uma única raiz de projeto.
-  whole-host   Teto físico "/". Não habilita Full automaticamente.
-
-Opções:
-  --profile PROFILE         custom | project | whole-host
-  --scope PATH              Teto/raiz existente para custom/project.
-  --create-scope            Cria explicitamente uma raiz ausente.
-  --run-as USER             Usuário não-root dos jobs shell confinados.
-  --lang LANG               pt-BR | en
-  --domain HOSTNAME         Hostname público MCP/OAuth.
-  --operator-email EMAIL    E-mail dedicado do operador OAuth.
-  --operator-username NAME  Nome de usuário do login OAuth.
-  --local-only              Para após a verificação local.
-  --yes                     Aceita a autoridade exibida sem prompt.
-  --ack-whole-host          Obrigatório com --yes em whole-host.
-  -h, --help                Mostra esta ajuda.
-EOF
-  else
-    cat <<'EOF'
-usage: bash scripts/install.sh [options]
-
-Guided, transparent installation for Portico MCP.
-
-Profiles:
-  custom       Recommended default: /opt ceiling with dynamic root approval.
-  project      Lock Portico MCP to one project/filesystem root.
-  whole-host   Physical filesystem ceiling "/". Does not enable Full.
-
-Options:
-  --profile PROFILE         custom | project | whole-host
-  --scope PATH              Existing ceiling/root for custom/project.
-  --create-scope            Explicitly create a missing scope.
-  --run-as USER             Non-root host user for confined shell jobs.
-  --lang LANG               pt-BR | en
-  --domain HOSTNAME         Public MCP/OAuth hostname.
-  --operator-email EMAIL    Dedicated OAuth operator email.
-  --operator-username NAME  OAuth login username.
-  --local-only              Stop after local runtime verification.
-  --yes                     Accept the displayed effective authority.
-  --ack-whole-host          Required with --yes for whole-host.
-  -h, --help                Show this help.
-EOF
-  fi
+  vps_agent_block install.usage
 }
 
 # Resolve an explicit language before normal argument parsing so help/banner can use it.
@@ -117,7 +67,7 @@ while [ "$#" -gt 0 ]; do
     --yes) ASSUME_YES=1; shift ;;
     --ack-whole-host) ACK_WHOLE_HOST=1; shift ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "$(vps_agent_text "ERROR: unknown argument: $1" "ERRO: argumento desconhecido: $1")" >&2; usage >&2; exit 2 ;;
+    *) echo "$(vps_agent_msg error.unknown_argument "arg=$1")" >&2; usage >&2; exit 2 ;;
   esac
 done
 
@@ -148,45 +98,8 @@ if [ -z "$PROFILE" ]; then
     echo "$(vps_agent_text 'ERROR: --profile is required in non-interactive mode.' 'ERRO: --profile é obrigatório em modo não interativo.')" >&2
     exit 2
   fi
-  if vps_agent_is_pt_br; then
-    cat <<'EOF'
-Escolha como o Portico MCP poderá acessar sua VPS:
-
-  1) Standard (recomendado)
-     /opt é apenas o teto físico padrão: o limite máximo da IA, não uma autorização.
-     O Portico pode descobrir os nomes das pastas logo abaixo do teto, mas não abrir seu conteúdo.
-     Você autoriza cada projeto depois, quando o ChatGPT precisar.
-
-  2) Project
-     O Portico fica limitado a uma única pasta desde a instalação.
-     Use quando ele deve trabalhar somente em um projeto específico.
-
-  3) Whole Host
-     O teto físico passa a ser toda a VPS (/).
-     Use apenas quando precisar permitir acesso fora de /opt.
-     Isso ainda não ativa Full nem libera tudo automaticamente.
-EOF
-    printf 'Perfil [1]: '
-  else
-    cat <<'EOF'
-Choose how Portico MCP may access your VPS:
-
-  1) Standard (recommended)
-     /opt is only the default physical ceiling: the AI's maximum boundary, not an authorization.
-     Portico may discover immediate folder names below the ceiling, but cannot open their contents.
-     You approve each project later when ChatGPT needs it.
-
-  2) Project
-     Portico is limited to one folder from installation time.
-     Use this when it should work only in one specific project.
-
-  3) Whole Host
-     The physical ceiling becomes the whole VPS (/).
-     Use this only when you need access outside /opt.
-     This still does not enable Full or automatically unlock everything.
-EOF
-    printf 'Profile [1]: '
-  fi
+  vps_agent_block install.profile_menu
+  printf '%s' "$(vps_agent_msg install.profile_prompt)"
   read -r answer
   case "${answer:-1}" in
     1|standard|Standard|custom|Custom) PROFILE="custom" ;;
@@ -229,10 +142,10 @@ fi
 
 if [ "$SCOPE" != "/" ] && [ ! -d "$SCOPE" ]; then
   if [ "$CREATE_SCOPE" -eq 1 ]; then
-    echo "$(vps_agent_text "Creating $SCOPE with sudo install." "Criando $SCOPE com sudo install.")"
+    echo "$(vps_agent_msg install.creating_scope "scope=$SCOPE")"
     sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 "$SCOPE"
   elif [ -t 0 ]; then
-    printf '%s' "$(vps_agent_text "$SCOPE does not exist. Create it now? [y/N]: " "$SCOPE não existe. Criar agora? [s/N]: ")"
+    printf '%s' "$(vps_agent_msg install.scope_missing_prompt "scope=$SCOPE")"
     read -r create_answer
     case "$create_answer" in
       y|Y|yes|YES|s|S|sim|SIM)
@@ -244,7 +157,7 @@ if [ "$SCOPE" != "/" ] && [ ! -d "$SCOPE" ]; then
         ;;
     esac
   else
-    echo "$(vps_agent_text "ERROR: scope does not exist: $SCOPE" "ERRO: o escopo não existe: $SCOPE")" >&2
+    echo "$(vps_agent_msg error.scope_missing "scope=$SCOPE")" >&2
     exit 1
   fi
 fi
@@ -262,7 +175,7 @@ if [ "$RUN_AS" = "root" ]; then
   fi
 fi
 if [ -z "$RUN_AS" ] || [ "$RUN_AS" = "root" ] || ! id -u "$RUN_AS" >/dev/null 2>&1; then
-  echo "$(vps_agent_text "ERROR: invalid non-root shell user: $RUN_AS" "ERRO: usuário não-root inválido para shell: $RUN_AS")" >&2
+  echo "$(vps_agent_msg error.invalid_shell_user "user=$RUN_AS")" >&2
   exit 2
 fi
 
@@ -295,7 +208,7 @@ chmod 600 .env
 
 if [ "$PROFILE" = "custom" ]; then
   echo
-  echo "$(vps_agent_text     "Standard profile selected. Physical ceiling: $SCOPE."     "Perfil Standard selecionado. Teto físico: $SCOPE.")"
+  echo "$(vps_agent_msg install.standard_selected "scope=$SCOPE")"
   echo "$(vps_agent_text     'No project root is authorized yet. Portico may discover immediate folder names under the ceiling, but contents stay locked until explicit approval.'     'Nenhuma raiz de projeto está autorizada ainda. O Portico pode descobrir os nomes das pastas imediatamente abaixo do teto, mas o conteúdo fica bloqueado até aprovação explícita.')"
   echo "$(vps_agent_text     'Protected files such as .env remain locked even inside an authorized project and require a separate temporary approval.'     'Arquivos protegidos como .env continuam trancados mesmo dentro de um projeto autorizado e exigem uma autorização temporária separada.')"
 fi
@@ -357,19 +270,5 @@ printf '\n'
 bash scripts/setup-integrated-auth.sh "${auth_args[@]}"
 
 vps_agent_step "$(vps_agent_text '7/7 Connect ChatGPT and verify E2E' '7/7 Conectar ao ChatGPT e verificar E2E')"
-if vps_agent_is_pt_br; then
-  cat <<'EOF'
-O próximo script orienta a conexão com o ChatGPT passo a passo.
-Faça a configuração no seu tempo e volte ao terminal para pressionar Enter.
-A instalação só termina quando o Broker confirmar uma chamada system.info real,
-autenticada e registrada na auditoria.
-EOF
-else
-  cat <<'EOF'
-The next script guides the ChatGPT connection step by step.
-Take your time, then return to the terminal and press Enter to verify.
-Installation completes only after the Broker confirms a real authenticated
-system.info call in the audit trail.
-EOF
-fi
+vps_agent_block install.chatgpt_intro
 bash scripts/connect-chatgpt.sh
