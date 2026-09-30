@@ -8,19 +8,19 @@
   <link rel="alternate" hreflang="en" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/">
   <link rel="alternate" hreflang="pt-BR" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/pt-BR/">
   <link rel="alternate" hreflang="x-default" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/">
-  <meta property="og:title" content="Conecte o ChatGPT Web à sua VPS Linux | MCP VPS Agent Gateway">
+  <meta property="og:title" content="Conecte o ChatGPT Web à sua VPS Linux | Portico MCP">
   <meta property="og:description" content="Uma ponte MCP auto-hospedada e auditável entre o ChatGPT Web e sua VPS Linux. Você escolhe o perímetro e as capacidades; o Broker aplica a política a cada operação privilegiada.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://josemirmoura.github.io/mcp-vps-agent-gateway/pt-BR/">
   <meta property="og:locale" content="pt_BR">
   <meta property="og:locale:alternate" content="en_US">
-  <title>Conecte o ChatGPT Web à sua VPS Linux | MCP VPS Agent Gateway</title>
+  <title>Conecte o ChatGPT Web à sua VPS Linux | Portico MCP</title>
   <link rel="stylesheet" href="../styles.css">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareSourceCode",
-    "name": "MCP VPS Agent Gateway",
+    "name": "Portico MCP",
     "description": "Ponte open source e auto-hospedada que conecta o ChatGPT Web a uma VPS Linux pelo Model Context Protocol (MCP), com OAuth, política definida pelo operador, autorização privilegiada no Broker e auditoria.",
     "codeRepository": "https://github.com/josemirmoura/mcp-vps-agent-gateway",
     "programmingLanguage": ["Go", "Shell"],
@@ -34,7 +34,7 @@
 <body>
   <header class="hero">
     <nav>
-      <strong>MCP VPS Agent Gateway</strong>
+      <strong>Portico MCP</strong>
       <div>
         <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway">GitHub</a>
         <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/README.pt-BR.md">Docs</a>
@@ -44,7 +44,7 @@
     <div class="hero-copy">
       <p class="eyebrow">v0.1.0-rc.3 · MCP auto-hospedado · política aplicada · auditável</p>
       <h1>Conecte o ChatGPT Web diretamente à sua VPS Linux.</h1>
-      <p class="lede">O MCP VPS Agent Gateway cria um caminho seguro para o ChatGPT inspecionar e operar sua VPS dentro da autoridade que você definir. O OAuth autentica o cliente. Um Broker local privilegiado reautoriza cada operação no host e registra evidências de auditoria.</p>
+      <p class="lede">O Portico MCP cria um caminho seguro para o ChatGPT inspecionar e operar sua VPS dentro da autoridade que você definir. O OAuth autentica o cliente. Um Broker local privilegiado reautoriza cada operação no host e registra evidências de auditoria.</p>
       <div class="actions">
         <a class="button" href="#quick-start">Começo rápido</a>
         <a class="button secondary" href="#problem-solution">Veja como funciona</a>
@@ -56,7 +56,7 @@
     <section id="problem-solution" class="solution-section">
       <p class="eyebrow">Problema → Solução</p>
       <h2>Pare de copiar comandos entre o ChatGPT e o terminal.</h2>
-      <p class="section-lede">O ChatGPT consegue raciocinar sobre um servidor, mas sem um caminho confiável de execução ele não enxerga o estado real, não executa a ação autorizada, não inspeciona o resultado e não continua a partir da mesma conversa. O MCP VPS Agent Gateway fecha esse ciclo.</p>
+      <p class="section-lede">O ChatGPT consegue raciocinar sobre um servidor, mas sem um caminho confiável de execução ele não enxerga o estado real, não executa a ação autorizada, não inspeciona o resultado e não continua a partir da mesma conversa. O Portico MCP fecha esse ciclo.</p>
 
       <div class="grid two problem-solution-grid">
         <article>
@@ -73,7 +73,7 @@
           <p class="eyebrow">A ponte</p>
           <h3>Deixe o ChatGPT trabalhar na VPS dentro das regras que você definiu.</h3>
           <p>Pela própria conversa, o ChatGPT pode inspecionar arquivos, diagnosticar serviços, analisar logs, trabalhar com Docker e executar outras operações que você habilitar explicitamente.</p>
-          <p><strong>Project, Custom ou Whole Host</strong> define o perímetro físico. Filesystem, shell, systemd, Docker, rede e capacidades administrativas continuam sendo decisões separadas de política.</p>
+          <p><strong>Standard, Project ou Whole Host</strong> define o perímetro físico. Filesystem, shell, systemd, Docker, rede e capacidades administrativas continuam sendo decisões separadas de política.</p>
         </article>
       </div>
 
@@ -102,7 +102,7 @@
       <article>
         <p class="eyebrow">Autoridade</p>
         <h2>Você escolhe o perímetro delegado.</h2>
-        <p>Project, Custom e Whole Host definem o teto físico do filesystem. Filesystem, shell, systemd, Docker, rede e capacidades administrativas permanecem decisões separadas de política.</p>
+        <p>Standard, Project e Whole Host definem o teto físico do filesystem. Filesystem, shell, systemd, Docker, rede e capacidades administrativas permanecem decisões separadas de política.</p>
       </article>
       <article>
         <p class="eyebrow">Privilégio</p>
@@ -160,9 +160,9 @@
         <article>
           <h3>ChatGPT</h3>
           <ul class="feature-list">
-            <li><strong>ChatGPT Plus ou superior</strong>, com Modo de Desenvolvedor e criação de app MCP personalizado realmente disponíveis no ChatGPT Web da conta.</li>
-            <li>A disponibilidade e o rollout são controlados pela OpenAI, portanto o instalador não pode garantir que todas as contas exponham as mesmas capacidades MCP.</li>
-            <li>A OpenAI atualmente documenta suporte MCP completo, incluindo escrita/alteração, para Business, Enterprise e Edu. Se a conta expuser somente leitura/busca, o projeto não transforma isso em permissão de escrita.</li>
+            <li>Uma conta/workspace do ChatGPT Web em que o Modo de Desenvolvedor e a criação de app MCP personalizado estejam realmente disponíveis.</li>
+            <li>A OpenAI controla disponibilidade por plano/workspace e rollout; o rótulo da assinatura, sozinho, não garante compatibilidade.</li>
+            <li>A documentação oficial atual lista MCP completo com escrita/alteração para Business, Enterprise e Edu; usuários Pro podem conectar MCPs personalizados com leitura/busca no modo de desenvolvedor.</li>
           </ul>
         </article>
       </div>
@@ -180,8 +180,8 @@
 cd mcp-vps-agent-gateway
 bash scripts/install.sh</code></pre>
       </div>
-      <p>O terminal verifica requisitos, pergunta por Project / Custom / Whole Host, mostra a autoridade efetiva, inicia o runtime, valida o funcionamento, configura o OAuth público e então espera a chamada real de conclusão feita pelo ChatGPT.</p>
-      <p><strong>Project é o padrão recomendado.</strong> Whole Host define <code>/</code> como teto do filesystem, mas não habilita Full nem rede irrestrita.</p>
+      <p>O terminal executa um preflight de pré-requisitos, pergunta por Standard / Project / Whole Host, mostra a autoridade efetiva, inicia o runtime, valida o funcionamento, configura o OAuth público e orienta a chamada real de conclusão feita pelo ChatGPT.</p>
+      <p><strong>Standard é o padrão recomendado.</strong> Usa <code>/opt</code> como teto físico e começa sem raiz de projeto autorizada. Whole Host define <code>/</code> como teto do filesystem, mas não habilita Full nem rede irrestrita.</p>
     </section>
 
     <section id="connect-chatgpt" class="quick">
@@ -193,14 +193,14 @@ bash scripts/install.sh</code></pre>
           <svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h10v10H9z"></path><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"></path></svg>
           <svg class="check-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>
         </button>
-        <pre><code id="components-code">bash scripts/init.sh --scope /opt/my-app
+        <pre><code id="components-code">bash scripts/init.sh --scope /opt --dynamic-baseline
 docker compose up -d --build
 bash scripts/verify.sh
 bash scripts/setup-integrated-auth.sh
 bash scripts/connect-chatgpt.sh</code></pre>
       </div>
       <p><strong>Nenhuma credencial de VPS ou SSH é entregue ao ChatGPT.</strong> A credencial dedicada do operador OAuth pertence ao serviço de identidade integrado e é informada localmente pelo fluxo de autenticação suportado.</p>
-      <p><code>connect-chatgpt.sh</code> espera um novo evento autenticado de <code>system.info</code> para o subject esperado e valida a auditoria do Broker antes de imprimir <code>INSTALLATION COMPLETE</code>.</p>
+      <p><code>connect-chatgpt.sh</code> registra uma linha de base da auditoria, deixa você concluir o app/OAuth no ChatGPT sem pressa e verifica a chamada real autenticada de <code>system.info</code> quando você volta ao terminal e pressiona Enter. Só então pode imprimir <code>INSTALAÇÃO CONCLUÍDA</code>.</p>
     </section>
 
     <section class="grid three">
