@@ -242,7 +242,9 @@
     "Stopping Portico MCP containers...": "Portico MCP コンテナを停止しています...",
     "Public MCP endpoint is no longer reachable from this host.": "公開 MCP エンドポイントはこのホストから到達できなくなりました。",
     "Check for a stale proxy route before considering removal complete.": "削除完了と判断する前に古いプロキシルートが残っていないか確認してください。",
-    "Reloading Broker with the updated policy...": "更新された Policy で Broker を再読み込みしています..."
+    "Reloading Broker with the updated policy...": "更新された Policy で Broker を再読み込みしています...",
+    "health": "状態",
+    "restarts": "再起動回数"
   },
   "blocks": {
     "install.usage": "使用方法: bash scripts/install.sh [オプション]\n\nPortico MCP のガイド付き透明インストール。\n\nプロファイル:\n  custom       推奨: /opt を物理上限とし、ルートを動的承認。\n  project      Portico MCP を1つのプロジェクト/ファイルシステムルートに制限。\n  whole-host   物理ファイルシステム上限を \"/\" に設定。Full は自動的に有効になりません。\n\nオプション:\n  --profile PROFILE         custom | project | whole-host\n  --scope PATH              custom/project 用の既存上限/ルート。\n  --create-scope            存在しないスコープを明示的に作成。\n  --run-as USER             制限付きシェルジョブ用の非 root ユーザー。\n  --lang LANG               en | pt-BR | es | de | fr | ja | id\n  --domain HOSTNAME         公開 MCP/OAuth ホスト名。\n  --operator-email EMAIL    専用 OAuth オペレーターメール。\n  --operator-username NAME  OAuth ログインユーザー名。\n  --local-only              ローカルランタイム検証後に停止。\n  --yes                     表示された実効権限を承認。\n  --ack-whole-host          whole-host で --yes を使う場合に必須。\n  -h, --help                このヘルプを表示。\n",
@@ -251,7 +253,13 @@
     "init.usage": "使用方法: bash scripts/init.sh [--scope /絶対/既存/パス] [オプション]\n\nオプション:\n  --scope PATH          Scoped モードの物理ファイルシステム上限を設定。\n  --dynamic-baseline    静的な論理プロジェクトルートなしで開始。\n                        プロジェクトルートは後から動的承認します。\n  --run-as USER         制限付きシェルジョブ用の非 root ホストユーザー。\n  --migrate-policy-root policy.yaml 内の以前のルート参照を置換。\n                        上限を広げるためではなく、プロジェクトルート移動時に使用。\n  --lang LANG           言語: en | pt-BR | es | de | fr | ja | id。\n  -h, --help            このヘルプを表示。\n",
     "setup_auth.usage": "使用方法: bash scripts/setup-integrated-auth.sh [--domain mcp.example.jp] [オプション]\n\nChatGPT 向けのサポート済み公開経路を構成します。ZITADEL、PostgreSQL、\n既存の Portico Gateway/Broker を使うセルフホスト OAuth/OIDC です。\n\nオプション:\n  --domain DOMAIN          MCP + OAuth 用の公開 DNS 名。\n  --operator-email EMAIL   Portico オペレーターのログインメール。\n  --operator-username NAME ログインユーザー名（既定: vps-operator）。\n  --edge-network NETWORK   既存 Traefik の Docker ネットワーク。\n  --certresolver NAME      既存 Traefik の ACME リゾルバー。\n  --bundled-proxy          既存を再利用せず同梱 Traefik を強制使用。\n  -h, --help               このヘルプを表示。\n\n専用 OAuth オペレーターパスワードはローカルで非表示入力します。\nVPS/SSH パスワードではなく、ChatGPT に渡してはいけません。\n",
     "setup_auth.domain_help": "\nChatGPT を Portico MCP に接続するには、この VPS に公開ホスト名が必要です。\n\n1. 管理しているドメインの DNS パネルでサブドメインを作成します。例:\n   mcp.example.jp\n\n2. そのサブドメインをこの VPS の公開 IP に向ける DNS A レコードを作成します。\n   IPv6 を使用する場合は AAAA レコードも作成できます。\n\n3. DNS が解決されるまで待ち、https:// と /mcp を付けずに\n   ホスト名だけを入力してください。\n\n例:\n  mcp.example.jp\n\n",
-    "connect.not_detected": "ChatGPT の system.info 呼び出しはまだ検出されていません。\n\n次を確認してください:\n- MCP アプリが作成されている;\n- OAuth が完了している;\n- チャットで Portico MCP が選択されている;\n- テストメッセージが実際に送信されている。\n\n何も失われていません。必要な修正を行い、Enter を押して再試行してください。\n"
+    "connect.not_detected": "ChatGPT の system.info 呼び出しはまだ検出されていません。\n\n次を確認してください:\n- MCP アプリが作成されている;\n- OAuth が完了している;\n- チャットで Portico MCP が選択されている;\n- テストメッセージが実際に送信されている。\n\n何も失われていません。必要な修正を行い、Enter を押して再試行してください。\n",
+    "remove.usage": "使用方法: bash scripts/remove.sh [safe|--purge] [--remove-source]\n\nsafe             Portico MCP を停止しローカル資格情報をローテーションします。\n                 設定、Policy、監査状態、統合 ID は保持します。\n--purge          MCP 所有のランタイム、Volume、ローカル状態/設定、\n                 既定ローカルイメージ、空の旧構造を削除します。\n--remove-source  --purge と併用した場合のみ、別の明示確認後に Git checkout も削除します。\n",
+    "remove.summary": "削除モード: {mode}\nランタイム: Gateway + Broker + パッケージプロキシ（設定時）\n管理対象 VPS リソース: 保持\nオペレーター Policy/監査: {policy_state}\nソース checkout: {source_state}\n",
+    "remove.safe_complete": "\n安全な削除が完了しました\n削除:\n  Gateway/Broker/パッケージプロキシのランタイム\n  有効な一時許可\n無効化:\n  以前のローカル admin/static bearer 資格情報\n保持:\n  .env（ローカル資格情報はローテーション済み）\n  config/policy.yaml\n  state/ の監査と操作履歴\n  統合 ID の状態\n  Portico が管理を許可されていたすべての VPS リソース\n",
+    "remove.purge_complete": "\n完全 PURGE が完了しました\n削除された Portico ローカル成果物:\n  ランタイム/Volume\n  Gateway/Broker の既定ローカルイメージ（存在する場合）\n  .env\n  config/policy.yaml\n  state/\n  backups/\n  空の旧 /opt/vps-agent-sandbox（存在する場合）\n保持:\n  アプリ、サイト、データベース、第三者イメージ/コンテナ、サービス、委任ファイル\n",
+    "delegate.usage": "使用方法:\n  bash scripts/delegate-root.sh add /opt/project [--access read|work|compose] [--apply]\n  bash scripts/delegate-root.sh remove /opt/project [--apply]\n  bash scripts/delegate-root.sh list\n\nアクセスプロファイル:\n  read      ファイルシステム読み取りのみ\n  work      読み書き + 制限付き shell cwd（既定）\n  compose   work + そのディレクトリでの Docker Compose 検査/管理\n\nパスは VPS_AGENT_SCOPE_ROOT 内である必要があります。物理上限そのものを\nターミナルから手動委任する場合は --allow-ceiling が必要です。\n",
+    "delegate.pending": "\nPolicy は更新されましたが、実行中の Broker はまだ再読み込みされていません。\nまず確認:\n  python3 scripts/authority-summary.py\n\nその後適用:\n  bash scripts/delegate-root.sh list\n  docker compose up -d --force-recreate broker\n  bash scripts/verify.sh\n\nまたは add/remove コマンドを --apply 付きで再実行してください。\n"
   },
   "messages": {
     "install.profile_prompt": "プロファイル [1]: ",
@@ -284,6 +292,14 @@
     "error.public_url_https": "公開 MCP エンドポイントは HTTPS を使用する必要があります: {url}",
     "error.expected_401": "未認証 MCP リクエストは HTTP 401 の想定ですが、{code} が返りました。",
     "verify.local_call_skipped": "認証モード {mode} ではローカル MCP ツール呼び出しを省略します。公開 OAuth 検証を使用します。",
-    "connect.email_line": "   アカウントのメール: {email}"
+    "connect.email_line": "   アカウントのメール: {email}",
+    "update.non_ff": "Non-fast-forward 更新を拒否しました: 対象 {target} は {current} の子孫ではありません。",
+    "update.rollback": "更新に失敗しました。{current} にロールバックしています...",
+    "remove.usage_line": "使用方法: {script} [safe|--purge] [--remove-source]",
+    "remove.incomplete_containers": "削除未完了: パッケージコンテナがまだ存在します: {containers}",
+    "remove.public_route_gone": "公開 MCP ルートは削除済みです（残存 Edge プロキシから HTTP {code}）。",
+    "remove.url_still_live": "削除未完了: MCP URL が消えず、HTTP {code} を返しました。",
+    "remove.deleting_source": "確認済み Portico MCP ソース checkout を削除しています: {path}",
+    "diagnose.usage": "使用方法: {script} [status|health|logs [行数]|audit [上限]|bundle [output.tar.gz]]"
   }
 }
