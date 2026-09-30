@@ -46,8 +46,6 @@ def current_lang() -> str:
 @lru_cache(maxsize=None)
 def catalog(lang: str) -> dict:
     lang = normalize_lang(lang)
-    if lang in ("en", "pt-BR"):
-        return {"strings": {}, "blocks": {}, "messages": {}}
     path = LOCALES_DIR / f"{lang}.json"
     if not path.exists():
         return {"strings": {}, "blocks": {}, "messages": {}}
@@ -93,17 +91,14 @@ def tr(key: str, en: str, pt: str, **values: object) -> str:
     return template.format(**values)
 
 
-def block(key: str, en: str = "", pt: str = "") -> str:
+def block(key: str, **values: object) -> str:
     lang = current_lang()
-    if lang == "en":
-        value = en
-    elif lang == "pt-BR":
-        value = pt
-    else:
-        value = catalog(lang)["blocks"].get(key, en)
-        if value == en and os.environ.get("VPS_AGENT_I18N_STRICT") == "1":
+    value = catalog(lang)["blocks"].get(key)
+    if value is None:
+        if os.environ.get("VPS_AGENT_I18N_STRICT") == "1":
             raise KeyError(f"missing {lang} block translation for: {key}")
-    return value
+        value = catalog("en")["blocks"].get(key, key)
+    return value.format(**values)
 
 
 def yes_no(value: bool) -> str:
@@ -142,8 +137,7 @@ def main() -> int:
 
     p_block = sub.add_parser("block")
     p_block.add_argument("key")
-    p_block.add_argument("en")
-    p_block.add_argument("pt")
+    p_block.add_argument("values", nargs="*")
 
     p_msg = sub.add_parser("message")
     p_msg.add_argument("key")
@@ -158,7 +152,7 @@ def main() -> int:
     if args.command == "text":
         print(t(args.en, args.pt), end="")
     elif args.command == "block":
-        print(block(args.key, args.en, args.pt), end="")
+        print(block(args.key, **parse_values(args.values)), end="")
     elif args.command == "message":
         print(tr(args.key, args.en, args.pt, **parse_values(args.values)), end="")
     elif args.command == "label":
