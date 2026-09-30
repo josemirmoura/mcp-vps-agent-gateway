@@ -164,6 +164,24 @@ func (b *Broker) guardSensitiveRequest(ctx context.Context, req wire.Request) *w
 				return &resp
 			}
 			sourceWrite := req.Tool == "file.move"
+			if sourceWrite {
+				info, statErr := os.Lstat(hostexec.Path(filepath.Clean(req.Resource)))
+				if statErr != nil && !os.IsNotExist(statErr) {
+					resp := deny(req.ID, "sensitive_path_check_failed", statErr.Error())
+					return &resp
+				}
+				if statErr == nil && info.IsDir() {
+					_, writeRoots, rootsErr := b.effectiveFileRoots(ctx, req.Subject)
+					if rootsErr != nil {
+						resp := deny(req.ID, "sensitive_path_check_failed", rootsErr.Error())
+						return &resp
+					}
+					if err := b.requireSensitiveSubtreeWork(ctx, req.Subject, req.Resource, writeRoots); err != nil {
+						resp := deny(req.ID, "sensitive_path_locked", err.Error())
+						return &resp
+					}
+				}
+			}
 			checks = append(checks,
 				check{path: req.Resource, write: sourceWrite},
 				check{path: in.Destination, write: true},
