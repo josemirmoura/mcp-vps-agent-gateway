@@ -12,6 +12,7 @@ import (
 const DefaultScanLimit = 50000
 
 var ErrScanLimit = errors.New("sensitive-path scan exceeded safety limit")
+var errProtectedMatch = errors.New("protected inode match")
 
 func ProtectedName(path string) bool {
 	name := filepath.Base(filepath.Clean(path))
@@ -96,11 +97,11 @@ func IsProtected(hostRoot, target string, roots []string, limit int) (bool, erro
 			}
 			got, _, ok := inode(fi)
 			if ok && got == key {
-				return fs.SkipAll
+				return errProtectedMatch
 			}
 			return nil
 		})
-		if errors.Is(err, fs.SkipAll) {
+		if errors.Is(err, errProtectedMatch) {
 			return true, nil
 		}
 		if err != nil {
