@@ -114,16 +114,16 @@ EOF
   fi
 fi
 if [[ "$DOMAIN" == *"://"* || "$DOMAIN" == */* || "$DOMAIN" == *" "* || "$DOMAIN" == .* || "$DOMAIN" == *. ]]; then
-  echo "ERROR: --domain must be a hostname only, for example mcp.example.com." >&2
+  echo "$(vps_agent_text 'ERROR: --domain must be a hostname only, for example mcp.example.com.' 'ERRO: --domain deve conter apenas o hostname, por exemplo mcp.exemplo.com.')" >&2
   exit 2
 fi
 if [[ ! "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
-  echo "ERROR: --domain contains unsupported characters." >&2
+  echo "$(vps_agent_text 'ERROR: --domain contains unsupported characters.' 'ERRO: --domain contém caracteres não suportados.')" >&2
   exit 2
 fi
 
 for cmd in docker curl openssl python3 ss getent; do
-  command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: required command not found: $cmd" >&2; exit 1; }
+  command -v "$cmd" >/dev/null 2>&1 || { echo "$(vps_agent_text "ERROR: required command not found: $cmd" "ERRO: comando obrigatório não encontrado: $cmd")" >&2; exit 1; }
 done
 docker compose version >/dev/null
 
@@ -194,8 +194,8 @@ MARKER="state/integrated-auth.json"
 CURRENT_SUBJECT="$(env_value VPS_AGENT_SUBJECT || true)"
 MARKER_DOMAIN="$(marker_value "$MARKER" domain || true)"
 if [ -s "$MARKER" ] && [ -n "$MARKER_DOMAIN" ] && [ "$MARKER_DOMAIN" != "$DOMAIN" ]; then
-  echo "ERROR: integrated auth was already initialized for $MARKER_DOMAIN." >&2
-  echo "Automatic issuer/domain migration is intentionally not supported." >&2
+  echo "$(vps_agent_text "ERROR: integrated auth was already initialized for $MARKER_DOMAIN." "ERRO: a autenticação integrada já foi inicializada para $MARKER_DOMAIN.")" >&2
+  echo "$(vps_agent_text 'Automatic issuer/domain migration is intentionally not supported.' 'A migração automática de issuer/domínio não é suportada intencionalmente.')" >&2
   exit 1
 fi
 
@@ -220,7 +220,7 @@ if [ "$NEEDS_OPERATOR" -eq 1 ]; then
     fi
   fi
   if [[ "$OPERATOR_EMAIL" != *@*.* ]]; then
-    echo "ERROR: operator email does not look valid: $OPERATOR_EMAIL" >&2
+    echo "$(vps_agent_text "ERROR: operator email does not look valid: $OPERATOR_EMAIL" "ERRO: o e-mail do operador parece inválido: $OPERATOR_EMAIL")" >&2
     exit 2
   fi
   if [[ ! "$OPERATOR_USERNAME" =~ ^[A-Za-z0-9._-]+$ ]]; then
@@ -265,15 +265,15 @@ else
   elif [ "${#TRAEFIK_IDS[@]}" -eq 1 ]; then
     TRAEFIK_ID="${TRAEFIK_IDS[0]}"
   elif [ "${#TRAEFIK_IDS[@]}" -gt 1 ]; then
-    echo "ERROR: multiple running Traefik containers found." >&2
-    echo "Pass --edge-network NETWORK to select the edge explicitly." >&2
+    echo "$(vps_agent_text 'ERROR: multiple running Traefik containers found.' 'ERRO: mais de um contêiner Traefik em execução foi encontrado.')" >&2
+    echo "$(vps_agent_text 'Pass --edge-network NETWORK to select the edge explicitly.' 'Informe --edge-network REDE para selecionar explicitamente a borda.')" >&2
     exit 1
   fi
 
   if [ -z "$TRAEFIK_ID" ]; then
     if ss -ltnH | awk '{print $4}' | grep -Eq '(^|:)(80|443)$'; then
-      echo "ERROR: no reusable Traefik was found, but host ports 80/443 are already in use." >&2
-      echo "The installer will not replace an unknown web server." >&2
+      echo "$(vps_agent_text 'ERROR: no reusable Traefik was found, but host ports 80/443 are already in use.' 'ERRO: nenhum Traefik reutilizável foi encontrado, mas as portas 80/443 já estão em uso.')" >&2
+      echo "$(vps_agent_text 'The installer will not replace an unknown web server.' 'O instalador não substituirá um servidor web desconhecido.')" >&2
       exit 1
     fi
     echo "$(vps_agent_text       'No existing Traefik was found and ports 80/443 are free. Portico will provision its bundled Traefik automatically.'       'Nenhum Traefik existente foi encontrado e as portas 80/443 estão livres. O Portico instalará automaticamente seu Traefik embutido.')"
@@ -296,7 +296,7 @@ else
       EDGE_NETWORK="${NETWORKS[0]}"
     fi
     docker network inspect "$EDGE_NETWORK" >/dev/null 2>&1 || {
-      echo "ERROR: Docker network not found: $EDGE_NETWORK" >&2
+      echo "$(vps_agent_text "ERROR: Docker network not found: $EDGE_NETWORK" "ERRO: rede Docker não encontrada: $EDGE_NETWORK")" >&2
       exit 1
     }
 
@@ -373,7 +373,7 @@ fi
 "${compose[@]}" up -d zitadel-postgres zitadel-api zitadel-login
 
 OIDC_URL="https://$DOMAIN/.well-known/openid-configuration"
-echo "Waiting for public OIDC discovery and TLS..."
+echo "$(vps_agent_text 'Waiting for public OIDC discovery and TLS...' 'Aguardando descoberta OIDC pública e TLS...')"
 rm -f /tmp/vps-agent-oidc.json
 for _ in $(seq 1 90); do
   if curl -fsS --max-time 5 "$OIDC_URL" >/tmp/vps-agent-oidc.json 2>/dev/null; then
@@ -382,8 +382,8 @@ for _ in $(seq 1 90); do
   sleep 2
 done
 if ! test -s /tmp/vps-agent-oidc.json; then
-  echo "ERROR: OIDC discovery did not become reachable at $OIDC_URL" >&2
-  echo "Check DNS, firewall/ports 80/443 and Traefik, then rerun." >&2
+  echo "$(vps_agent_text "ERROR: OIDC discovery did not become reachable at $OIDC_URL" "ERRO: a descoberta OIDC não ficou acessível em $OIDC_URL")" >&2
+  echo "$(vps_agent_text 'Check DNS, firewall/ports 80/443 and Traefik, then rerun.' 'Confira DNS, firewall/portas 80/443 e Traefik e tente novamente.')" >&2
   "${compose[@]}" ps >&2 || true
   exit 1
 fi
@@ -431,14 +431,14 @@ if [ "$NEEDS_BOOTSTRAP" -eq 1 ]; then
       cat /zitadel/bootstrap/bootstrap-admin.pat 2>/dev/null || true
   )"
   if [ -z "$BOOTSTRAP_PAT" ]; then
-    echo "ERROR: integrated OAuth bootstrap is incomplete but its short-lived admin PAT is unavailable." >&2
-    echo "Restore the identity backup or purge this incomplete identity stack and rerun setup." >&2
+    echo "$(vps_agent_text 'ERROR: integrated OAuth bootstrap is incomplete but its short-lived admin PAT is unavailable.' 'ERRO: o bootstrap OAuth integrado está incompleto, mas o PAT administrativo temporário não está disponível.')" >&2
+    echo "$(vps_agent_text 'Restore the identity backup or purge this incomplete identity stack and rerun setup.' 'Restaure o backup de identidade ou remova esta stack incompleta e execute a configuração novamente.')" >&2
     exit 1
   fi
 
   ZITADEL_CID="$("${compose[@]}" ps -q zitadel-api)"
   if [ -z "$ZITADEL_CID" ]; then
-    echo "ERROR: ZITADEL API container is not running." >&2
+    echo "$(vps_agent_text 'ERROR: ZITADEL API container is not running.' 'ERRO: o contêiner da API ZITADEL não está em execução.')" >&2
     exit 1
   fi
 
@@ -459,7 +459,7 @@ if [ "$NEEDS_BOOTSTRAP" -eq 1 ]; then
     sh -c 'chmod 600 /zitadel/bootstrap/*.pat 2>/dev/null || true'
 
   if [ "$DCR_READY" != "1" ]; then
-    echo "Enabling MCP-compatible Dynamic Client Registration privately..."
+    echo "$(vps_agent_text 'Enabling MCP-compatible Dynamic Client Registration privately...' 'Habilitando o registro dinâmico de cliente compatível com MCP de forma privada...')"
     curl_zitadel_internal --fail \
       --request PUT \
       --url "http://127.0.0.1:8080/v2/settings/security" \
@@ -576,7 +576,7 @@ fi
 
 if [ "$NEEDS_RESOURCE" -eq 1 ]; then
   if [ -z "$RESOURCE_PROJECT_ID" ]; then
-    echo "Creating the dedicated OAuth resource/audience project..."
+    echo "$(vps_agent_text 'Creating the dedicated OAuth resource/audience project...' 'Criando o projeto OAuth dedicado de recurso/audiência...')"
     RESOURCE_RESPONSE="$(mktemp)"
     chmod 600 "$RESOURCE_RESPONSE"
     curl_zitadel_internal --fail \
@@ -599,7 +599,7 @@ PY
   fi
 
   if [ -z "$INTROSPECTION_CLIENT_ID" ] || [ -z "$INTROSPECTION_CLIENT_SECRET" ]; then
-    echo "Creating the private token-introspection API client..."
+    echo "$(vps_agent_text 'Creating the private token-introspection API client...' 'Criando o cliente privado de API para introspecção de token...')"
     APP_RESPONSE="$(mktemp)"
     chmod 600 "$APP_RESPONSE"
     curl_zitadel_internal --fail \
@@ -642,7 +642,7 @@ upsert_env VPS_AGENT_REQUIRED_SCOPES "openid $AUDIENCE_SCOPE"
 chmod 600 .env
 
 if [ "$NEEDS_BOOTSTRAP" -eq 1 ]; then
-  echo "Verifying the private introspection client..."
+  echo "$(vps_agent_text 'Verifying the private introspection client...' 'Verificando o cliente privado de introspecção...')"
   curl_zitadel_internal --fail \
     --request POST \
     --url "http://127.0.0.1:8080/oauth/v2/introspect" \
@@ -700,7 +700,7 @@ PY
       --url "http://127.0.0.1:8080/v2/users/$BOOTSTRAP_HUMAN_ID" \
       --header "Authorization: Bearer $BOOTSTRAP_PAT" \
       >/tmp/vps-agent-delete-bootstrap-human.json
-    echo "Bootstrap human IAM owner removed."
+    echo "$(vps_agent_text 'Bootstrap human IAM owner removed.' 'Proprietário IAM humano de bootstrap removido.')"
   fi
 
   if [ -n "$BOOTSTRAP_MACHINE_ID" ]; then
@@ -709,7 +709,7 @@ PY
       --url "http://127.0.0.1:8080/v2/users/$BOOTSTRAP_MACHINE_ID" \
       --header "Authorization: Bearer $BOOTSTRAP_PAT" \
       >/tmp/vps-agent-delete-bootstrap-machine.json
-    echo "Bootstrap machine IAM owner removed and its PAT revoked."
+    echo "$(vps_agent_text 'Bootstrap machine IAM owner removed and its PAT revoked.' 'Proprietário IAM de máquina do bootstrap removido e seu PAT revogado.')"
   fi
 
   docker run --rm \
@@ -733,7 +733,7 @@ PY
   chmod 600 "$MARKER"
 fi
 
-echo "Confirming OAuth dynamic-client discovery..."
+echo "$(vps_agent_text 'Confirming OAuth dynamic-client discovery...' 'Confirmando descoberta dinâmica de cliente OAuth...')"
 for _ in $(seq 1 30); do
   curl -fsS "$OIDC_URL" >/tmp/vps-agent-oidc.json
   if python3 - <<'PY'
@@ -756,10 +756,10 @@ assert "S256" in x.get("code_challenge_methods_supported",[]), x
 print("DYNAMIC CLIENT REGISTRATION + PKCE: PASS")
 PY
 
-echo "Switching Gateway and Broker to the integrated operator subject..."
+echo "$(vps_agent_text 'Switching Gateway and Broker to the integrated operator subject...' 'Alterando Gateway e Broker para o subject do operador integrado...')"
 "${compose[@]}" up -d --build --force-recreate broker gateway
 
-echo "Waiting for the public MCP protected resource..."
+echo "$(vps_agent_text 'Waiting for the public MCP protected resource...' 'Aguardando o recurso MCP público protegido...')"
 for _ in $(seq 1 60); do
   code="$(curl -sS --max-time 5 -o /tmp/vps-agent-public-unauth.txt -w '%{http_code}' "https://$DOMAIN/mcp" 2>/dev/null || true)"
   [ "$code" = "401" ] && break
