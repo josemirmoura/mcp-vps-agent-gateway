@@ -2,6 +2,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=scripts/lib/product.sh
+source scripts/lib/product.sh
+vps_agent_init_language ""
+
 usage() {
   cat <<'EOF'
 usage: bash scripts/setup-integrated-auth.sh [--domain mcp.example.com] [options]
@@ -28,6 +32,7 @@ EOF
 DOMAIN=""
 OPERATOR_EMAIL=""
 OPERATOR_USERNAME="vps-operator"
+OPERATOR_USERNAME_EXPLICIT=0
 EDGE_NETWORK=""
 CERTRESOLVER=""
 BUNDLED_PROXY=0
@@ -42,7 +47,7 @@ while [ "$#" -gt 0 ]; do
       OPERATOR_EMAIL="$2"; shift 2 ;;
     --operator-username)
       [ "$#" -ge 2 ] || { echo "ERROR: --operator-username needs a value." >&2; exit 2; }
-      OPERATOR_USERNAME="$2"; shift 2 ;;
+      OPERATOR_USERNAME="$2"; OPERATOR_USERNAME_EXPLICIT=1; shift 2 ;;
     --edge-network)
       [ "$#" -ge 2 ] || { echo "ERROR: --edge-network needs a value." >&2; exit 2; }
       EDGE_NETWORK="$2"; shift 2 ;;
@@ -62,10 +67,49 @@ fi
 
 if [ -z "$DOMAIN" ]; then
   if [ -t 0 ]; then
-    printf 'Public MCP domain (for example mcp.example.com): '
+    if vps_agent_is_pt_br; then
+      cat <<'EOF'
+
+Para conectar o ChatGPT ao Portico MCP, você precisa de um endereço público
+para esta VPS.
+
+1. No painel onde você gerencia seu domínio, crie um subdomínio, por exemplo:
+   mcp.seudominio.com.br
+
+2. Crie um registro DNS A apontando esse subdomínio para o IP público desta VPS.
+   Se você usa IPv6, também pode criar um registro AAAA.
+
+3. Aguarde o DNS responder e informe abaixo apenas o nome criado, sem https://
+   e sem /mcp.
+
+Exemplo:
+  mcp.seudominio.com.br
+
+EOF
+      printf 'Domínio público do Portico MCP: '
+    else
+      cat <<'EOF'
+
+To connect ChatGPT to Portico MCP, this VPS needs a public hostname.
+
+1. In the DNS panel for a domain you control, create a subdomain, for example:
+   mcp.example.com
+
+2. Create a DNS A record pointing that subdomain to this VPS public IP.
+   If you use IPv6, you may also create an AAAA record.
+
+3. Wait for DNS to resolve, then enter only the hostname below, without
+   https:// and without /mcp.
+
+Example:
+  mcp.example.com
+
+EOF
+      printf 'Public Portico MCP domain: '
+    fi
     read -r DOMAIN
   else
-    echo "ERROR: --domain is required in non-interactive mode." >&2
+    echo "$(vps_agent_text 'ERROR: --domain is required in non-interactive mode.' 'ERRO: --domain é obrigatório em modo não interativo.')" >&2
     exit 2
   fi
 fi
@@ -139,10 +183,12 @@ PY
 }
 
 if ! getent ahosts "$DOMAIN" >/dev/null 2>&1; then
-  echo "ERROR: DNS for $DOMAIN does not resolve yet." >&2
-  echo "Create the A/AAAA record pointing to this VPS, wait for DNS propagation, and rerun." >&2
+  echo "$(vps_agent_text "ERROR: DNS for $DOMAIN does not resolve yet." "ERRO: o DNS de $DOMAIN ainda não está respondendo.")" >&2
+  echo "$(vps_agent_text     'Create the A/AAAA record pointing to this VPS, wait for DNS propagation, and rerun.'     'Crie o registro A/AAAA apontando para esta VPS, aguarde a propagação do DNS e tente novamente.')" >&2
   exit 1
 fi
+DNS_ADDRS="$(getent ahosts "$DOMAIN" 2>/dev/null | awk '{print $1}' | sort -u | paste -sd, -)"
+echo "$(vps_agent_text 'DNS resolved:' 'DNS resolvido:') $DOMAIN -> ${DNS_ADDRS:-?}"
 
 MARKER="state/integrated-auth.json"
 CURRENT_SUBJECT="$(env_value VPS_AGENT_SUBJECT || true)"
@@ -159,12 +205,17 @@ if [ -s "$MARKER" ] && [ -n "$CURRENT_SUBJECT" ]; then
 fi
 
 if [ "$NEEDS_OPERATOR" -eq 1 ]; then
+  if [ "$OPERATOR_USERNAME_EXPLICIT" -ne 1 ] && [ -t 0 ]; then
+    printf '%s' "$(vps_agent_text 'OAuth login username [vps-operator]: ' 'Nome de usuário do login OAuth [vps-operator]: ')"
+    read -r operator_username_answer
+    OPERATOR_USERNAME="${operator_username_answer:-vps-operator}"
+  fi
   if [ -z "$OPERATOR_EMAIL" ]; then
     if [ -t 0 ]; then
-      printf 'Operator login email: '
+      printf '%s' "$(vps_agent_text 'Operator login email: ' 'E-mail da conta de operador: ')"
       read -r OPERATOR_EMAIL
     else
-      echo "ERROR: --operator-email is required in non-interactive mode." >&2
+      echo "$(vps_agent_text 'ERROR: --operator-email is required in non-interactive mode.' 'ERRO: --operator-email é obrigatório em modo não interativo.')" >&2
       exit 2
     fi
   fi
@@ -173,13 +224,19 @@ if [ "$NEEDS_OPERATOR" -eq 1 ]; then
     exit 2
   fi
   if [[ ! "$OPERATOR_USERNAME" =~ ^[A-Za-z0-9._-]+$ ]]; then
-    echo "ERROR: operator username may contain only letters, numbers, dot, underscore and hyphen." >&2
+    echo "$(vps_agent_text       'ERROR: operator username may contain only letters, numbers, dot, underscore and hyphen.'       'ERRO: o nome de usuário pode conter apenas letras, números, ponto, sublinhado e hífen.')" >&2
     exit 2
   fi
+  echo
+  echo "$(vps_agent_text 'Portico MCP operator account' 'Conta de operador do Portico MCP')"
+  echo "  $(vps_agent_text 'Email' 'E-mail'): $OPERATOR_EMAIL"
+  echo "  $(vps_agent_text 'Username' 'Nome de usuário'): $OPERATOR_USERNAME"
+  echo "  $(vps_agent_text     'This username will be used on the OAuth login screen. It is not your Linux/SSH user.'     'Esse nome de usuário será usado na tela de login OAuth. Ele não é seu usuário Linux/SSH.')"
 else
   OPERATOR_EMAIL="$(marker_value "$MARKER" email || true)"
   OPERATOR_USERNAME="$(marker_value "$MARKER" username || true)"
-  echo "Existing integrated operator identity detected; bootstrap will be reused."
+  echo "$(vps_agent_text     'Existing integrated operator identity detected; bootstrap will be reused.'     'Identidade de operador existente detectada; o bootstrap será reutilizado.')"
+  echo "  $(vps_agent_text 'Username' 'Nome de usuário'): $OPERATOR_USERNAME"
 fi
 
 mapfile -t TRAEFIK_IDS < <(
@@ -219,7 +276,7 @@ else
       echo "The installer will not replace an unknown web server." >&2
       exit 1
     fi
-    echo "No existing Traefik found and ports 80/443 are free; using the bundled Traefik."
+    echo "$(vps_agent_text       'No existing Traefik was found and ports 80/443 are free. Portico will provision its bundled Traefik automatically.'       'Nenhum Traefik existente foi encontrado e as portas 80/443 estão livres. O Portico instalará automaticamente seu Traefik embutido.')"
     BUNDLED_PROXY=1
     EDGE_NETWORK="${EDGE_NETWORK:-mcp-vps-agent-edge}"
     CERTRESOLVER="${CERTRESOLVER:-letsencrypt}"
@@ -255,10 +312,11 @@ print(values[0] if len(values)==1 else "")
       )"
     fi
     if [ -z "$CERTRESOLVER" ]; then
-      echo "ERROR: could not uniquely discover the Traefik ACME certificate resolver." >&2
-      echo "Pass --certresolver NAME." >&2
+      echo "$(vps_agent_text         'ERROR: could not uniquely discover the Traefik ACME certificate resolver.'         'ERRO: não foi possível descobrir de forma única o resolvedor ACME do Traefik.')" >&2
+      echo "$(vps_agent_text 'Pass --certresolver NAME.' 'Informe --certresolver NOME.')" >&2
       exit 1
     fi
+    echo "$(vps_agent_text       "Existing Traefik detected and will be reused. No new proxy will be installed."       "Traefik existente detectado e será reutilizado. Nenhum novo proxy será instalado.")"
   fi
 fi
 
@@ -297,11 +355,15 @@ if [ "$BUNDLED_PROXY" -eq 1 ]; then
 fi
 
 echo
-echo "Integrated auth plan:"
+echo "$(vps_agent_text 'Integrated authentication plan:' 'Plano de autenticação integrada:')"
 echo "  MCP + issuer: https://$DOMAIN"
-echo "  edge network: $EDGE_NETWORK"
-echo "  cert resolver: $CERTRESOLVER"
-echo "  proxy: $([ "$BUNDLED_PROXY" -eq 1 ] && echo bundled || echo existing)"
+echo "  $(vps_agent_text 'edge network' 'rede de borda'): $EDGE_NETWORK"
+echo "  $(vps_agent_text 'certificate resolver' 'resolvedor de certificado'): $CERTRESOLVER"
+if [ "$BUNDLED_PROXY" -eq 1 ]; then
+  echo "  proxy: $(vps_agent_text 'bundled Traefik (Portico-managed)' 'Traefik embutido (gerenciado pelo Portico)')"
+else
+  echo "  proxy: $(vps_agent_text 'existing Traefik (reused)' 'Traefik existente (reutilizado)')"
+fi
 echo
 
 "${compose[@]}" config -q
