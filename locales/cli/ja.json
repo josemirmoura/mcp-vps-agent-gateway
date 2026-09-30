@@ -300,6 +300,10 @@
     "remove.public_route_gone": "公開 MCP ルートは削除済みです（残存 Edge プロキシから HTTP {code}）。",
     "remove.url_still_live": "削除未完了: MCP URL が消えず、HTTP {code} を返しました。",
     "remove.deleting_source": "確認済み Portico MCP ソース checkout を削除しています: {path}",
-    "diagnose.usage": "使用方法: {script} [status|health|logs [行数]|audit [上限]|bundle [output.tar.gz]]"
+    "diagnose.usage": "使用方法: {script} [status|health|logs [行数]|audit [上限]|bundle [output.tar.gz]]",
+    "remove.state_preserved": "保持",
+    "remove.state_deleted": "削除",
+    "remove.state_delete": "削除",
+    "remove.state_preserve": "保持"
   }
 }
