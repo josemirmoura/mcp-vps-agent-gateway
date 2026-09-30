@@ -204,3 +204,106 @@ func TestDynamicRootRequestCannotDelegatePhysicalCeilingOrEscapeIt(t *testing.T)
 		}
 	}
 }
+
+
+func TestDynamicRootApprovalWorksFromEmptyStaticBaseline(t *testing.T) {
+	ctx := context.Background()
+	physical := t.TempDir()
+	project := filepath.Join(physical, "project")
+	if err := os.MkdirAll(project, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("VPS_AGENT_PHYSICAL_SCOPE_ROOT", physical)
+	t.Setenv("VPS_AGENT_HOST_ROOT", "")
+
+	cfg := &policy.Config{
+		Version: 1,
+		Mode:    "scoped",
+		Filesystem: policy.FilesystemPolicy{
+			Read:    []string{},
+			Write:   []string{},
+			Actions: []string{"list", "stat", "read", "mkdir", "write", "hash"},
+		},
+		Shell: policy.ShellPolicy{
+			Enabled: true, CWDRoots: []string{},
+			MaxRuntimeSeconds: 60, MaxOutputBytes: 1 << 20,
+		},
+		Network: policy.NetworkPolicy{Mode: "blocked"},
+		Privilege: policy.PrivilegePolicy{Admin: "broker-only"},
+		Replay: policy.ReplayPolicy{RequireIdempotencyForSafeWrites: true},
+		Grant: policy.GrantPolicy{MaxTTLMinutes: 60, OutOfBandApproval: true, StepUpAuth: true},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	fs, err := securefs.New(nil, nil, securefs.DefaultMaxBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := state.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	b := &Broker{
+		Policy: cfg, FS: fs, State: store, AdminToken: "operator-secret",
+		ExpectedSubject: "alice",
+	}
+
+	target := filepath.Join(project, "approved.txt")
+	writeArgs, _ := json.Marshal(map[string]any{"content": "portico"})
+	before := b.Handle(ctx, wire.Request{
+		ID: "empty-before", Subject: "alice", Tool: "file.write", Resource: target,
+		InvocationID: "empty-write-before", Args: writeArgs,
+	})
+	if before.OK {
+		t.Fatal("empty static baseline unexpectedly authorized the project")
+	}
+
+	requestArgs, _ := json.Marshal(map[string]any{
+		"root": project, "access": "work", "ttl_seconds": 0,
+	})
+	request := b.Handle(ctx, wire.Request{
+		ID: "empty-request", Subject: "alice", Tool: "permissions.request_root_access",
+		Resource: project, InvocationID: "empty-request-root", Args: requestArgs,
+	})
+	if !request.OK {
+		t.Fatalf("root request failed from empty baseline: %+v", request)
+	}
+	var pending struct {
+		RequestID     string `json:"request_id"`
+		ApprovalToken string `json:"approval_token"`
+	}
+	if err := json.Unmarshal(request.Result, &pending); err != nil {
+		t.Fatal(err)
+	}
+	if pending.RequestID == "" || pending.ApprovalToken == "" {
+		t.Fatalf("missing approval data: %+v", pending)
+	}
+
+	confirmArgs, _ := json.Marshal(map[string]any{
+		"request_id": pending.RequestID,
+		"approval_token": pending.ApprovalToken,
+		"decision": "approve",
+	})
+	approved := b.Handle(ctx, wire.Request{
+		ID: "empty-approve", Subject: "alice", Tool: "permissions.confirm_root_access",
+		Args: confirmArgs,
+	})
+	if !approved.OK {
+		t.Fatalf("approval failed from empty baseline: %+v", approved)
+	}
+
+	after := b.Handle(ctx, wire.Request{
+		ID: "empty-after", Subject: "alice", Tool: "file.write", Resource: target,
+		InvocationID: "empty-write-after", Args: writeArgs,
+	})
+	if !after.OK {
+		t.Fatalf("dynamic work root was not writable from empty baseline: %+v", after)
+	}
+	data, err := os.ReadFile(target)
+	if err != nil || string(data) != "portico" {
+		t.Fatalf("unexpected file after approved write: %q err=%v", data, err)
+	}
+}
