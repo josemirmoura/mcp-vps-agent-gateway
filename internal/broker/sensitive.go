@@ -120,8 +120,24 @@ func (b *Broker) guardSensitiveRequest(ctx context.Context, req wire.Request) *w
 	switch req.Tool {
 	case "file.read", "file.read_test", "file.hash":
 		checks = append(checks, check{path: req.Resource})
-	case "file.write", "file.write_test", "file.patch", "file.remove", "file.chmod", "file.chown":
+	case "file.write", "file.write_test", "file.patch", "file.chmod", "file.chown":
 		checks = append(checks, check{path: req.Resource, write: true})
+	case "file.remove":
+		checks = append(checks, check{path: req.Resource, write: true})
+		var in struct {
+			Recursive bool `json:"recursive"`
+		}
+		if json.Unmarshal(req.Args, &in) == nil && in.Recursive {
+			_, writeRoots, err := b.effectiveFileRoots(ctx, req.Subject)
+			if err != nil {
+				resp := deny(req.ID, "sensitive_path_check_failed", err.Error())
+				return &resp
+			}
+			if err := b.requireSensitiveSubtreeWork(ctx, req.Subject, req.Resource, writeRoots); err != nil {
+				resp := deny(req.ID, "sensitive_path_locked", err.Error())
+				return &resp
+			}
+		}
 	case "file.copy", "file.move":
 		var in struct {
 			Destination string `json:"destination"`
