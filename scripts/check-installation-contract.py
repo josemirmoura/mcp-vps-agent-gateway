@@ -169,7 +169,9 @@ ux_requirements = {
     ],
     "scripts/install.sh": [
         "Escolha como o Portico MCP poderá acessar sua VPS",
-        "Você autoriza cada pasta depois",
+        "nomes das pastas imediatamente abaixo do teto",
+        "conteúdo fica bloqueado até aprovação explícita",
+        "Arquivos protegidos como .env continuam trancados",
         "python3 scripts/preflight.py",
     ],
     "scripts/setup-integrated-auth.sh": [
@@ -191,10 +193,14 @@ ux_requirements = {
         "Autorizar todo ",
         "overflow-wrap: anywhere",
         "button:focus-visible",
+        "Arquivo protegido",
+        "permissions.confirm_sensitive_access",
     ],
     "internal/broker/broker.go": [
         '"ceiling_wide": root == physical',
         '"physical_ceiling": physical',
+        '"permissions.discover_scope"',
+        '"permissions.request_sensitive_access"',
     ],
 }
 ux_sources = {
