@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import sys
 from functools import lru_cache
 
@@ -64,6 +65,48 @@ def is_pt_br() -> bool:
     return current_lang() == "pt-BR"
 
 
+DYNAMIC_TEXT_PATTERNS = (
+    (r"^ERROR: unknown argument: (?P<arg>.+)$", "error.unknown_argument"),
+    (r"^Creating (?P<scope>.+) with sudo install\\.$", "install.creating_scope"),
+    (r"^(?P<scope>.+) does not exist\\. Create it now\\? \\[y/N\\]: $", "install.scope_missing_prompt"),
+    (r"^ERROR: scope does not exist: (?P<scope>.+)$", "error.scope_missing"),
+    (r"^ERROR: invalid non-root shell user: (?P<user>.+)$", "error.invalid_shell_user"),
+    (r"^Standard profile selected\\. Physical ceiling: (?P<scope>.+)\\.$", "install.standard_selected"),
+    (r"^ERROR: --scope must be an absolute path: (?P<scope>.+)$", "error.scope_absolute"),
+    (r"^ERROR: --scope must be canonical \\(no '\\.\\.', '\\.' or trailing slash\\): (?P<scope>.+)$", "error.scope_canonical"),
+    (r"^Physical ceiling changed from (?P<old>.+) to (?P<new>.+); static roots will start empty\\.$", "init.ceiling_changed_empty"),
+    (r"^Physical ceiling changed from (?P<old>.+) to (?P<new>.+)\\. Existing logical policy roots were preserved\\.$", "init.ceiling_changed_preserved"),
+    (r"^ERROR: VPS_AGENT_SCOPE_ROOT may not traverse symlinks: (?P<path>.+)$", "error.scope_symlink"),
+    (r"^ERROR: VPS_AGENT_SCOPE_ROOT does not exist: (?P<path>.+)$", "error.scope_root_missing"),
+    (r"^ERROR: shell execution user does not exist: (?P<user>.+)$", "error.shell_user_missing"),
+    (r"^ERROR: required command not found: (?P<command>.+)$", "error.required_command"),
+    (r"^ERROR: DNS for (?P<domain>.+) does not resolve yet\\.$", "error.dns_unresolved"),
+    (r"^ERROR: integrated auth was already initialized for (?P<domain>.+)\\.$", "error.auth_already_initialized"),
+    (r"^ERROR: operator email does not look valid: (?P<email>.+)$", "error.operator_email_invalid"),
+    (r"^ERROR: more than one Traefik is attached to (?P<network>.+)\\.$", "error.traefik_multiple_network"),
+    (r"^ERROR: Traefik has (?P<count>\\d+) candidate Docker networks: (?P<networks>.+)$", "error.traefik_candidate_networks"),
+    (r"^ERROR: Docker network not found: (?P<network>.+)$", "error.docker_network_missing"),
+    (r"^ERROR: OIDC discovery did not become reachable at (?P<url>.+)$", "error.oidc_unreachable"),
+    (r"^ERROR: operator creation failed \\(curl=(?P<curl_status>[^ ]+) HTTP=(?P<http_code>[^)]+)\\)\\.$", "error.operator_creation_failed"),
+    (r"^Public MCP endpoint must use HTTPS: (?P<url>.+)$", "error.public_url_https"),
+    (r"^Expected HTTP 401 from unauthenticated MCP request, got (?P<code>.+)\\.$", "error.expected_401"),
+    (r"^Local MCP tool call skipped for auth mode (?P<mode>.+); public OAuth verification will be used\\.$", "verify.local_call_skipped"),
+)
+
+
+def dynamic_translation(lang: str, en: str) -> str | None:
+    messages = catalog(lang)["messages"]
+    for pattern, key in DYNAMIC_TEXT_PATTERNS:
+        match = re.match(pattern, en)
+        if not match:
+            continue
+        template = messages.get(key)
+        if template is None:
+            return None
+        return template.format(**match.groupdict())
+    return None
+
+
 def t(en: str, pt: str) -> str:
     lang = current_lang()
     if lang == "en":
@@ -71,6 +114,9 @@ def t(en: str, pt: str) -> str:
     if lang == "pt-BR":
         return pt
     translated = catalog(lang)["strings"].get(en)
+    if translated is not None:
+        return translated
+    translated = dynamic_translation(lang, en)
     if translated is not None:
         return translated
     if os.environ.get("VPS_AGENT_I18N_STRICT") == "1":
