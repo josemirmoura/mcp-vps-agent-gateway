@@ -364,6 +364,40 @@ func (b *Broker) requestSensitiveAccess(ctx context.Context, req wire.Request) w
 	return wire.Response{ID: req.ID, OK: true, Result: result}
 }
 
+func (b *Broker) validateSensitiveApproval(ctx context.Context, approval state.Approval) error {
+	if approval.Kind != "capability" || len(approval.Capabilities) != 1 {
+		return errors.New("approval is not a protected-file capability")
+	}
+	access, path, ok := decodeSensitiveCapability(approval.Capabilities[0])
+	if !ok {
+		return errors.New("approval is not a protected-file capability")
+	}
+	readRoots, writeRoots, err := b.effectiveFileRoots(ctx, approval.Subject)
+	if err != nil {
+		return err
+	}
+	roots := readRoots
+	if access == "work" {
+		roots = writeRoots
+	}
+	if !pathWithinAnyRoot(roots, path) {
+		return errors.New("parent root authorization is no longer active")
+	}
+	protected, err := sensitive.IsProtected(
+		os.Getenv("VPS_AGENT_HOST_ROOT"),
+		path,
+		roots,
+		sensitive.DefaultScanLimit,
+	)
+	if err != nil {
+		return err
+	}
+	if !protected {
+		return errors.New("path is no longer classified as protected")
+	}
+	return nil
+}
+
 func (b *Broker) confirmSensitiveAccess(ctx context.Context, req wire.Request) wire.Response {
 	if b.State == nil {
 		return deny(req.ID, "state_required", "sensitive access confirmation requires durable state")
