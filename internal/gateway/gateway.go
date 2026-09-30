@@ -287,12 +287,6 @@ type rootAccessRevokeInput struct {
 	OperationID string `json:"operation_id,omitempty" jsonschema:"stable retry identity when the client can preserve one"`
 }
 
-type rootAccessConfirmInput struct {
-	RequestID     string `json:"request_id" jsonschema:"pending root approval request identifier"`
-	ApprovalToken string `json:"approval_token" jsonschema:"one-time approval token supplied only to the approval UI"`
-	Decision      string `json:"decision" jsonschema:"approve or deny"`
-}
-
 type elevationInput struct {
 	Capabilities []string `json:"capabilities" jsonschema:"explicit capabilities requested for temporary elevation"`
 	TTLSeconds   int64    `json:"ttl_seconds" jsonschema:"requested grant lifetime in seconds"`
@@ -309,15 +303,10 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 		&mcp.ServerOptions{
 			Instructions: serverInstructions(),
 			Capabilities: &mcp.ServerCapabilities{
-			Logging: &mcp.LoggingCapabilities{},
-			Extensions: map[string]any{
-				"io.modelcontextprotocol/ui": map[string]any{
-					"mimeTypes": []string{"text/html;profile=mcp-app"},
-				},
+				Logging: &mcp.LoggingCapabilities{},
 			},
-		}},
+		},
 	)
-	registerRootApprovalWidget(server)
 	registerAuthorityTools(server, s)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "system.info", Description: "Return non-sensitive host/runtime information."},
@@ -799,21 +788,28 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "permissions.request_root_access",
-		Description: "Request access to an additional filesystem root inside the server's physical scope. The request renders an approval card; authority is activated only after the authenticated user presses Authorize.",
-		Meta: mcp.Meta{
-			"ui": map[string]any{
-				"resourceUri": rootApprovalWidgetURI,
-				"visibility": []string{"model", "app"},
-			},
-			"openai/outputTemplate": rootApprovalWidgetURI,
-			"openai/toolInvocation/invoking": "Preparing root access request…",
-			"openai/toolInvocation/invoked": "Root access request ready.",
-		},
+		Description: "Request human-approved access to a filesystem root inside the configured physical ceiling. On clients with MCP elicitation support, the client renders the native approval UI and the Broker activates authority only after the human accepts.",
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint: false, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
 		},
 	},
-		func(ctx context.Context, _ *mcp.CallToolRequest, in rootAccessRequestInput) (*mcp.CallToolResult, map[string]any, error) {
+		func(ctx context.Context, req *mcp.CallToolRequest, in rootAccessRequestInput) (*mcp.CallToolResult, any, error) {
+			if state, decision, handled, err := nativeApprovalDecision(req, "root"); handled {
+				if err != nil {
+					return nil, nil, err
+				}
+				var out map[string]any
+				args, _ := json.Marshal(map[string]any{
+					"request_id": state.RequestID,
+					"approval_token": state.ApprovalToken,
+					"decision": decision,
+				})
+				if err := s.call(ctx, "permissions.confirm_root_access", state.RequestID, decision, args, &out, true, state.RequestID+":"+decision); err != nil {
+					return nil, out, err
+				}
+				return nil, out, nil
+			}
+
 			var out map[string]any
 			args, _ := json.Marshal(in)
 			if err := s.call(ctx, "permissions.request_root_access", in.Root, "request", args, &out, true, in.OperationID); err != nil {
@@ -821,33 +817,19 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			}
 			approvalToken, _ := out["approval_token"].(string)
 			delete(out, "approval_token")
-			return &mcp.CallToolResult{Meta: mcp.Meta{
-				"vps-agent/approvalToken": approvalToken,
-			}}, out, nil
+
+			if !supportsNativeElicitation(req) {
+				out["approval_method"] = "operator_fallback"
+				out["message"] = "This MCP client did not advertise native elicitation. The request remains pending for separate operator approval."
+				return nil, out, nil
+			}
+			approval, err := nativeApprovalResult("root", out, approvalToken)
+			if err != nil {
+				return nil, nil, err
+			}
+			return approval, nil, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{
-		Name: "permissions.confirm_root_access",
-		Description: "Approve or deny a pending root delegation from the interactive approval card. This tool is app-only and requires a one-time token hidden from the model.",
-		Meta: mcp.Meta{
-			"ui": map[string]any{
-				"visibility": []string{"app"},
-			},
-			"openai/widgetAccessible": true,
-			"openai/visibility": "private",
-		},
-		Annotations: &mcp.ToolAnnotations{
-			ReadOnlyHint: false, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
-		},
-	},
-		func(ctx context.Context, _ *mcp.CallToolRequest, in rootAccessConfirmInput) (*mcp.CallToolResult, map[string]any, error) {
-			var out map[string]any
-			args, _ := json.Marshal(in)
-			if err := s.call(ctx, "permissions.confirm_root_access", in.RequestID, in.Decision, args, &out, true, in.RequestID+":"+in.Decision); err != nil {
-				return nil, out, err
-			}
-			return nil, out, nil
-		})
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "permissions.revoke_root_access",
