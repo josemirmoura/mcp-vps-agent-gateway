@@ -168,7 +168,28 @@ Example:
 - T3 content cannot grant capability
 - secrets never flow from T0/T1 to T2/T3 unless an explicit policy allows it
 
-## 9. Tests
+## 9. MCP client safety annotations
+
+Every model-visible Portico tool is classified centrally with the standard MCP safety hints:
+
+- `readOnlyHint`
+- `destructiveHint`
+- `idempotentHint`
+- `openWorldHint`
+
+These hints help ChatGPT and other MCP clients choose clearer native confirmation behavior. They are **UX/safety metadata, not authorization**. A client may ignore them, change its confirmation policy, or interpret them differently over time; the Broker still re-authorizes the authenticated subject, canonical resource, action, policy and grant on every privileged operation.
+
+The classification is intentionally conservative. Examples:
+
+- inventory, diagnostics and bounded reads are read-only;
+- `network.check` is read-only but open-world because it reaches an external destination;
+- file replacement/removal, shell execution, Docker mutations and identity/firewall changes are marked destructive;
+- package operations and commands that may use network egress are marked open-world;
+- permission request/revoke tools mutate Portico authority but are not described as destructive user-data operations.
+
+All public registrations use the shared `annotatedTool` helper. Unknown tools fail closed at registration time, and CI rejects a return to direct unclassified public-tool registration.
+
+## 10. Tests
 
 Mandatory tests include:
 
