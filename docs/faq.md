@@ -40,11 +40,15 @@ See privacy.md.
 
 ## Can I run only one project?
 
-Yes. Project is the recommended default profile.
+Yes. Choose **Project** when Portico should be permanently limited to one project root.
+
+## What is the recommended default?
+
+**Standard**. It uses `/opt` as the physical ceiling, starts with no project root authorized, and lets the operator approve specific roots later from ChatGPT.
 
 ## Can I delegate several directories?
 
-Yes, through Custom, provided they fit under the configured physical filesystem ceiling and the policy lists the exact intended roots.
+Yes. With Standard, approve the needed roots dynamically under the physical ceiling. Advanced operators can also manage static roots through the policy/helper tooling.
 
 ## Can I manage several VPS instances?
 

@@ -10,7 +10,7 @@ Assume the AI model, remote clients, tool results, logs and external content can
 | Confused deputy | Gateway asks Broker to touch an unauthorized resource | Broker re-authorizes subject + tool + resource + action |
 | Privilege escalation | agent asks for admin shell | Full disabled; temporary explicit grant only |
 | Path traversal | ../../etc/shadow | safe descriptor-based path resolution |
-| Symlink escape | allowed path redirects outside root | openat2 or safe directory-FD fallback |
+| Symlink/rename race | allowed path is swapped toward an outside target | descriptor-relative `os.Root` operations + adversarial swap tests |
 | Docker privilege | Gateway gets docker.sock | Docker only through Broker |
 | Fork/memory bomb | generated process exhausts VPS | systemd/cgroups/timeouts |
 | Duplicate write | client retries mutation | infrastructure idempotency or no blind retry |
@@ -41,12 +41,15 @@ Assume the AI model, remote clients, tool results, logs and external content can
 - malicious tool result cannot alter policy
 
 ### Gate 3/4
+- hardlink unlink behavior and concurrent symlink/rename-race containment
 - idempotent retry behavior
 - non-replay-safe no-blind-retry behavior
 - SQLite recovery
 - job restart/reconciliation
 - secret redaction
 - shell/resource containment when enabled
+- request-body/concurrency/rate-limit abuse controls
+- egress allowlist fail-closed behavior until enforcement is available
 
 ### Gate 5 / R5
 - self-approval impossible

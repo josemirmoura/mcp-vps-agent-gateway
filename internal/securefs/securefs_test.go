@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -306,4 +307,126 @@ func FuzzSelectRootNeverEscapes(f *testing.F) {
 			t.Fatalf("authorized target escaped root: target=%q rel=%q err=%v", target, rel, err)
 		}
 	})
+}
+
+
+func TestHardlinkRemovalDoesNotAffectOutsideName(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	outsideFile := filepath.Join(outside, "original.txt")
+	if err := os.WriteFile(outsideFile, []byte("keep-me"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	insideLink := filepath.Join(root, "inside-link.txt")
+	if err := os.Link(outsideFile, insideLink); err != nil {
+		t.Skipf("hardlink unavailable on this filesystem: %v", err)
+	}
+
+	m, err := New([]string{root}, []string{root}, 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Remove(insideLink, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(insideLink); !os.IsNotExist(err) {
+		t.Fatalf("inside hardlink still exists after removal: %v", err)
+	}
+	got, err := os.ReadFile(outsideFile)
+	if err != nil || string(got) != "keep-me" {
+		t.Fatalf("outside hardlink name/content was affected: got=%q err=%v", got, err)
+	}
+}
+
+func TestMoveCannotFollowSymlinkDirectoryOutsideRoot(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	src := filepath.Join(root, "src.txt")
+	if err := os.WriteFile(src, []byte("inside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	linkDir := filepath.Join(root, "escape-dir")
+	if err := os.Symlink(outside, linkDir); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	m, err := New([]string{root}, []string{root}, 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Move(src, filepath.Join(linkDir, "escaped.txt")); err == nil {
+		t.Fatal("move unexpectedly followed a symlink directory outside the authorized root")
+	}
+	if _, err := os.Stat(filepath.Join(outside, "escaped.txt")); !os.IsNotExist(err) {
+		t.Fatalf("move created an outside file through symlink: %v", err)
+	}
+}
+
+func TestConcurrentSymlinkSwapNeverReadsOutsideRoot(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	outsideFile := filepath.Join(outside, "secret.txt")
+	if err := os.WriteFile(outsideFile, []byte("outside-secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(root, "victim.txt")
+	regular := filepath.Join(root, "regular.tmp")
+	link := filepath.Join(root, "link.tmp")
+	if err := os.WriteFile(target, []byte("inside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(regular, []byte("inside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outsideFile, link); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	m, err := New([]string{root}, []string{root}, 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			_ = os.Remove(target)
+			_ = os.Rename(link, target)
+			_ = os.Rename(target, link)
+			_ = os.Rename(regular, target)
+			_ = os.Rename(target, regular)
+		}
+	}()
+
+	for i := 0; i < 4000; i++ {
+		data, err := m.ReadFile(target)
+		if err != nil {
+			continue
+		}
+		if string(data) == "outside-secret" {
+			close(stop)
+			wg.Wait()
+			t.Fatal("concurrent symlink swap escaped the authorized root")
+		}
+		if string(data) != "inside" {
+			close(stop)
+			wg.Wait()
+			t.Fatalf("unexpected content during race: %q", data)
+		}
+	}
+	close(stop)
+	wg.Wait()
+
+	got, err := os.ReadFile(outsideFile)
+	if err != nil || string(got) != "outside-secret" {
+		t.Fatalf("outside target changed during race: got=%q err=%v", got, err)
+	}
 }

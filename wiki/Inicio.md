@@ -1,4 +1,4 @@
-# Wiki do MCP VPS Agent Gateway
+# Wiki do Portico MCP
 
 > Esta Wiki é uma camada de navegação. A documentação canônica vive em [`docs/`](https://github.com/josemirmoura/mcp-vps-agent-gateway/tree/main/docs) e permanece versionada junto com o código. Se houver qualquer divergência, a documentação do repositório prevalece.
 

@@ -95,7 +95,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          flags=(--verify-tag --generate-notes --title "MCP VPS Agent Gateway ${GITHUB_REF_NAME}")
+          flags=(--verify-tag --generate-notes --title "Portico MCP ${GITHUB_REF_NAME}")
           if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
             flags+=(--prerelease)
           fi
