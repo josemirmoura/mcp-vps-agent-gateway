@@ -260,6 +260,11 @@ if [ "$LOCAL_ONLY" -eq 1 ]; then
 fi
 
 vps_agent_step "$(vps_agent_text '6/7 Secure public access' '6/7 Acesso público seguro')"
+if [ -z "$DOMAIN" ] && [ -t 0 ]; then
+  vps_agent_block setup_auth.domain_help
+  printf '%s' "$(vps_agent_msg setup_auth.domain_prompt)"
+  read -r DOMAIN
+fi
 auth_args=()
 [ -n "$DOMAIN" ] && auth_args+=(--domain "$DOMAIN")
 [ -n "$OPERATOR_EMAIL" ] && auth_args+=(--operator-email "$OPERATOR_EMAIL")
