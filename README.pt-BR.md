@@ -36,7 +36,9 @@ filesystem inteiro: /
 
 Filesystem é só uma dimensão. A policy controla separadamente shell, units systemd, recursos Docker/Compose, rede, pacotes, usuários/grupos, firewall e administração temporária.
 
-Em hosts com vários projetos, um teto físico mais amplo como `/opt` pode conter várias raízes delegadas explicitamente. Ampliar o teto não autoriza o teto inteiro. As raízes estáticas continuam em `config/policy.yaml`; em produção, novas raízes podem ser solicitadas via MCP, aprovadas pela fronteira separada do operador no Broker, listadas pelo chat e revogadas pelo chat sem reescrever a policy nem reiniciar o Broker. O `scripts/delegate-root.sh` continua disponível para bootstrap e raízes estáticas administradas pelo operador.
+Em hosts com vários projetos, um teto físico mais amplo como `/opt` pode conter várias raízes delegadas explicitamente. Ampliar o teto não autoriza o teto inteiro. O Portico pode descobrir apenas os nomes das pastas imediatamente abaixo desse teto para que o assistente peça o projeto correto sem abri-lo. As raízes estáticas continuam em `config/policy.yaml`; em produção, novas raízes podem ser solicitadas via MCP, aprovadas pela fronteira separada do operador no Broker, listadas pelo chat e revogadas pelo chat sem reescrever a policy nem reiniciar o Broker. O `scripts/delegate-root.sh` continua disponível para bootstrap e raízes estáticas administradas pelo operador.
+
+Arquivos com segredos formam uma segunda fronteira dentro dos projetos autorizados. `.env` e `.env.*` continuam bloqueados por padrão e exigem uma autorização temporária separada para o caminho exato; templates comuns como `.env.example` continuam legíveis. A mesma proteção vale para tools de arquivo e shell confinado.
 
 **O LLM nunca é a fronteira de segurança. O servidor decide.**
 
@@ -127,6 +129,7 @@ Delete recursivo, chmod/chown, pacotes, usuários, firewall, rede irrestrita e s
 - mutações usam locks/fencing quando necessário.
 - resultados de tools são dados não confiáveis.
 - Full não implica rede irrestrita.
+- segredos protegidos como `.env` continuam trancados mesmo dentro de uma raiz autorizada, salvo autorização temporária separada.
 - secrets não aparecem em tools genéricas.
 
 ## Validação
