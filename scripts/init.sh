@@ -6,35 +6,7 @@ cd "$(dirname "$0")/.."
 source scripts/lib/product.sh
 
 usage() {
-  if vps_agent_is_pt_br; then
-    cat <<'EOF'
-uso: bash scripts/init.sh [--scope /caminho/absoluto/existente] [opções]
-
-Opções:
-  --scope PATH          Define o teto físico do filesystem no modo Scoped.
-  --dynamic-baseline    Inicia sem raízes lógicas estáticas de projeto.
-                        As raízes serão autorizadas depois pelo fluxo dinâmico.
-  --run-as USER         Usuário não-root para jobs shell confinados.
-  --migrate-policy-root Substitui referências da raiz anterior em policy.yaml.
-                        Use para mover uma raiz de projeto, não para ampliar o teto.
-  --lang LANG           Idioma: pt-BR ou en.
-  -h, --help            Mostra esta ajuda.
-EOF
-  else
-    cat <<'EOF'
-usage: bash scripts/init.sh [--scope /absolute/existing/path] [options]
-
-Options:
-  --scope PATH          Set the physical Scoped filesystem ceiling.
-  --dynamic-baseline    Start with no static logical project roots.
-                        Project roots are authorized later through dynamic approval.
-  --run-as USER         Non-root host user for confined shell jobs.
-  --migrate-policy-root Replace references to the previous root in policy.yaml.
-                        Use for a project-root move, not for widening the ceiling.
-  --lang LANG           Language: pt-BR or en.
-  -h, --help            Show this help.
-EOF
-  fi
+  vps_agent_block init.usage
 }
 
 SCOPE_OVERRIDE=""
@@ -97,7 +69,7 @@ while [ "$#" -gt 0 ]; do
       exit 0
       ;;
     *)
-      echo "$(vps_agent_text "ERROR: unknown argument: $1" "ERRO: argumento desconhecido: $1")" >&2
+      echo "$(vps_agent_msg error.unknown_argument "arg=$1")" >&2
       usage >&2
       exit 2
       ;;
@@ -177,7 +149,7 @@ OLD_SCOPE_ROOT="${VPS_AGENT_SCOPE_ROOT:-}"
 
 if [ -n "$SCOPE_OVERRIDE" ]; then
   if [[ "$SCOPE_OVERRIDE" != /* ]]; then
-    echo "$(vps_agent_text "ERROR: --scope must be an absolute path: $SCOPE_OVERRIDE" "ERRO: --scope deve ser um caminho absoluto: $SCOPE_OVERRIDE")" >&2
+    echo "$(vps_agent_msg error.scope_absolute "scope=$SCOPE_OVERRIDE")" >&2
     exit 1
   fi
 
@@ -188,7 +160,7 @@ print(os.path.normpath(sys.argv[1]))
 PY
 )"
   if [ "$NORMALIZED_OVERRIDE" != "$SCOPE_OVERRIDE" ]; then
-    echo "$(vps_agent_text "ERROR: --scope must be canonical (no '..', '.' or trailing slash): $SCOPE_OVERRIDE" "ERRO: --scope deve ser canônico (sem '..', '.' ou barra final): $SCOPE_OVERRIDE")" >&2
+    echo "$(vps_agent_msg error.scope_canonical "scope=$SCOPE_OVERRIDE")" >&2
     exit 1
   fi
 
@@ -217,7 +189,7 @@ PY
 
   if [ -n "$OLD_SCOPE_ROOT" ] && [ "$OLD_SCOPE_ROOT" != "$SCOPE_OVERRIDE" ]; then
     if [ "$DYNAMIC_BASELINE" -eq 1 ] && { [ "$POLICY_CREATED" -eq 1 ] || [ "$POLICY_PRISTINE_TEMPLATE" -eq 1 ]; }; then
-      echo "$(vps_agent_text         "Physical ceiling changed from $OLD_SCOPE_ROOT to $SCOPE_OVERRIDE; static roots will start empty."         "Teto físico alterado de $OLD_SCOPE_ROOT para $SCOPE_OVERRIDE; as raízes estáticas começarão vazias.")"
+      echo "$(vps_agent_msg init.ceiling_changed_empty "old=$OLD_SCOPE_ROOT" "new=$SCOPE_OVERRIDE")"
     elif [ "$POLICY_CREATED" -eq 1 ] || [ "$POLICY_PRISTINE_TEMPLATE" -eq 1 ] || [ "$MIGRATE_POLICY_ROOT" -eq 1 ]; then
       python3 - "config/policy.yaml" "$OLD_SCOPE_ROOT" "$SCOPE_OVERRIDE" <<'PY'
 import os
@@ -238,7 +210,7 @@ else:
     print("A policy não continha a raiz Scoped anterior; mantendo os caminhos inalterados." if lang=="pt-BR" else "Policy did not contain the previous scoped root; leaving policy paths unchanged.")
 PY
     else
-      echo "$(vps_agent_text         "Physical ceiling changed from $OLD_SCOPE_ROOT to $SCOPE_OVERRIDE. Existing logical policy roots were preserved."         "Teto físico alterado de $OLD_SCOPE_ROOT para $SCOPE_OVERRIDE. As raízes lógicas existentes foram preservadas.")"
+      echo "$(vps_agent_msg init.ceiling_changed_preserved "old=$OLD_SCOPE_ROOT" "new=$SCOPE_OVERRIDE")"
     fi
   fi
 
@@ -271,7 +243,7 @@ else
   CHECK_PATH="$SCOPE_ROOT"
   while [ "$CHECK_PATH" != "/" ]; do
     if [ -L "$CHECK_PATH" ]; then
-      echo "$(vps_agent_text "ERROR: VPS_AGENT_SCOPE_ROOT may not traverse symlinks: $CHECK_PATH" "ERRO: VPS_AGENT_SCOPE_ROOT não pode atravessar links simbólicos: $CHECK_PATH")" >&2
+      echo "$(vps_agent_msg error.scope_symlink "path=$CHECK_PATH")" >&2
       exit 1
     fi
     CHECK_PATH="$(dirname "$CHECK_PATH")"
@@ -279,7 +251,7 @@ else
 
   if [ ! -d "$SCOPE_ROOT" ]; then
     cat >&2 <<EOF
-$(vps_agent_text "ERROR: VPS_AGENT_SCOPE_ROOT does not exist: $SCOPE_ROOT" "ERRO: VPS_AGENT_SCOPE_ROOT não existe: $SCOPE_ROOT")
+$(vps_agent_msg error.scope_root_missing "path=$SCOPE_ROOT")
 
 $(vps_agent_text "Create it first, or choose an existing directory." "Crie o diretório primeiro ou escolha um diretório existente.")
 EOF
@@ -335,7 +307,7 @@ if [ -n "$RUN_AS_OVERRIDE" ]; then
     exit 1
   fi
   if ! id -u "$RUN_AS_OVERRIDE" >/dev/null 2>&1; then
-    echo "$(vps_agent_text "ERROR: shell execution user does not exist: $RUN_AS_OVERRIDE" "ERRO: usuário de execução shell não existe: $RUN_AS_OVERRIDE")" >&2
+    echo "$(vps_agent_msg error.shell_user_missing "user=$RUN_AS_OVERRIDE")" >&2
     exit 1
   fi
   python3 - "config/policy.yaml" "$RUN_AS_OVERRIDE" <<'PY'
