@@ -45,7 +45,12 @@ func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
 	if req.ID == "" {
 		req.ID = fmt.Sprintf("req-%d", time.Now().UnixNano())
 	}
-	resp := b.handle(ctx, req)
+	var resp wire.Response
+	if guarded := b.guardSensitiveRequest(ctx, req); guarded != nil {
+		resp = *guarded
+	} else {
+		resp = b.handle(ctx, req)
+	}
 	decision := "allow"
 	if !resp.OK {
 		decision = "deny"
@@ -173,6 +178,16 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			"mode":         b.Policy.Mode,
 			"full_enabled": b.Policy.Features.FullModeEnabled && b.Policy.Enabled,
 		})
+	case "permissions.discover_scope":
+		return b.discoverScope(ctx, req)
+	case "permissions.request_sensitive_access":
+		return b.requestSensitiveAccess(ctx, req)
+	case "permissions.confirm_sensitive_access":
+		return b.confirmSensitiveAccess(ctx, req)
+	case "permissions.list_sensitive_access":
+		return b.listSensitiveAccess(ctx, req)
+	case "permissions.revoke_sensitive_access":
+		return b.revokeSensitiveAccess(ctx, req)
 	case "file.read", "file.read_test":
 		fs, fsErr := b.effectiveFS(ctx, req.Subject)
 		if fsErr != nil {
@@ -1038,10 +1053,17 @@ func (b *Broker) startShellJob(ctx context.Context, req wire.Request, admin bool
 		_ = b.State.AbortOperation(context.Background(), req.InvocationID)
 		return deny(req.ID, "state_error", rootsErr.Error())
 	}
+	isolateFilesystem := !admin && !b.Policy.ShellMayReadHost()
 	inaccessible := []string(nil)
-	if !b.Policy.ShellMayReadHost() {
+	if !isolateFilesystem && !b.Policy.ShellMayReadHost() {
 		inaccessible = scopedInaccessiblePaths()
 	}
+	sensitiveMasks, maskErr := b.sensitiveShellMasks(ctx, req.Subject, uniqueStrings(append(readOnly, readWrite...)))
+	if maskErr != nil {
+		_ = b.State.AbortOperation(context.Background(), req.InvocationID)
+		return deny(req.ID, "sensitive_path_check_failed", maskErr.Error())
+	}
+	inaccessible = uniqueStrings(append(inaccessible, sensitiveMasks...))
 
 	networkMode := b.Policy.Network.Mode
 	if networkMode == "" {
@@ -1058,7 +1080,7 @@ func (b *Broker) startShellJob(ctx context.Context, req wire.Request, admin bool
 	spec := sandbox.Spec{
 		Unit: shellUnit(req.InvocationID), User: user, Command: in.Command, CWD: in.CWD,
 		ReadOnlyPaths: uniqueStrings(readOnly), ReadWritePaths: uniqueStrings(readWrite),
-		InaccessiblePaths: inaccessible, IsolateFilesystem: !admin && !b.Policy.ShellMayReadHost(),
+		InaccessiblePaths: inaccessible, IsolateFilesystem: isolateFilesystem,
 		Runtime: runtimeRequested, MemoryMaxBytes: memory, TasksMax: tasks,
 		NetworkMode: networkMode, Admin: admin,
 	}
@@ -1282,6 +1304,7 @@ func (b *Broker) requestRootAccess(ctx context.Context, req wire.Request) wire.R
 		"delegation_ttl_seconds": in.TTLSeconds,
 		"approval_expires_at": a.ExpiresAt,
 		"approval_required": true,
+		"kind": "root",
 		"ceiling_wide": root == physical,
 		"physical_ceiling": physical,
 		"approval_token": approvalToken,
