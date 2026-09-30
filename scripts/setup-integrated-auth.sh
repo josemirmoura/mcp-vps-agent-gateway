@@ -7,26 +7,45 @@ source scripts/lib/product.sh
 vps_agent_init_language ""
 
 usage() {
-  cat <<'EOF'
+  if vps_agent_is_pt_br; then
+    cat <<'EOF'
+uso: bash scripts/setup-integrated-auth.sh [--domain mcp.exemplo.com] [opções]
+
+Configura o acesso público suportado ao ChatGPT com OAuth/OIDC auto-hospedado,
+ZITADEL, PostgreSQL e o Gateway/Broker do Portico.
+
+Opções:
+  --domain DOMINIO          Nome DNS público do MCP + OAuth.
+  --operator-email EMAIL    E-mail da conta de operador.
+  --operator-username NOME  Nome de usuário do login (padrão: vps-operator).
+  --edge-network REDE       Rede Docker de um Traefik existente.
+  --certresolver NOME       Resolvedor ACME do Traefik existente.
+  --bundled-proxy           Força o Traefik embutido em vez de reutilizar um.
+  -h, --help                Mostra esta ajuda.
+
+A senha dedicada do operador OAuth é solicitada localmente sem aparecer no
+terminal. Ela não é a senha VPS/SSH e não deve ser fornecida ao ChatGPT.
+EOF
+  else
+    cat <<'EOF'
 usage: bash scripts/setup-integrated-auth.sh [--domain mcp.example.com] [options]
 
 Configure the supported public ChatGPT path: self-hosted OAuth/OIDC with
-ZITADEL, PostgreSQL and the existing package Gateway/Broker.
+ZITADEL, PostgreSQL and the existing Portico Gateway/Broker.
 
 Options:
   --domain DOMAIN          Public DNS name for MCP + OAuth.
-  --operator-email EMAIL   Login email for the VPS operator.
+  --operator-email EMAIL   Login email for the Portico operator.
   --operator-username NAME Login username (default: vps-operator).
   --edge-network NETWORK   Existing Traefik Docker network.
   --certresolver NAME      Existing Traefik ACME resolver.
-  --bundled-proxy          Force the package Traefik instead of reusing one.
+  --bundled-proxy          Force the bundled Traefik instead of reusing one.
   -h, --help               Show this help.
 
 The dedicated OAuth operator password is requested locally without terminal
 echo. It is not the VPS/SSH password and must not be supplied to ChatGPT.
-For CI/automation, VPS_AGENT_OPERATOR_PASSWORD may be supplied in the
-environment; do not put a real password on a shared command line.
 EOF
+  fi
 }
 
 DOMAIN=""
