@@ -56,6 +56,10 @@
     "remove.public_route_gone": "Public MCP route is gone (HTTP {code} from the remaining edge proxy).",
     "remove.url_still_live": "Removal incomplete: the MCP URL still returned HTTP {code} instead of disappearing.",
     "remove.deleting_source": "Deleting verified Portico MCP source checkout: {path}",
-    "diagnose.usage": "usage: {script} [status|health|logs [lines]|audit [limit]|bundle [output.tar.gz]]"
+    "diagnose.usage": "usage: {script} [status|health|logs [lines]|audit [limit]|bundle [output.tar.gz]]",
+    "remove.state_preserved": "PRESERVED",
+    "remove.state_deleted": "DELETED",
+    "remove.state_delete": "DELETE",
+    "remove.state_preserve": "PRESERVE"
   }
 }
