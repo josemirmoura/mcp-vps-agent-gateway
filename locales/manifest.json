@@ -1,0 +1,47 @@
+{
+  "default": "en",
+  "official": [
+    {
+      "code": "en",
+      "name": "English",
+      "native_name": "English",
+      "docs_path": "docs"
+    },
+    {
+      "code": "pt-BR",
+      "name": "Portuguese (Brazil)",
+      "native_name": "Português (Brasil)",
+      "docs_path": "docs/pt-BR"
+    },
+    {
+      "code": "es",
+      "name": "Spanish",
+      "native_name": "Español",
+      "docs_path": "docs/es"
+    },
+    {
+      "code": "de",
+      "name": "German",
+      "native_name": "Deutsch",
+      "docs_path": "docs/de"
+    },
+    {
+      "code": "fr",
+      "name": "French",
+      "native_name": "Français",
+      "docs_path": "docs/fr"
+    },
+    {
+      "code": "ja",
+      "name": "Japanese",
+      "native_name": "日本語",
+      "docs_path": "docs/ja"
+    },
+    {
+      "code": "id",
+      "name": "Indonesian",
+      "native_name": "Bahasa Indonesia",
+      "docs_path": "docs/id"
+    }
+  ]
+}
