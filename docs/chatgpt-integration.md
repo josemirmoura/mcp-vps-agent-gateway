@@ -85,11 +85,11 @@ The ChatGPT product UI is version-sensitive, so button names and workspace eligi
 
 ChatGPT receives the public MCP endpoint and completes the standards-based OAuth flow. It does not need the VPS login password, a private SSH key, root credentials, unrestricted remote shell access, or unrelated infrastructure secrets.
 
-The dedicated OAuth operator password is entered only into the integrated identity provider login flow. Development-only remote access used by maintainers to validate a build is not part of this supported connection procedure.
+The dedicated OAuth operator password is entered only into the integrated identity provider login flow. The setup also shows the dedicated OAuth username (default `vps-operator`) because the login screen may ask for the username rather than the email address. These OAuth credentials are separate from Linux/SSH/root credentials. Development-only remote access used by maintainers to validate a build is not part of this supported connection procedure.
 
 ## Completion gate
 
-`scripts/connect-chatgpt.sh` waits on the Broker for a new authenticated `system.info` event from the expected subject.
+`scripts/connect-chatgpt.sh` records a fixed audit baseline, then lets the interactive operator complete ChatGPT setup without a hidden countdown. After the operator presses Enter, it checks for a new authenticated `system.info` event from the expected subject after that baseline.
 
 ~~~text
 tutorial shown
@@ -104,7 +104,7 @@ ChatGPT app connected
  = INSTALLATION COMPLETE
 ~~~
 
-If that event does not arrive before the timeout, installation is still incomplete.
+If the event has not arrived yet, the interactive script remains incomplete, explains what to check and offers another Enter-to-verify attempt. Non-interactive/CI mode retains a bounded timeout.
 
 ## Transport
 
