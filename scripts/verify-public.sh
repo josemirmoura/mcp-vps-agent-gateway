@@ -30,7 +30,7 @@ fi
 case "$PUBLIC_URL" in
   https://*) ;;
   *)
-    echo "$(vps_agent_text "Public MCP endpoint must use HTTPS: $PUBLIC_URL" "O endpoint MCP público deve usar HTTPS: $PUBLIC_URL")" >&2
+    echo "$(vps_agent_msg error.public_url_https "url=$PUBLIC_URL")" >&2
     exit 1
     ;;
 esac
@@ -133,7 +133,7 @@ code="$(curl --silent --show-error \
   --write-out '%{http_code}' \
   "$PUBLIC_URL" || true)"
 if [ "$code" != "401" ]; then
-  echo "$(vps_agent_text "Expected HTTP 401 from unauthenticated MCP request, got $code." "Esperávamos HTTP 401 da chamada MCP sem autenticação, mas recebemos $code.")" >&2
+  echo "$(vps_agent_msg error.expected_401 "code=$code")" >&2
   cat /tmp/vps-agent-public-unauth.txt >&2 || true
   exit 1
 fi
