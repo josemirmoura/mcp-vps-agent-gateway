@@ -309,7 +309,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 	)
 	registerAuthorityTools(server, s)
 
-	mcp.AddTool(server, &mcp.Tool{Name: "system.info", Description: "Return non-sensitive host/runtime information."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "system.info", Description: "Return non-sensitive host/runtime information."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, systemInfoOutput, error) {
 			var out systemInfoOutput
 			if err := s.call(ctx, "system.info", "", "", nil, &out, false, ""); err != nil {
@@ -318,7 +318,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "file.read_test", Description: "Read a text file only from the disposable Gate 0 safe root."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "file.read_test", Description: "Read a text file only from the disposable Gate 0 safe root."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in fileReadInput) (*mcp.CallToolResult, fileReadOutput, error) {
 			var out fileReadOutput
 			if err := s.call(ctx, "file.read_test", in.Path, "", nil, &out, false, ""); err != nil {
@@ -327,7 +327,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "file.write_test", Description: "Write a text file only inside the disposable Gate 0 safe root."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "file.write_test", Description: "Write a text file only inside the disposable Gate 0 safe root."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in fileWriteInput) (*mcp.CallToolResult, fileWriteOutput, error) {
 			var out fileWriteOutput
 			args, _ := json.Marshal(map[string]any{"content": in.Content})
@@ -337,7 +337,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "file.read", Description: "Read a bounded text file only from server-authorized filesystem roots."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "file.read", Description: "Read a bounded text file only from server-authorized filesystem roots."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in fileReadInput) (*mcp.CallToolResult, fileReadOutput, error) {
 			var out fileReadOutput
 			if err := s.call(ctx, "file.read", in.Path, "", nil, &out, false, ""); err != nil {
@@ -346,7 +346,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "file.write", Description: "Atomically write a bounded text file only inside server-authorized writable roots."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "file.write", Description: "Atomically write a bounded text file only inside server-authorized writable roots."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in fileWriteInput) (*mcp.CallToolResult, fileWriteOutput, error) {
 			var out fileWriteOutput
 			args, _ := json.Marshal(map[string]any{"content": in.Content})
@@ -356,7 +356,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "file.mkdir", Description: "Create an authorized directory tree without following symlink components."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "file.mkdir", Description: "Create an authorized directory tree without following symlink components."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in fileMkdirInput) (*mcp.CallToolResult, fileMkdirOutput, error) {
 			var out fileMkdirOutput
 			if err := s.call(ctx, "file.mkdir", in.Path, "mkdir", nil, &out, true, ""); err != nil {
@@ -365,7 +365,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "file.list", Description: "List entries from an authorized directory."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "file.list", Description: "List entries from an authorized directory."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in fileListInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"limit": in.Limit})
@@ -375,7 +375,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "file.stat", Description: "Return metadata for an authorized filesystem path without following it outside policy."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "file.stat", Description: "Return metadata for an authorized filesystem path without following it outside policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in fileReadInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "file.stat", in.Path, "stat", nil, &out, false, ""); err != nil {
@@ -384,7 +384,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "file.hash", Description: "Compute SHA-256 for an authorized regular file."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "file.hash", Description: "Compute SHA-256 for an authorized regular file."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in fileReadInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "file.hash", in.Path, "hash", nil, &out, false, ""); err != nil {
@@ -393,7 +393,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "file.patch", Description: "Patch exactly one text occurrence in an authorized file, optionally guarded by SHA-256."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "file.patch", Description: "Patch exactly one text occurrence in an authorized file, optionally guarded by SHA-256."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in filePatchInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"old_text": in.OldText, "new_text": in.NewText, "expected_sha256": in.ExpectedSHA256})
@@ -403,7 +403,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "file.copy", Description: "Copy an authorized regular file to an authorized writable destination."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "file.copy", Description: "Copy an authorized regular file to an authorized writable destination."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in fileDestinationInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"destination": in.Destination})
@@ -413,7 +413,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "file.move", Description: "Move or rename an authorized path within writable scope."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "file.move", Description: "Move or rename an authorized path within writable scope."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in fileDestinationInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"destination": in.Destination})
@@ -423,7 +423,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "file.remove", Description: "Delete an authorized file or empty directory. Recursive deletion requires a separate policy capability."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "file.remove", Description: "Delete an authorized file or empty directory. Recursive deletion requires a separate policy capability."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in fileRemoveInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"recursive": in.Recursive})
@@ -433,7 +433,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "file.chmod", Description: "Change permission bits of an authorized path when explicitly enabled by policy."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "file.chmod", Description: "Change permission bits of an authorized path when explicitly enabled by policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in fileChmodInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"mode": in.Mode})
@@ -443,7 +443,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "file.chown", Description: "Change numeric ownership of an authorized path when explicitly enabled by policy."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "file.chown", Description: "Change numeric ownership of an authorized path when explicitly enabled by policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in fileChownInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"uid": in.UID, "gid": in.GID})
@@ -453,7 +453,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "service.list", Description: "List only systemd services visible through server-side policy."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "service.list", Description: "List only systemd services visible through server-side policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "service.list", "", "list", nil, &out, false, ""); err != nil {
@@ -462,7 +462,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "service.status", Description: "Return status for a systemd service allowed by server-side policy."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "service.status", Description: "Return status for a systemd service allowed by server-side policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in serviceInput) (*mcp.CallToolResult, serviceOutput, error) {
 			var out serviceOutput
 			if err := s.call(ctx, "service.status", in.Name, "status", nil, &out, false, ""); err != nil {
@@ -471,7 +471,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "service.logs", Description: "Read bounded journal logs for an allowed systemd service."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "service.logs", Description: "Read bounded journal logs for an allowed systemd service."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in serviceLogsInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"lines": in.Lines})
@@ -483,7 +483,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 
 	for _, action := range []string{"start", "stop", "restart", "reload", "enable", "disable"} {
 		action := action
-		mcp.AddTool(server, &mcp.Tool{Name: "service." + action, Description: "Perform the typed systemd " + action + " action when server-side policy permits it."},
+		addAnnotatedTool(server, &mcp.Tool{Name: "service." + action, Description: "Perform the typed systemd " + action + " action when server-side policy permits it."},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in serviceActionInput) (*mcp.CallToolResult, serviceOutput, error) {
 				var out serviceOutput
 				if err := s.call(ctx, "service."+action, in.Name, action, nil, &out, true, in.OperationID); err != nil {
@@ -493,7 +493,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			})
 	}
 
-	mcp.AddTool(server, &mcp.Tool{Name: "system.health", Description: "Return non-secret Gateway/Broker health information."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "system.health", Description: "Return non-secret Gateway/Broker health information."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "system.health", "", "", nil, &out, false, ""); err != nil {
@@ -502,7 +502,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "system.disk", Description: "Return bounded filesystem capacity diagnostics when policy permits."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "system.disk", Description: "Return bounded filesystem capacity diagnostics when policy permits."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "system.disk", "", "inspect", nil, &out, false, ""); err != nil {
@@ -511,7 +511,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "system.memory", Description: "Return bounded non-secret memory diagnostics when policy permits."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "system.memory", Description: "Return bounded non-secret memory diagnostics when policy permits."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "system.memory", "", "inspect", nil, &out, false, ""); err != nil {
@@ -520,7 +520,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "process.list", Description: "List bounded process metadata without command-line arguments or environment."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "process.list", Description: "List bounded process metadata without command-line arguments or environment."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in limitInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"limit": in.Limit})
@@ -530,7 +530,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "process.inspect", Description: "Inspect a process using a safe subset of /proc status fields."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "process.inspect", Description: "Inspect a process using a safe subset of /proc status fields."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in processInspectInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "process.inspect", fmt.Sprint(in.PID), "inspect", nil, &out, false, ""); err != nil {
@@ -539,7 +539,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "network.listen", Description: "Return bounded listening socket diagnostics when explicitly enabled."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "network.listen", Description: "Return bounded listening socket diagnostics when explicitly enabled."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in limitInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"limit": in.Limit})
@@ -549,7 +549,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "network.check", Description: "Test TCP reachability only to a destination allowed by network policy."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "network.check", Description: "Test TCP reachability only to a destination allowed by network policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in networkCheckInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"timeout_seconds": in.TimeoutSeconds})
@@ -559,7 +559,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "docker.list", Description: "List Docker resources visible through server-side policy."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "docker.list", Description: "List Docker resources visible through server-side policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "docker.list", "", "list", nil, &out, false, ""); err != nil {
@@ -568,7 +568,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "docker.inspect", Description: "Inspect one Docker resource allowed by server-side policy."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "docker.inspect", Description: "Inspect one Docker resource allowed by server-side policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in dockerInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "docker.inspect", in.Name, "inspect", nil, &out, false, ""); err != nil {
@@ -577,7 +577,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "docker.logs", Description: "Read bounded logs from one Docker resource allowed by server-side policy."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "docker.logs", Description: "Read bounded logs from one Docker resource allowed by server-side policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in dockerLogsInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"lines": in.Lines})
@@ -587,7 +587,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "docker.action", Description: "Perform one typed Docker mutation when server-side policy permits it."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "docker.action", Description: "Perform one typed Docker mutation when server-side policy permits it."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in dockerActionInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"action": in.Action})
@@ -597,7 +597,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "compose.validate", Description: "Validate an authorized Docker Compose project without returning expanded configuration or secrets."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "compose.validate", Description: "Validate an authorized Docker Compose project without returning expanded configuration or secrets."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in composeInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "compose.validate", in.ProjectDir, "validate", nil, &out, false, ""); err != nil {
@@ -608,7 +608,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 
 	for _, action := range []string{"pull", "up", "down"} {
 		action := action
-		mcp.AddTool(server, &mcp.Tool{Name: "compose." + action, Description: "Perform the typed Docker Compose " + action + " action when policy permits it."},
+		addAnnotatedTool(server, &mcp.Tool{Name: "compose." + action, Description: "Perform the typed Docker Compose " + action + " action when policy permits it."},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in composeInput) (*mcp.CallToolResult, map[string]any, error) {
 				var out map[string]any
 				if err := s.call(ctx, "compose."+action, in.ProjectDir, action, nil, &out, true, in.OperationID); err != nil {
@@ -620,7 +620,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 
 	for _, toolName := range []string{"shell.exec", "job.start"} {
 		toolName := toolName
-		mcp.AddTool(server, &mcp.Tool{Name: toolName, Description: "Start a durable sandboxed command job inside server-authorized shell and filesystem scope."},
+		addAnnotatedTool(server, &mcp.Tool{Name: toolName, Description: "Start a durable sandboxed command job inside server-authorized shell and filesystem scope."},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in shellExecInput) (*mcp.CallToolResult, map[string]any, error) {
 				var out map[string]any
 				args, _ := json.Marshal(map[string]any{
@@ -634,7 +634,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			})
 	}
 
-	mcp.AddTool(server, &mcp.Tool{Name: "shell.exec_admin", Description: "Start a temporary human-approved administrative shell job. Full mode and a valid shell.admin grant are required."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "shell.exec_admin", Description: "Start a temporary human-approved administrative shell job. Full mode and a valid shell.admin grant are required."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in adminShellExecInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{
@@ -647,7 +647,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "job.status", Description: "Return durable job state for the authenticated subject."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "job.status", Description: "Return durable job state for the authenticated subject."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in jobInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "job.status", in.JobID, "status", nil, &out, false, ""); err != nil {
@@ -656,7 +656,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "job.tail", Description: "Read bounded output for a durable job owned by the authenticated subject."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "job.tail", Description: "Read bounded output for a durable job owned by the authenticated subject."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in jobTailInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"lines": in.Lines})
@@ -666,7 +666,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "job.cancel", Description: "Cancel a durable job owned by the authenticated subject."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "job.cancel", Description: "Cancel a durable job owned by the authenticated subject."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in jobInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "job.cancel", in.JobID, "cancel", nil, &out, true, ""); err != nil {
@@ -675,7 +675,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "package.list", Description: "List only installed packages visible through server-side package policy."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "package.list", Description: "List only installed packages visible through server-side package policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in limitInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"limit": in.Limit})
@@ -685,7 +685,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "package.update", Description: "Run the host package index update only when explicitly enabled by policy."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "package.update", Description: "Run the host package index update only when explicitly enabled by policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in packageActionInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "package.update", "", "update", nil, &out, true, in.OperationID); err != nil {
@@ -696,7 +696,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 
 	for _, action := range []string{"install", "remove"} {
 		action := action
-		mcp.AddTool(server, &mcp.Tool{Name: "package." + action, Description: "Perform typed APT " + action + " only for packages permitted by policy."},
+		addAnnotatedTool(server, &mcp.Tool{Name: "package." + action, Description: "Perform typed APT " + action + " only for packages permitted by policy."},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in packageActionInput) (*mcp.CallToolResult, map[string]any, error) {
 				var out map[string]any
 				if err := s.call(ctx, "package."+action, in.Name, action, nil, &out, true, in.OperationID); err != nil {
@@ -706,7 +706,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			})
 	}
 
-	mcp.AddTool(server, &mcp.Tool{Name: "user.list", Description: "List only users visible through identity policy."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "user.list", Description: "List only users visible through identity policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "user.list", "", "list", nil, &out, false, ""); err != nil {
@@ -715,7 +715,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "user.inspect", Description: "Inspect one policy-authorized local user."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "user.inspect", Description: "Inspect one policy-authorized local user."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in userActionInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "user.inspect", in.Name, "inspect", nil, &out, false, ""); err != nil {
@@ -726,7 +726,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 
 	for _, action := range []string{"add", "delete", "lock", "unlock"} {
 		action := action
-		mcp.AddTool(server, &mcp.Tool{Name: "user." + action, Description: "Perform typed local-user " + action + " only when policy permits it."},
+		addAnnotatedTool(server, &mcp.Tool{Name: "user." + action, Description: "Perform typed local-user " + action + " only when policy permits it."},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in userActionInput) (*mcp.CallToolResult, map[string]any, error) {
 				var out map[string]any
 				args, _ := json.Marshal(map[string]any{"create_home": in.CreateHome})
@@ -737,7 +737,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			})
 	}
 
-	mcp.AddTool(server, &mcp.Tool{Name: "group.list", Description: "List only groups visible through identity policy."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "group.list", Description: "List only groups visible through identity policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "group.list", "", "list", nil, &out, false, ""); err != nil {
@@ -746,7 +746,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "group.inspect", Description: "Inspect one policy-authorized local group."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "group.inspect", Description: "Inspect one policy-authorized local group."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in groupActionInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "group.inspect", in.Name, "inspect", nil, &out, false, ""); err != nil {
@@ -757,7 +757,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 
 	for _, action := range []string{"add", "delete"} {
 		action := action
-		mcp.AddTool(server, &mcp.Tool{Name: "group." + action, Description: "Perform typed local-group " + action + " only when policy permits it."},
+		addAnnotatedTool(server, &mcp.Tool{Name: "group." + action, Description: "Perform typed local-group " + action + " only when policy permits it."},
 			func(ctx context.Context, _ *mcp.CallToolRequest, in groupActionInput) (*mcp.CallToolResult, map[string]any, error) {
 				var out map[string]any
 				if err := s.call(ctx, "group."+action, in.Name, action, nil, &out, true, in.OperationID); err != nil {
@@ -767,7 +767,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			})
 	}
 
-	mcp.AddTool(server, &mcp.Tool{Name: "firewall.status", Description: "Return UFW status only when firewall inspection is enabled by policy."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "firewall.status", Description: "Return UFW status only when firewall inspection is enabled by policy."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			if err := s.call(ctx, "firewall.status", "", "status", nil, &out, false, ""); err != nil {
@@ -776,7 +776,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "firewall.action", Description: "Apply a structured UFW allow/deny/delete rule only when policy permits it."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "firewall.action", Description: "Apply a structured UFW allow/deny/delete rule only when policy permits it."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in firewallActionInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{"action": in.Action, "port": in.Port, "protocol": in.Protocol, "source": in.Source})
@@ -786,7 +786,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{
+	addAnnotatedTool(server, &mcp.Tool{
 		Name: "permissions.request_root_access",
 		Description: "Request human-approved access to a filesystem root inside the configured physical ceiling. On clients with MCP elicitation support, the client renders the native approval UI and the Broker activates authority only after the human accepts.",
 		Annotations: &mcp.ToolAnnotations{
@@ -831,7 +831,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 		})
 
 
-	mcp.AddTool(server, &mcp.Tool{
+	addAnnotatedTool(server, &mcp.Tool{
 		Name: "permissions.revoke_root_access",
 		Description: "Revoke this authenticated subject's dynamic access to one delegated root. This can only reduce dynamic authority; it cannot remove static policy roots.",
 		Annotations: &mcp.ToolAnnotations{
@@ -847,7 +847,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{
+	addAnnotatedTool(server, &mcp.Tool{
 		Name: "permissions.list_root_access",
 		Description: "List the physical scope ceiling, static policy roots, and active dynamic root delegations for this authenticated subject.",
 		Annotations: &mcp.ToolAnnotations{
@@ -862,7 +862,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{
+	addAnnotatedTool(server, &mcp.Tool{
 		Name: "permissions.request_elevation",
 		Description: "Create a pending temporary-elevation request. This tool cannot approve its own request.",
 		Annotations: &mcp.ToolAnnotations{
@@ -878,7 +878,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "permissions.status", Description: "Report the active server-side permission mode without changing it."},
+	addAnnotatedTool(server, &mcp.Tool{Name: "permissions.status", Description: "Report the active server-side permission mode without changing it."},
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, permissionsOutput, error) {
 			var out permissionsOutput
 			if err := s.call(ctx, "permissions.status", "", "", nil, &out, false, ""); err != nil {
