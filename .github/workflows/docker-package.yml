@@ -284,7 +284,7 @@ jobs:
 
           /tmp/mcp-call shell.exec '{"command":"if cat .env > env-copy 2>/dev/null; then echo LEAKED > env-result; else echo DENIED > env-result; fi","cwd":"/tmp/vps-agent-docker-proof/work","runtime_seconds":20}' | tee evidence/env-shell-start.json
           for _ in $(seq 1 30); do test -f /tmp/vps-agent-docker-proof/work/env-result && break; sleep 1; done
-          test "$(cat /tmp/vps-agent-docker-proof/work/env-result)" = "DENIED"
+          test "$(sudo cat /tmp/vps-agent-docker-proof/work/env-result)" = "DENIED"
           test ! -s /tmp/vps-agent-docker-proof/work/env-copy
 
       - name: Filesystem escape must be denied
