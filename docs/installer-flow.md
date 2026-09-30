@@ -47,7 +47,7 @@ cd mcp-vps-agent-gateway
 bash scripts/install.sh
 ~~~
 
-The recommended interactive profile is **Standard**: physical ceiling `/opt` with no static project roots. Project roots are authorized later through the dynamic approval flow.
+The recommended interactive profile is **Standard**: physical ceiling `/opt` with no static project roots. The ceiling is only the maximum filesystem boundary; it does not grant project read/write authority. A different absolute ceiling may be selected when the operator organizes applications elsewhere.
 
 Advanced operators can reproduce that bootstrap explicitly:
 
@@ -70,6 +70,8 @@ For deliberate whole-host filesystem authority, set `VPS_AGENT_WHOLE_HOST=1` in 
 
 With the recommended Standard profile, no project root is authorized during installation.
 
+Portico can use `permissions.discover_scope` to list only the immediate directory names below the physical ceiling. This discovery surface does not open files or descend into those directories. It exists so the assistant can explain what it can see and request the exact project needed instead of asking the operator to remember server paths.
+
 After the MCP is connected, project roots are granted through explicit runtime approval:
 
 ~~~text
@@ -81,9 +83,11 @@ permissions.request_root_access
 
 `read` grants filesystem read. `work` grants filesystem read/write plus scoped shell cwd. `compose` adds Compose authority only for Compose actions already enabled by the static action policy.
 
+Protected secret-bearing paths form a second boundary inside authorized projects. By default `.env` and `.env.*` remain locked while `.env.example`, `.env.sample` and `.env.template` remain ordinary readable templates. Reading or modifying a protected path requires a separate temporary `permissions.request_sensitive_access` approval. The grant is exact-path, subject-bound, auditable, expiring and independently revocable. Scoped shell jobs mask protected paths, including hardlink aliases discovered inside the delegated roots, unless a temporary protected-file `work` grant explicitly exposes that exact path.
+
 Advanced operators may still define static roots with `scripts/delegate-root.sh`. Manual editing of `config/policy.yaml` is not required by the normal guided installation.
 
-Dynamic approval may target a subdirectory or, after a stronger explicit warning, the exact configured physical ceiling. The ceiling is still the hard maximum boundary; no dynamic approval can escape it.
+Dynamic approval may target a subdirectory or, after a stronger explicit warning, the exact configured physical ceiling. The ceiling is still the hard maximum boundary; no dynamic approval can escape it. Granting the ceiling itself is intentionally broad because it covers current and future projects beneath it, but it still does not unlock protected secret files.
 
 systemd, Docker/Compose actions, network, packages, users/groups, firewall, and temporary elevation remain separately constrained by static server policy.
 
