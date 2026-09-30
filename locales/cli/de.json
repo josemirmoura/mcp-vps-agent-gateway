@@ -246,6 +246,7 @@
     "error.operator_creation_failed": "FEHLER: Operator-Erstellung fehlgeschlagen (curl={curl_status} HTTP={http_code}).",
     "error.public_url_https": "Öffentlicher MCP-Endpunkt muss HTTPS verwenden: {url}",
     "error.expected_401": "HTTP 401 für nicht authentifizierte MCP-Anfrage erwartet, erhalten: {code}.",
-    "verify.local_call_skipped": "Lokaler MCP-Tool-Aufruf für Auth-Modus {mode} übersprungen; öffentliche OAuth-Prüfung wird verwendet."
+    "verify.local_call_skipped": "Lokaler MCP-Tool-Aufruf für Auth-Modus {mode} übersprungen; öffentliche OAuth-Prüfung wird verwendet.",
+    "connect.email_line": "   Konto-E-Mail: {email}"
   }
 }
