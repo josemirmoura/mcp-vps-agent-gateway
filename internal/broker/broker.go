@@ -1190,9 +1190,6 @@ func (b *Broker) normalizeDelegatedRoot(root, access string) (string, string, er
 	if !pathWithinRoot(physical, root) {
 		return "", "", fmt.Errorf("root %q is outside physical scope %q", root, physical)
 	}
-	if root == physical {
-		return "", "", errors.New("dynamic delegation of the entire physical ceiling is not allowed")
-	}
 	if _, err := securefs.NewWithHostRoot(
 		[]string{root},
 		[]string{root},
@@ -1275,6 +1272,7 @@ func (b *Broker) requestRootAccess(ctx context.Context, req wire.Request) wire.R
 		_ = b.State.AbortOperation(context.Background(), req.InvocationID)
 		return deny(req.ID, "approval_unavailable", err.Error())
 	}
+	physical := filepath.Clean(os.Getenv("VPS_AGENT_PHYSICAL_SCOPE_ROOT"))
 	result, _ := json.Marshal(map[string]any{
 		"request_id": a.ID,
 		"status": a.Status,
@@ -1284,6 +1282,8 @@ func (b *Broker) requestRootAccess(ctx context.Context, req wire.Request) wire.R
 		"delegation_ttl_seconds": in.TTLSeconds,
 		"approval_expires_at": a.ExpiresAt,
 		"approval_required": true,
+		"ceiling_wide": root == physical,
+		"physical_ceiling": physical,
 		"approval_token": approvalToken,
 	})
 	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
