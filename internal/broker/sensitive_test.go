@@ -138,3 +138,47 @@ func TestDiscoverScopeShowsNamesWithoutOpeningContents(t *testing.T) {
 		if d.Name == "top-secret.txt" { t.Fatal("discovery leaked a file entry") }
 	}
 }
+
+
+func TestSensitiveApprovalFailsIfParentAuthorityDisappears(t *testing.T) {
+	ctx := context.Background()
+	b, root, store := sensitiveTestBroker(t)
+	defer store.Close()
+
+	envPath := filepath.Join(root, ".env")
+	if err := os.WriteFile(envPath, []byte("private-value"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	requestArgs, _ := json.Marshal(map[string]any{"path": envPath, "access": "read", "ttl_seconds": 60})
+	request := b.Handle(ctx, wire.Request{
+		ID: "stale-secret-request", Subject: "alice", Tool: "permissions.request_sensitive_access",
+		Resource: envPath, InvocationID: "stale-secret-request-1", Args: requestArgs,
+	})
+	if !request.OK {
+		t.Fatalf("sensitive request failed: %+v", request)
+	}
+	var pending struct {
+		RequestID string `json:"request_id"`
+		ApprovalToken string `json:"approval_token"`
+	}
+	if err := json.Unmarshal(request.Result, &pending); err != nil {
+		t.Fatal(err)
+	}
+
+	b.Policy.Filesystem.Read = nil
+	b.Policy.Filesystem.Write = nil
+	b.Policy.Shell.CWDRoots = nil
+
+	confirmArgs, _ := json.Marshal(map[string]any{
+		"request_id": pending.RequestID,
+		"approval_token": pending.ApprovalToken,
+		"decision": "approve",
+	})
+	confirm := b.Handle(ctx, wire.Request{
+		ID: "stale-secret-confirm", Subject: "alice",
+		Tool: "permissions.confirm_sensitive_access", Args: confirmArgs,
+	})
+	if confirm.OK {
+		t.Fatal("protected-file approval survived removal of its parent root authority")
+	}
+}
