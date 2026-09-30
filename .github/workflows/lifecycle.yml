@@ -164,76 +164,13 @@ jobs:
             --local-only \
             --yes | tee /tmp/guided-install.txt
           grep -q 'Portico MCP' /tmp/guided-install.txt
-          grep -q 'Feito por Josemir Moura | github.com/josemirmoura' /tmp/guided-install.txt
+          grep -Fq 'Feito por Josemir Moura | github.com/josemirmoura' /tmp/guided-install.txt
           grep -q 'CHECKPOINT LOCAL CONCLUÍDO' /tmp/guided-install.txt
           grep -q 'A instalação NÃO está concluída' /tmp/guided-install.txt
-          grep -q '^VPS_AGENT_SCOPE_ROOT=/opt
-
-      - name: Safe remove after guided installation
-        run: |
-          bash scripts/remove.sh safe
-          test -f .env
-          test -f config/policy.yaml
-          test -f state/state.db
-          test -z "$(docker ps -q --filter label=com.docker.compose.project=mcp-vps-agent)"
-
-      - name: Cleanup
-        if: always()
-        run: |
-          docker compose down -v --remove-orphans || true
-
- .env
-          grep -q '^  read: \[\]
-
-      - name: Safe remove after guided installation
-        run: |
-          bash scripts/remove.sh safe
-          test -f .env
-          test -f config/policy.yaml
-          test -f state/state.db
-          test -z "$(docker ps -q --filter label=com.docker.compose.project=mcp-vps-agent)"
-
-      - name: Cleanup
-        if: always()
-        run: |
-          docker compose down -v --remove-orphans || true
-          sudo rm -rf /opt/vps-agent-guided-scope
-
- config/policy.yaml
-          grep -q '^  write: \[\]
-
-      - name: Safe remove after guided installation
-        run: |
-          bash scripts/remove.sh safe
-          test -f .env
-          test -f config/policy.yaml
-          test -f state/state.db
-          test -z "$(docker ps -q --filter label=com.docker.compose.project=mcp-vps-agent)"
-
-      - name: Cleanup
-        if: always()
-        run: |
-          docker compose down -v --remove-orphans || true
-          sudo rm -rf /opt/vps-agent-guided-scope
-
- config/policy.yaml
-          grep -q '^  cwd_roots: \[\]
-
-      - name: Safe remove after guided installation
-        run: |
-          bash scripts/remove.sh safe
-          test -f .env
-          test -f config/policy.yaml
-          test -f state/state.db
-          test -z "$(docker ps -q --filter label=com.docker.compose.project=mcp-vps-agent)"
-
-      - name: Cleanup
-        if: always()
-        run: |
-          docker compose down -v --remove-orphans || true
-          sudo rm -rf /opt/vps-agent-guided-scope
-
- config/policy.yaml
+          grep -q '^VPS_AGENT_SCOPE_ROOT=/opt$' .env
+          grep -q '^  read: \[\]$' config/policy.yaml
+          grep -q '^  write: \[\]$' config/policy.yaml
+          grep -q '^  cwd_roots: \[\]$' config/policy.yaml
           grep -q "^  run_as: $(id -un)$" config/policy.yaml
           test -f state/state.db
           bash scripts/diagnose.sh status | tee /tmp/guided-status.txt
@@ -253,5 +190,4 @@ jobs:
         if: always()
         run: |
           docker compose down -v --remove-orphans || true
-          sudo rm -rf /opt/vps-agent-guided-scope
 
