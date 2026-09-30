@@ -176,7 +176,13 @@ jobs:
           bash scripts/diagnose.sh status | tee /tmp/guided-status.txt
           grep -q 'Portico MCP' /tmp/guided-status.txt
           python3 scripts/authority-summary.py | tee /tmp/guided-authority.txt
-          grep -q 'Whole-host mount override:   no' /tmp/guided-authority.txt
+          grep -q 'Resumo da autoridade efetiva' /tmp/guided-authority.txt
+          grep -q 'Montagem de host inteiro: não' /tmp/guided-authority.txt
+          grep -q 'Raízes de leitura do filesystem:' /tmp/guided-authority.txt
+          grep -q '  - nenhuma' /tmp/guided-authority.txt
+          ! grep -q 'Effective authority summary' /tmp/guided-authority.txt
+          ! grep -q 'Filesystem read roots' /tmp/guided-authority.txt
+          ! grep -q '  - none' /tmp/guided-authority.txt
 
       - name: Safe remove after guided installation
         run: |
