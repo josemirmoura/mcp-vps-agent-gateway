@@ -207,6 +207,45 @@
     "[Enter] continue | [L] choose another language: ": "[Enter] fortfahren | [L] andere Sprache wählen: ",
     "Secure MCP Gateway for Linux Hosts": "Sicheres MCP-Gateway für Linux-Hosts"
   },
-  "blocks": {},
-  "messages": {}
+  "blocks": {
+    "install.usage": "Verwendung: bash scripts/install.sh [Optionen]\n\nGeführte, transparente Installation von Portico MCP.\n\nProfile:\n  custom       Empfohlen: /opt-Obergrenze mit dynamischer Root-Genehmigung.\n  project      Portico MCP auf eine Projekt-/Dateisystemwurzel begrenzen.\n  whole-host   Physische Dateisystem-Obergrenze \"/\". Aktiviert Full nicht automatisch.\n\nOptionen:\n  --profile PROFILE         custom | project | whole-host\n  --scope PATH              Vorhandene Obergrenze/Wurzel für custom/project.\n  --create-scope            Fehlenden Bereich ausdrücklich erstellen.\n  --run-as USER             Nicht-root-Benutzer für eingeschränkte Shell-Jobs.\n  --lang LANG               en | pt-BR | es | de | fr | ja | id\n  --domain HOSTNAME         Öffentlicher MCP/OAuth-Hostname.\n  --operator-email EMAIL    Dedizierte OAuth-Operator-E-Mail.\n  --operator-username NAME  OAuth-Anmeldename.\n  --local-only              Nach lokaler Laufzeitprüfung stoppen.\n  --yes                     Angezeigte effektive Berechtigungen akzeptieren.\n  --ack-whole-host          Mit --yes für whole-host erforderlich.\n  -h, --help                Diese Hilfe anzeigen.\n",
+    "install.profile_menu": "Wählen Sie, wie Portico MCP auf Ihre VPS zugreifen darf:\n\n  1) Standard (empfohlen)\n     /opt ist nur die standardmäßige physische Obergrenze: die maximale Grenze der KI, keine Autorisierung.\n     Portico darf unmittelbare Ordnernamen unterhalb der Obergrenze erkennen, aber deren Inhalte nicht öffnen.\n     Projekte werden später einzeln genehmigt, wenn ChatGPT sie benötigt.\n\n  2) Project\n     Portico ist ab der Installation auf einen Ordner begrenzt.\n     Verwenden Sie dies, wenn nur in einem bestimmten Projekt gearbeitet werden soll.\n\n  3) Whole Host\n     Die physische Obergrenze wird die gesamte VPS (/).\n     Nur verwenden, wenn Zugriff außerhalb von /opt erforderlich ist.\n     Dadurch werden Full oder andere Bereiche weiterhin nicht automatisch freigeschaltet.\n",
+    "install.chatgpt_intro": "Das nächste Skript führt Schritt für Schritt durch die ChatGPT-Verbindung.\nNehmen Sie sich Zeit und kehren Sie anschließend zum Terminal zurück, um mit Enter zu prüfen.\nDie Installation ist erst abgeschlossen, wenn der Broker einen echten authentifizierten\nsystem.info-Aufruf im Audit-Protokoll bestätigt.\n",
+    "init.usage": "Verwendung: bash scripts/init.sh [--scope /absoluter/vorhandener/pfad] [Optionen]\n\nOptionen:\n  --scope PATH          Physische Scoped-Dateisystem-Obergrenze setzen.\n  --dynamic-baseline    Ohne statische logische Projektwurzeln starten.\n                        Projektwurzeln werden später dynamisch genehmigt.\n  --run-as USER         Nicht-root-Hostbenutzer für eingeschränkte Shell-Jobs.\n  --migrate-policy-root Referenzen auf die bisherige Wurzel in policy.yaml ersetzen.\n                        Für das Verschieben einer Projektwurzel, nicht zur Erweiterung der Obergrenze.\n  --lang LANG           Sprache: en | pt-BR | es | de | fr | ja | id.\n  -h, --help            Diese Hilfe anzeigen.\n",
+    "setup_auth.usage": "Verwendung: bash scripts/setup-integrated-auth.sh [--domain mcp.beispiel.de] [Optionen]\n\nKonfiguriert den unterstützten öffentlichen ChatGPT-Pfad: selbst gehostetes OAuth/OIDC\nmit ZITADEL, PostgreSQL und dem vorhandenen Portico Gateway/Broker.\n\nOptionen:\n  --domain DOMAIN          Öffentlicher DNS-Name für MCP + OAuth.\n  --operator-email EMAIL   Anmelde-E-Mail des Portico-Operators.\n  --operator-username NAME Anmeldename (Standard: vps-operator).\n  --edge-network NETWORK   Docker-Netzwerk eines vorhandenen Traefik.\n  --certresolver NAME      ACME-Resolver des vorhandenen Traefik.\n  --bundled-proxy          Mitgeliefertes Traefik erzwingen statt ein vorhandenes zu verwenden.\n  -h, --help               Diese Hilfe anzeigen.\n\nDas dedizierte OAuth-Operator-Passwort wird lokal und ohne Echo eingegeben.\nEs ist nicht Ihr VPS-/SSH-Passwort und darf nicht an ChatGPT weitergegeben werden.\n",
+    "setup_auth.domain_help": "\nUm ChatGPT mit Portico MCP zu verbinden, benötigt diese VPS einen öffentlichen Hostnamen.\n\n1. Erstellen Sie im DNS-Panel einer von Ihnen kontrollierten Domain eine Subdomain, z. B.:\n   mcp.beispiel.de\n\n2. Erstellen Sie einen DNS-A-Eintrag, der auf die öffentliche IP dieser VPS zeigt.\n   Bei IPv6 kann zusätzlich ein AAAA-Eintrag erstellt werden.\n\n3. Warten Sie auf die DNS-Auflösung und geben Sie unten nur den Hostnamen ein,\n   ohne https:// und ohne /mcp.\n\nBeispiel:\n  mcp.beispiel.de\n\n",
+    "connect.not_detected": "Der ChatGPT-system.info-Aufruf wurde noch nicht erkannt.\n\nPrüfen Sie:\n- ob die MCP-App erstellt wurde;\n- ob OAuth abgeschlossen wurde;\n- ob Portico MCP im Chat ausgewählt ist;\n- ob die Testnachricht tatsächlich gesendet wurde.\n\nEs ist nichts verloren. Korrigieren Sie das Nötige und drücken Sie Enter, um erneut zu prüfen.\n"
+  },
+  "messages": {
+    "install.profile_prompt": "Profil [1]: ",
+    "setup_auth.domain_prompt": "Öffentliche Portico-MCP-Domain: ",
+    "connect.prompt": "[Enter] Verbindung prüfen  [T] Anleitung erneut zeigen  [Q] beenden: ",
+    "connect.invalid_choice": "Enter, T oder Q wählen.",
+    "connect.tutorial": "=== Portico MCP mit ChatGPT verbinden ===\n\nDie VPS-Seite ist bereit. Der letzte Schritt ist die Verbindung von Portico MCP mit ChatGPT.\nDieser Teil erfolgt in ChatGPT Web.\n\nMCP-Endpunkt:\n  {public_url}\n\n1. Öffnen Sie ChatGPT im Browser.\n2. Aktivieren Sie den Entwicklermodus, falls er noch nicht aktiv ist.\n3. Öffnen Sie Einstellungen > Apps und erstellen Sie eine neue MCP-App.\n4. Wenn ChatGPT nach dem MCP-Endpunkt fragt, verwenden Sie exakt:\n\n   {public_url}\n\n5. Wählen Sie OAuth als Authentifizierung.\n6. Verwenden Sie auf der Portico-MCP-Anmeldeseite:\n\n   Benutzername: {username}\n{email_line}\n   Verwenden Sie das bei der Installation erstellte Operator-Passwort.\n   Verwenden Sie nicht Ihr VPS-SSH/root/Linux-Passwort.\n\n7. Prüfen Sie die gefundenen Tools und schließen Sie die App-Erstellung ab.\n8. Starten Sie einen neuen Chat mit Portico MCP und senden Sie exakt:\n\n   Call system.info on my VPS MCP and tell me the hostname.\n\nDies ist nur ein harmloser Verbindungstest. Er bestätigt, dass ChatGPT diese VPS\nüber authentifiziertes MCP erreicht und der Broker den Aufruf auditiert hat.\n\nNehmen Sie sich so viel Zeit wie nötig für die Verbindung.\n",
+    "error.unknown_argument": "FEHLER: unbekanntes Argument: {arg}",
+    "install.creating_scope": "{scope} wird mit sudo install erstellt.",
+    "install.scope_missing_prompt": "{scope} existiert nicht. Jetzt erstellen? [j/N]: ",
+    "error.scope_missing": "FEHLER: Bereich existiert nicht: {scope}",
+    "error.invalid_shell_user": "FEHLER: ungültiger Nicht-root-Shellbenutzer: {user}",
+    "install.standard_selected": "Standard-Profil gewählt. Physische Obergrenze: {scope}.",
+    "error.scope_absolute": "FEHLER: --scope muss ein absoluter Pfad sein: {scope}",
+    "error.scope_canonical": "FEHLER: --scope muss kanonisch sein (kein '..', '.' oder abschließender Slash): {scope}",
+    "init.ceiling_changed_empty": "Physische Obergrenze von {old} auf {new} geändert; statische Wurzeln starten leer.",
+    "init.ceiling_changed_preserved": "Physische Obergrenze von {old} auf {new} geändert. Vorhandene logische Policy-Wurzeln wurden beibehalten.",
+    "error.scope_symlink": "FEHLER: VPS_AGENT_SCOPE_ROOT darf keine Symlinks durchlaufen: {path}",
+    "error.scope_root_missing": "FEHLER: VPS_AGENT_SCOPE_ROOT existiert nicht: {path}",
+    "error.shell_user_missing": "FEHLER: Benutzer für Shell-Ausführung existiert nicht: {user}",
+    "error.required_command": "FEHLER: erforderlicher Befehl nicht gefunden: {command}",
+    "error.dns_unresolved": "FEHLER: DNS für {domain} wird noch nicht aufgelöst.",
+    "error.auth_already_initialized": "FEHLER: integrierte Authentifizierung wurde bereits für {domain} initialisiert.",
+    "error.operator_email_invalid": "FEHLER: Operator-E-Mail scheint ungültig: {email}",
+    "error.traefik_multiple_network": "FEHLER: Mehr als ein Traefik ist mit {network} verbunden.",
+    "error.traefik_candidate_networks": "FEHLER: Traefik hat {count} mögliche Docker-Netzwerke: {networks}",
+    "error.docker_network_missing": "FEHLER: Docker-Netzwerk nicht gefunden: {network}",
+    "error.oidc_unreachable": "FEHLER: OIDC-Discovery wurde unter {url} nicht erreichbar.",
+    "error.operator_creation_failed": "FEHLER: Operator-Erstellung fehlgeschlagen (curl={curl_status} HTTP={http_code}).",
+    "error.public_url_https": "Öffentlicher MCP-Endpunkt muss HTTPS verwenden: {url}",
+    "error.expected_401": "HTTP 401 für nicht authentifizierte MCP-Anfrage erwartet, erhalten: {code}.",
+    "verify.local_call_skipped": "Lokaler MCP-Tool-Aufruf für Auth-Modus {mode} übersprungen; öffentliche OAuth-Prüfung wird verwendet."
+  }
 }
