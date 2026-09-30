@@ -20,13 +20,7 @@ type sensitiveAccessRevokeInput struct {
 }
 
 func registerAuthorityTools(server *mcp.Server, s *Server) {
-	mcp.AddTool(server, &mcp.Tool{
-		Name: "permissions.discover_scope",
-		Description: "List only the immediate directory names under the configured physical filesystem ceiling. This is discovery-only: directory contents remain locked until separately authorized.",
-		Annotations: &mcp.ToolAnnotations{
-			ReadOnlyHint: true, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
-		},
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in limitInput) (*mcp.CallToolResult, map[string]any, error) {
+	mcp.AddTool(server, annotatedTool("permissions.discover_scope", "List only the immediate directory names under the configured physical filesystem ceiling. This is discovery-only: directory contents remain locked until separately authorized."), func(ctx context.Context, _ *mcp.CallToolRequest, in limitInput) (*mcp.CallToolResult, map[string]any, error) {
 		var out map[string]any
 		args, _ := json.Marshal(map[string]any{"limit": in.Limit})
 		if err := s.call(ctx, "permissions.discover_scope", "", "discover", args, &out, false, ""); err != nil {
@@ -35,13 +29,7 @@ func registerAuthorityTools(server *mcp.Server, s *Server) {
 		return nil, out, nil
 	})
 
-	mcp.AddTool(server, &mcp.Tool{
-		Name: "permissions.request_sensitive_access",
-		Description: "Request temporary human-approved access to one protected secret file such as .env inside an already-authorized root. Normal root delegation never unlocks protected secrets. On clients with MCP elicitation support, the host renders the native approval UI.",
-		Annotations: &mcp.ToolAnnotations{
-			ReadOnlyHint: false, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
-		},
-	}, func(ctx context.Context, req *mcp.CallToolRequest, in sensitiveAccessRequestInput) (*mcp.CallToolResult, any, error) {
+	mcp.AddTool(server, annotatedTool("permissions.request_sensitive_access", "Request temporary human-approved access to one protected secret file such as .env inside an already-authorized root. Normal root delegation never unlocks protected secrets. On clients with MCP elicitation support, the host renders the native approval UI."), func(ctx context.Context, req *mcp.CallToolRequest, in sensitiveAccessRequestInput) (*mcp.CallToolResult, any, error) {
 		if state, decision, handled, err := nativeApprovalDecision(req, "sensitive"); handled {
 			if err != nil {
 				return nil, nil, err
@@ -79,13 +67,7 @@ func registerAuthorityTools(server *mcp.Server, s *Server) {
 	})
 
 
-	mcp.AddTool(server, &mcp.Tool{
-		Name: "permissions.list_sensitive_access",
-		Description: "List this authenticated subject's active temporary protected-file grants.",
-		Annotations: &mcp.ToolAnnotations{
-			ReadOnlyHint: true, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
-		},
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
+	mcp.AddTool(server, annotatedTool("permissions.list_sensitive_access", "List this authenticated subject's active temporary protected-file grants."), func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
 		var out map[string]any
 		if err := s.call(ctx, "permissions.list_sensitive_access", "", "list", nil, &out, false, ""); err != nil {
 			return nil, out, err
@@ -93,13 +75,7 @@ func registerAuthorityTools(server *mcp.Server, s *Server) {
 		return nil, out, nil
 	})
 
-	mcp.AddTool(server, &mcp.Tool{
-		Name: "permissions.revoke_sensitive_access",
-		Description: "Immediately revoke this authenticated subject's temporary access to one protected secret path.",
-		Annotations: &mcp.ToolAnnotations{
-			ReadOnlyHint: false, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
-		},
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in sensitiveAccessRevokeInput) (*mcp.CallToolResult, map[string]any, error) {
+	mcp.AddTool(server, annotatedTool("permissions.revoke_sensitive_access", "Immediately revoke this authenticated subject's temporary access to one protected secret path."), func(ctx context.Context, _ *mcp.CallToolRequest, in sensitiveAccessRevokeInput) (*mcp.CallToolResult, map[string]any, error) {
 		var out map[string]any
 		args, _ := json.Marshal(in)
 		if err := s.call(ctx, "permissions.revoke_sensitive_access", in.Path, "revoke", args, &out, true, in.OperationID); err != nil {

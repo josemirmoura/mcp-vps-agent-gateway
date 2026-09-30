@@ -30,7 +30,7 @@ Do not record passwords, tokens, private keys or .env contents.
 Clone the exact RC tag and enter the guided flow.
 
 ~~~bash
-git clone --branch v0.1.0-rc.4 https://github.com/josemirmoura/mcp-vps-agent-gateway.git
+git clone --branch v0.1.0-rc.5 https://github.com/josemirmoura/mcp-vps-agent-gateway.git
 cd mcp-vps-agent-gateway
 bash scripts/install.sh
 ~~~
@@ -41,7 +41,9 @@ Confirm:
 - requirements are checked;
 - Standard / Project / Whole Host choice is understandable;
 - effective authority is shown before startup;
-- Standard starts with /opt as the physical ceiling and no project root authorized;
+- Standard starts with /opt as the default physical ceiling and no project root authorized;
+- a different absolute physical ceiling can be selected deliberately;
+- the installer explains that the ceiling is a maximum boundary, not implicit read/write authority;
 - no silent privilege escalation occurs;
 - no VPS/SSH credential is requested by ChatGPT or documentation.
 
@@ -70,14 +72,38 @@ In ChatGPT web:
 
 The terminal must not print `INSTALLATION COMPLETE` until the authenticated call is observed through Gateway -> Broker -> policy -> execution -> audit.
 
-## 4. Safe real operations
+## 4. Native authority UX, discovery and safe real operations
 
-Within the chosen delegated scope, exercise representative non-destructive operations such as:
+Before granting a project root:
+
+- call `permissions.discover_scope`;
+- confirm it returns only immediate directory names below the physical ceiling;
+- confirm no project file content is exposed by discovery.
+
+Request access to one disposable project root:
+
+- confirm ChatGPT/MCP client renders its **native elicitation/confirmation UI**, not the old custom inline iframe;
+- verify the prompt shows path, access profile, duration and physical ceiling;
+- for an exact-ceiling request, confirm the stronger current-and-future-descendants warning appears; denying that broad request is sufficient for this UI check;
+- approve a narrower disposable root and verify the Broker activates only the requested `read`, `work` or `compose` profile;
+- revoke the root and verify access fails immediately.
+
+Within the approved disposable scope, exercise representative operations such as:
 
 - read/write one disposable test file;
 - inspect an allowed service or Docker resource;
 - run one bounded scoped shell/job if enabled;
 - verify an out-of-scope file/resource is denied.
+
+Then validate the nested secret boundary:
+
+- create a disposable `.env.example` and confirm it remains readable;
+- create a disposable `.env` and confirm normal file read/hash and confined shell access are denied despite the parent project being authorized;
+- request temporary protected-file access to that exact `.env`;
+- confirm the MCP client renders native human approval and clearly identifies the protected file, access profile and expiration;
+- approve the temporary exception, perform only the intended test, then revoke it;
+- confirm the `.env` becomes inaccessible again immediately;
+- confirm no secret content appears in audit/log output.
 
 Do not widen policy merely to make a test pass.
 

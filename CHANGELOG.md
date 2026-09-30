@@ -11,6 +11,33 @@ The project follows Semantic Versioning. Pre-release versions may change while t
 - final clean-install operator acceptance gate before the first stable release
 - freeze `v0.1.0` after the operator acceptance gate passes
 
+## [0.1.0-rc.5] - 2026-09-30
+
+### Added
+
+- discovery-only listing of immediate directories beneath the configured physical ceiling without granting project-content access
+- separate temporary, exact-path protected-file grants for secrets such as `.env`
+- native MCP elicitation for root and protected-file human approval, replacing the custom inline approval iframe on capable clients
+- centralized MCP tool safety annotations covering read-only, destructive, idempotent and open-world semantics
+- GitHub-native manual release promotion through Actions after validation
+
+### Security
+
+- `.env` and `.env.*` remain locked inside otherwise authorized project roots; common templates remain readable
+- protected-secret checks cover generic file operations, hardlink aliases and scoped shell namespace masking
+- authority approval remains subject-bound, one-time-state bound, auditable and Broker-authoritative
+- unknown/unclassified model-visible tools now fail closed at registration and CI rejects direct unclassified registrations
+
+### UX
+
+- Standard explicitly treats the chosen path, default `/opt`, as a maximum physical ceiling rather than implicit read authority
+- ChatGPT can discover project directory names under the ceiling and request the exact project needed
+- human authorization is rendered by the MCP client through native elicitation when supported
+
+### Release candidate
+
+RC5 is the exact candidate for the owner's final clean-install operator acceptance gate. Stable `v0.1.0` remains blocked until that gate passes.
+
 ## [0.1.0-rc.4] - 2026-09-30
 
 ### Added
@@ -94,7 +121,8 @@ The `v0.1.0-rc.1` tag was created, but its release workflow stopped before image
 - Full remains disabled by default and is not claimed as production-ready
 - unrestricted networking remains a separate capability
 
-[Unreleased]: https://github.com/josemirmoura/mcp-vps-agent-gateway/compare/v0.1.0-rc.4...HEAD
+[Unreleased]: https://github.com/josemirmoura/mcp-vps-agent-gateway/compare/v0.1.0-rc.5...HEAD
+[0.1.0-rc.5]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.5
 [0.1.0-rc.4]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.4
 [0.1.0-rc.3]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.3
 [0.1.0-rc.2]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.2

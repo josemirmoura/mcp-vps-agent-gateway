@@ -22,9 +22,21 @@ They are intended for final acceptance and may receive fixes before the correspo
 
 ## First public release
 
-The current acceptance candidate identifies itself as `0.1.0-rc.4`. RC4 contains the Portico branding/onboarding closeout, dynamic physical-ceiling approval, localized guided UX and the final pre-stable security test expansion. Earlier RC tags are retained as immutable history.
+The current acceptance candidate identifies itself as `0.1.0-rc.5`. RC5 adds configurable-ceiling discovery without project-content access, protected-secret enforcement inside delegated roots, native MCP elicitation for human approvals, explicit safety annotations across the public tool catalog, and a GitHub-native manual release promotion path. Earlier RC tags are retained as immutable history.
 
 The stable `v0.1.0` tag is created only after the owner's final clean-install operator acceptance gate succeeds.
+
+## Publishing a release
+
+The preferred owner path is **GitHub Actions → release → Run workflow** on `main`.
+
+Enter the exact SemVer tag required by `VERSION`, for example:
+
+~~~text
+v0.1.0-rc.5
+~~~
+
+The workflow validates source, tests and the installation contract first. Only after validation does a manual run create the exact tag, build/publish the multi-architecture images and create the GitHub Release. Existing external tag pushes remain supported and enter the same validated pipeline. Pre-release SemVer tags such as `-rc.5` are published as GitHub pre-releases.
 
 ## Release artifacts
 
@@ -46,7 +58,7 @@ By default, `scripts/update.sh` selects the newest stable SemVer tag available f
 A release candidate or explicit version can be selected deliberately:
 
 ~~~bash
-VPS_AGENT_UPDATE_REF=v0.1.0-rc.4 bash scripts/update.sh
+VPS_AGENT_UPDATE_REF=v0.1.0-rc.5 bash scripts/update.sh
 ~~~
 
 The updater refuses non-fast-forward targets and retains its backup after success or rollback.

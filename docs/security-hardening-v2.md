@@ -29,7 +29,7 @@ Active dynamic root delegations are Broker-owned state. They do not edit `policy
 
 Generic MCP tool annotations and host confirmation policy remain UX signals rather than the Broker security boundary.
 
-For MCP Apps-compatible clients, root delegation uses a stronger in-chat confirmation flow: the pending request returns a one-time HMAC approval token only in tool-result `_meta`. The model receives the visible request details but not that token. The inline app card calls an app-only confirmation tool with the hidden token after a user presses Authorize or Deny. The Broker binds the token to request ID, authenticated subject, root, access profile and approval expiry, and accepts it only while that request is still pending.
+For clients that advertise standard MCP elicitation, root and protected-file delegation use the client's native human-confirmation surface. The Gateway returns a multi-round-trip elicitation request with opaque request state; the model receives neither a self-approval tool nor a usable approval token. After accept/decline/cancel, the Broker independently binds the decision to the pending request, authenticated subject, requested resource, access profile and approval expiry. Clients without elicitation leave the request pending for the separate operator fallback.
 
 ### Administrative elevation
 
