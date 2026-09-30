@@ -210,8 +210,18 @@ docker image rm   mcp-vps-agent-gateway:local   mcp-vps-agent-broker:local   >/d
 # Legacy pre-Portico scaffold. rmdir is intentionally used instead of rm -rf:
 # a non-empty directory is preserved rather than risking user data.
 legacy_sandbox_removed=0
-if rmdir /opt/vps-agent-sandbox >/dev/null 2>&1; then
-  legacy_sandbox_removed=1
+if [ -d /opt/vps-agent-sandbox ]; then
+  if rmdir /opt/vps-agent-sandbox >/dev/null 2>&1; then
+    legacy_sandbox_removed=1
+  elif command -v sudo >/dev/null 2>&1; then
+    if [ -t 0 ]; then
+      if sudo rmdir /opt/vps-agent-sandbox >/dev/null 2>&1; then
+        legacy_sandbox_removed=1
+      fi
+    elif sudo -n rmdir /opt/vps-agent-sandbox >/dev/null 2>&1; then
+      legacy_sandbox_removed=1
+    fi
+  fi
 fi
 
 cat <<EOF
