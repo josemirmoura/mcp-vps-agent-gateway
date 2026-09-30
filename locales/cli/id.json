@@ -246,6 +246,7 @@
     "error.operator_creation_failed": "ERROR: pembuatan operator gagal (curl={curl_status} HTTP={http_code}).",
     "error.public_url_https": "Endpoint MCP publik harus menggunakan HTTPS: {url}",
     "error.expected_401": "Diharapkan HTTP 401 dari permintaan MCP tanpa autentikasi, tetapi mendapat {code}.",
-    "verify.local_call_skipped": "Panggilan tool MCP lokal dilewati untuk mode autentikasi {mode}; verifikasi OAuth publik akan digunakan."
+    "verify.local_call_skipped": "Panggilan tool MCP lokal dilewati untuk mode autentikasi {mode}; verifikasi OAuth publik akan digunakan.",
+    "connect.email_line": "   Email akun: {email}"
   }
 }
