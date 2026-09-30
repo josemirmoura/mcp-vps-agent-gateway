@@ -300,6 +300,10 @@
     "remove.public_route_gone": "Öffentliche MCP-Route ist entfernt (HTTP {code} vom verbleibenden Edge-Proxy).",
     "remove.url_still_live": "Entfernung unvollständig: Die MCP-URL lieferte weiterhin HTTP {code}, statt zu verschwinden.",
     "remove.deleting_source": "Verifizierten Portico-MCP-Quellcode-Checkout löschen: {path}",
-    "diagnose.usage": "Verwendung: {script} [status|health|logs [Zeilen]|audit [Limit]|bundle [ausgabe.tar.gz]]"
+    "diagnose.usage": "Verwendung: {script} [status|health|logs [Zeilen]|audit [Limit]|bundle [ausgabe.tar.gz]]",
+    "remove.state_preserved": "BEIBEHALTEN",
+    "remove.state_deleted": "GELÖSCHT",
+    "remove.state_delete": "LÖSCHEN",
+    "remove.state_preserve": "BEIBEHALTEN"
   }
 }
