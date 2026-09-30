@@ -85,6 +85,19 @@ func TestSensitiveEnvRequiresSeparateTemporaryApproval(t *testing.T) {
 	allowed := b.Handle(ctx, wire.Request{ID: "read-approved", Subject: "alice", Tool: "file.read", Resource: envPath})
 	if !allowed.OK { t.Fatalf("explicitly approved .env remained locked: %+v", allowed) }
 
+	leakPath := filepath.Join(root, "leaked.txt")
+	copyArgs, _ := json.Marshal(map[string]any{"destination": leakPath})
+	copyLeak := b.Handle(ctx, wire.Request{
+		ID: "copy-leak", Subject: "alice", Tool: "file.copy", Resource: envPath,
+		InvocationID: "copy-leak-1", Args: copyArgs,
+	})
+	if copyLeak.OK {
+		t.Fatal("protected .env was copied into an unprotected filename")
+	}
+	if _, err := os.Stat(leakPath); !os.IsNotExist(err) {
+		t.Fatalf("secret downgrade created destination: %v", err)
+	}
+
 	aliasStillDenied := b.Handle(ctx, wire.Request{ID: "alias-still-denied", Subject: "alice", Tool: "file.read", Resource: aliasPath})
 	if aliasStillDenied.OK { t.Fatal("exact-path approval must not silently authorize a hardlink alias") }
 
