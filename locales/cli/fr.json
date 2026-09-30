@@ -300,6 +300,10 @@
     "remove.public_route_gone": "La route MCP publique a disparu (HTTP {code} depuis le proxy de bord restant).",
     "remove.url_still_live": "Suppression incomplète : l’URL MCP renvoie encore HTTP {code} au lieu de disparaître.",
     "remove.deleting_source": "Suppression du checkout source Portico MCP vérifié : {path}",
-    "diagnose.usage": "utilisation : {script} [status|health|logs [lignes]|audit [limite]|bundle [sortie.tar.gz]]"
+    "diagnose.usage": "utilisation : {script} [status|health|logs [lignes]|audit [limite]|bundle [sortie.tar.gz]]",
+    "remove.state_preserved": "CONSERVÉS",
+    "remove.state_deleted": "SUPPRIMÉS",
+    "remove.state_delete": "SUPPRIMER",
+    "remove.state_preserve": "CONSERVER"
   }
 }
