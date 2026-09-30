@@ -71,9 +71,9 @@ Before starting the guided installation, have:
 - at least 2 GB RAM for the bundled ZITADEL OAuth path;
 - Git, OpenSSL, Python 3 and curl;
 - a public DNS hostname pointing to the VPS, TCP 80/443 available and valid HTTPS;
-- **ChatGPT Plus or higher**, with Developer Mode and custom MCP app creation actually available in ChatGPT Web for the account.
+- a ChatGPT Web account/workspace where Developer Mode and custom MCP app creation are actually available.
 
-ChatGPT plan capabilities are controlled by OpenAI and can change by plan, account and rollout. Current OpenAI documentation describes full MCP support, including write/modify actions, for Business, Enterprise and Edu. If an account exposes only narrower read/fetch MCP capabilities, Portico MCP cannot elevate that ChatGPT-side permission.
+OpenAI controls availability and permissions by plan, workspace and rollout. Current official OpenAI documentation lists **full MCP support, including write/modify actions, for Business, Enterprise and Edu**; Pro can connect custom MCPs with read/fetch permissions in developer mode. Portico MCP cannot elevate permissions that ChatGPT itself does not expose. Always verify the current product UI and official OpenAI documentation before relying on a specific plan label.
 
 See [compatibility](docs/compatibility.md) for the supported/tested matrix.
 
@@ -88,7 +88,7 @@ bash scripts/install.sh
 The terminal now conducts the supported flow:
 
 ~~~text
-Environment
+Prerequisites
  -> Scope: Standard / Project / Whole Host
  -> effective authority review
  -> Containers
