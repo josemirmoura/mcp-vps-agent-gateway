@@ -1,6 +1,6 @@
 # Release and version policy
 
-MCP VPS Agent Gateway follows Semantic Versioning.
+Portico MCP follows Semantic Versioning.
 
 ## Channels
 
@@ -22,7 +22,7 @@ They are intended for final acceptance and may receive fixes before the correspo
 
 ## First public release
 
-The current acceptance candidate identifies itself as `0.1.0-rc.3`. The earlier `v0.1.0-rc.1` tag is retained as immutable history after its release workflow failed before publication.
+The current acceptance candidate identifies itself as `0.1.0-rc.4`. RC4 contains the Portico branding/onboarding closeout, dynamic physical-ceiling approval, localized guided UX and the final pre-stable security test expansion. Earlier RC tags are retained as immutable history.
 
 The stable `v0.1.0` tag is created only after the owner's final clean-install operator acceptance gate succeeds.
 
@@ -46,7 +46,7 @@ By default, `scripts/update.sh` selects the newest stable SemVer tag available f
 A release candidate or explicit version can be selected deliberately:
 
 ~~~bash
-VPS_AGENT_UPDATE_REF=v0.1.0-rc.3 bash scripts/update.sh
+VPS_AGENT_UPDATE_REF=v0.1.0-rc.4 bash scripts/update.sh
 ~~~
 
 The updater refuses non-fast-forward targets and retains its backup after success or rollback.
