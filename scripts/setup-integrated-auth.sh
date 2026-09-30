@@ -7,45 +7,7 @@ source scripts/lib/product.sh
 vps_agent_init_language ""
 
 usage() {
-  if vps_agent_is_pt_br; then
-    cat <<'EOF'
-uso: bash scripts/setup-integrated-auth.sh [--domain mcp.exemplo.com] [opções]
-
-Configura o acesso público suportado ao ChatGPT com OAuth/OIDC auto-hospedado,
-ZITADEL, PostgreSQL e o Gateway/Broker do Portico.
-
-Opções:
-  --domain DOMINIO          Nome DNS público do MCP + OAuth.
-  --operator-email EMAIL    E-mail da conta de operador.
-  --operator-username NOME  Nome de usuário do login (padrão: vps-operator).
-  --edge-network REDE       Rede Docker de um Traefik existente.
-  --certresolver NOME       Resolvedor ACME do Traefik existente.
-  --bundled-proxy           Força o Traefik embutido em vez de reutilizar um.
-  -h, --help                Mostra esta ajuda.
-
-A senha dedicada do operador OAuth é solicitada localmente sem aparecer no
-terminal. Ela não é a senha VPS/SSH e não deve ser fornecida ao ChatGPT.
-EOF
-  else
-    cat <<'EOF'
-usage: bash scripts/setup-integrated-auth.sh [--domain mcp.example.com] [options]
-
-Configure the supported public ChatGPT path: self-hosted OAuth/OIDC with
-ZITADEL, PostgreSQL and the existing Portico Gateway/Broker.
-
-Options:
-  --domain DOMAIN          Public DNS name for MCP + OAuth.
-  --operator-email EMAIL   Login email for the Portico operator.
-  --operator-username NAME Login username (default: vps-operator).
-  --edge-network NETWORK   Existing Traefik Docker network.
-  --certresolver NAME      Existing Traefik ACME resolver.
-  --bundled-proxy          Force the bundled Traefik instead of reusing one.
-  -h, --help               Show this help.
-
-The dedicated OAuth operator password is requested locally without terminal
-echo. It is not the VPS/SSH password and must not be supplied to ChatGPT.
-EOF
-  fi
+  vps_agent_block setup_auth.usage
 }
 
 DOMAIN=""
@@ -75,7 +37,7 @@ while [ "$#" -gt 0 ]; do
       CERTRESOLVER="$2"; shift 2 ;;
     --bundled-proxy) BUNDLED_PROXY=1; shift ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "$(vps_agent_text "ERROR: unknown argument: $1" "ERRO: argumento desconhecido: $1")" >&2; usage >&2; exit 2 ;;
+    *) echo "$(vps_agent_msg error.unknown_argument "arg=$1")" >&2; usage >&2; exit 2 ;;
   esac
 done
 
@@ -86,46 +48,8 @@ fi
 
 if [ -z "$DOMAIN" ]; then
   if [ -t 0 ]; then
-    if vps_agent_is_pt_br; then
-      cat <<'EOF'
-
-Para conectar o ChatGPT ao Portico MCP, você precisa de um endereço público
-para esta VPS.
-
-1. No painel onde você gerencia seu domínio, crie um subdomínio, por exemplo:
-   mcp.seudominio.com.br
-
-2. Crie um registro DNS A apontando esse subdomínio para o IP público desta VPS.
-   Se você usa IPv6, também pode criar um registro AAAA.
-
-3. Aguarde o DNS responder e informe abaixo apenas o nome criado, sem https://
-   e sem /mcp.
-
-Exemplo:
-  mcp.seudominio.com.br
-
-EOF
-      printf 'Domínio público do Portico MCP: '
-    else
-      cat <<'EOF'
-
-To connect ChatGPT to Portico MCP, this VPS needs a public hostname.
-
-1. In the DNS panel for a domain you control, create a subdomain, for example:
-   mcp.example.com
-
-2. Create a DNS A record pointing that subdomain to this VPS public IP.
-   If you use IPv6, you may also create an AAAA record.
-
-3. Wait for DNS to resolve, then enter only the hostname below, without
-   https:// and without /mcp.
-
-Example:
-  mcp.example.com
-
-EOF
-      printf 'Public Portico MCP domain: '
-    fi
+    vps_agent_block setup_auth.domain_help
+    printf '%s' "$(vps_agent_msg setup_auth.domain_prompt)"
     read -r DOMAIN
   else
     echo "$(vps_agent_text 'ERROR: --domain is required in non-interactive mode.' 'ERRO: --domain é obrigatório em modo não interativo.')" >&2
@@ -142,7 +66,7 @@ if [[ ! "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
 fi
 
 for cmd in docker curl openssl python3 ss getent; do
-  command -v "$cmd" >/dev/null 2>&1 || { echo "$(vps_agent_text "ERROR: required command not found: $cmd" "ERRO: comando obrigatório não encontrado: $cmd")" >&2; exit 1; }
+  command -v "$cmd" >/dev/null 2>&1 || { echo "$(vps_agent_msg error.required_command "command=$cmd")" >&2; exit 1; }
 done
 docker compose version >/dev/null
 
@@ -202,7 +126,7 @@ PY
 }
 
 if ! getent ahosts "$DOMAIN" >/dev/null 2>&1; then
-  echo "$(vps_agent_text "ERROR: DNS for $DOMAIN does not resolve yet." "ERRO: o DNS de $DOMAIN ainda não está respondendo.")" >&2
+  echo "$(vps_agent_msg error.dns_unresolved "domain=$DOMAIN")" >&2
   echo "$(vps_agent_text     'Create the A/AAAA record pointing to this VPS, wait for DNS propagation, and rerun.'     'Crie o registro A/AAAA apontando para esta VPS, aguarde a propagação do DNS e tente novamente.')" >&2
   exit 1
 fi
@@ -213,7 +137,7 @@ MARKER="state/integrated-auth.json"
 CURRENT_SUBJECT="$(env_value VPS_AGENT_SUBJECT || true)"
 MARKER_DOMAIN="$(marker_value "$MARKER" domain || true)"
 if [ -s "$MARKER" ] && [ -n "$MARKER_DOMAIN" ] && [ "$MARKER_DOMAIN" != "$DOMAIN" ]; then
-  echo "$(vps_agent_text "ERROR: integrated auth was already initialized for $MARKER_DOMAIN." "ERRO: a autenticação integrada já foi inicializada para $MARKER_DOMAIN.")" >&2
+  echo "$(vps_agent_msg error.auth_already_initialized "domain=$MARKER_DOMAIN")" >&2
   echo "$(vps_agent_text 'Automatic issuer/domain migration is intentionally not supported.' 'A migração automática de issuer/domínio não é suportada intencionalmente.')" >&2
   exit 1
 fi
@@ -239,7 +163,7 @@ if [ "$NEEDS_OPERATOR" -eq 1 ]; then
     fi
   fi
   if [[ "$OPERATOR_EMAIL" != *@*.* ]]; then
-    echo "$(vps_agent_text "ERROR: operator email does not look valid: $OPERATOR_EMAIL" "ERRO: o e-mail do operador parece inválido: $OPERATOR_EMAIL")" >&2
+    echo "$(vps_agent_msg error.operator_email_invalid "email=$OPERATOR_EMAIL")" >&2
     exit 2
   fi
   if [[ ! "$OPERATOR_USERNAME" =~ ^[A-Za-z0-9._-]+$ ]]; then
@@ -275,7 +199,7 @@ else
       if docker inspect "$id" --format '{{range $name, $cfg := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' |
           grep -Fxq "$EDGE_NETWORK"; then
         if [ -n "$TRAEFIK_ID" ]; then
-          echo "$(vps_agent_text "ERROR: more than one Traefik is attached to $EDGE_NETWORK." "ERRO: mais de um Traefik está conectado à rede $EDGE_NETWORK.")" >&2
+          echo "$(vps_agent_msg error.traefik_multiple_network "network=$EDGE_NETWORK")" >&2
           exit 1
         fi
         TRAEFIK_ID="$id"
@@ -308,14 +232,14 @@ else
           sed '/^$/d'
       )
       if [ "${#NETWORKS[@]}" -ne 1 ]; then
-        echo "$(vps_agent_text "ERROR: Traefik has ${#NETWORKS[@]} candidate Docker networks: ${NETWORKS[*]:-none}" "ERRO: o Traefik possui ${#NETWORKS[@]} redes Docker candidatas: ${NETWORKS[*]:-nenhuma}")" >&2
+        echo "$(vps_agent_msg error.traefik_candidate_networks "count=${#NETWORKS[@]}" "networks=${NETWORKS[*]:-none}")" >&2
         echo "$(vps_agent_text 'Pass --edge-network NETWORK.' 'Informe --edge-network REDE.')" >&2
         exit 1
       fi
       EDGE_NETWORK="${NETWORKS[0]}"
     fi
     docker network inspect "$EDGE_NETWORK" >/dev/null 2>&1 || {
-      echo "$(vps_agent_text "ERROR: Docker network not found: $EDGE_NETWORK" "ERRO: rede Docker não encontrada: $EDGE_NETWORK")" >&2
+      echo "$(vps_agent_msg error.docker_network_missing "network=$EDGE_NETWORK")" >&2
       exit 1
     }
 
@@ -401,7 +325,7 @@ for _ in $(seq 1 90); do
   sleep 2
 done
 if ! test -s /tmp/vps-agent-oidc.json; then
-  echo "$(vps_agent_text "ERROR: OIDC discovery did not become reachable at $OIDC_URL" "ERRO: a descoberta OIDC não ficou acessível em $OIDC_URL")" >&2
+  echo "$(vps_agent_msg error.oidc_unreachable "url=$OIDC_URL")" >&2
   echo "$(vps_agent_text 'Check DNS, firewall/ports 80/443 and Traefik, then rerun.' 'Confira DNS, firewall/portas 80/443 e Traefik e tente novamente.')" >&2
   "${compose[@]}" ps >&2 || true
   exit 1
@@ -566,7 +490,7 @@ PY
   trap - EXIT
 
   if [ "$CURL_STATUS" -ne 0 ] || { [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; }; then
-    echo "$(vps_agent_text "ERROR: operator creation failed (curl=$CURL_STATUS HTTP=${HTTP_CODE:-none})." "ERRO: falha ao criar o operador (curl=$CURL_STATUS HTTP=${HTTP_CODE:-nenhum}).")" >&2
+    echo "$(vps_agent_msg error.operator_creation_failed "curl_status=$CURL_STATUS" "http_code=${HTTP_CODE:-none}")" >&2
     cat /tmp/vps-agent-create-operator.json >&2 2>/dev/null || true
     exit 1
   fi
