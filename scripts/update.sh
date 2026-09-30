@@ -74,7 +74,7 @@ if [ "$current" = "$target_sha" ]; then
   exit 0
 fi
 if ! git merge-base --is-ancestor "$current" "$target_sha"; then
-  echo "Refusing non-fast-forward update: target $target_sha is not a descendant of $current." >&2
+  echo "$(vps_agent_text "Refusing non-fast-forward update: target $target_sha is not a descendant of $current." "Atualização non-fast-forward recusada: o alvo $target_sha não descende de $current.")" >&2
   exit 1
 fi
 
