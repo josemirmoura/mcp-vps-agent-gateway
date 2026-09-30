@@ -207,6 +207,45 @@
     "[Enter] continue | [L] choose another language: ": "[Enter] 続行 | [L] 別の言語を選択: ",
     "Secure MCP Gateway for Linux Hosts": "Linux ホスト向け安全な MCP ゲートウェイ"
   },
-  "blocks": {},
-  "messages": {}
+  "blocks": {
+    "install.usage": "使用方法: bash scripts/install.sh [オプション]\n\nPortico MCP のガイド付き透明インストール。\n\nプロファイル:\n  custom       推奨: /opt を物理上限とし、ルートを動的承認。\n  project      Portico MCP を1つのプロジェクト/ファイルシステムルートに制限。\n  whole-host   物理ファイルシステム上限を \"/\" に設定。Full は自動的に有効になりません。\n\nオプション:\n  --profile PROFILE         custom | project | whole-host\n  --scope PATH              custom/project 用の既存上限/ルート。\n  --create-scope            存在しないスコープを明示的に作成。\n  --run-as USER             制限付きシェルジョブ用の非 root ユーザー。\n  --lang LANG               en | pt-BR | es | de | fr | ja | id\n  --domain HOSTNAME         公開 MCP/OAuth ホスト名。\n  --operator-email EMAIL    専用 OAuth オペレーターメール。\n  --operator-username NAME  OAuth ログインユーザー名。\n  --local-only              ローカルランタイム検証後に停止。\n  --yes                     表示された実効権限を承認。\n  --ack-whole-host          whole-host で --yes を使う場合に必須。\n  -h, --help                このヘルプを表示。\n",
+    "install.profile_menu": "Portico MCP が VPS にアクセスできる範囲を選択してください:\n\n  1) Standard（推奨）\n     /opt は既定の物理上限にすぎません。AI が到達できる最大境界であり、許可そのものではありません。\n     Portico は上限直下のフォルダ名のみ検出できますが、中身は開けません。\n     ChatGPT が必要としたときに、プロジェクトごとに後から承認します。\n\n  2) Project\n     インストール時から Portico を1つのフォルダに限定します。\n     特定のプロジェクトだけを扱わせたい場合に使用します。\n\n  3) Whole Host\n     物理上限を VPS 全体 (/) にします。\n     /opt の外へのアクセスが必要な場合だけ使用してください。\n     Full やその他すべてが自動的に解放されるわけではありません。\n",
+    "install.chatgpt_intro": "次のスクリプトが ChatGPT 接続を順番に案内します。\n時間をかけて設定し、準備ができたらターミナルに戻って Enter を押して確認してください。\nBroker が実際の認証済み system.info 呼び出しを監査ログで確認するまで、\nインストールは完了しません。\n",
+    "init.usage": "使用方法: bash scripts/init.sh [--scope /絶対/既存/パス] [オプション]\n\nオプション:\n  --scope PATH          Scoped モードの物理ファイルシステム上限を設定。\n  --dynamic-baseline    静的な論理プロジェクトルートなしで開始。\n                        プロジェクトルートは後から動的承認します。\n  --run-as USER         制限付きシェルジョブ用の非 root ホストユーザー。\n  --migrate-policy-root policy.yaml 内の以前のルート参照を置換。\n                        上限を広げるためではなく、プロジェクトルート移動時に使用。\n  --lang LANG           言語: en | pt-BR | es | de | fr | ja | id。\n  -h, --help            このヘルプを表示。\n",
+    "setup_auth.usage": "使用方法: bash scripts/setup-integrated-auth.sh [--domain mcp.example.jp] [オプション]\n\nChatGPT 向けのサポート済み公開経路を構成します。ZITADEL、PostgreSQL、\n既存の Portico Gateway/Broker を使うセルフホスト OAuth/OIDC です。\n\nオプション:\n  --domain DOMAIN          MCP + OAuth 用の公開 DNS 名。\n  --operator-email EMAIL   Portico オペレーターのログインメール。\n  --operator-username NAME ログインユーザー名（既定: vps-operator）。\n  --edge-network NETWORK   既存 Traefik の Docker ネットワーク。\n  --certresolver NAME      既存 Traefik の ACME リゾルバー。\n  --bundled-proxy          既存を再利用せず同梱 Traefik を強制使用。\n  -h, --help               このヘルプを表示。\n\n専用 OAuth オペレーターパスワードはローカルで非表示入力します。\nVPS/SSH パスワードではなく、ChatGPT に渡してはいけません。\n",
+    "setup_auth.domain_help": "\nChatGPT を Portico MCP に接続するには、この VPS に公開ホスト名が必要です。\n\n1. 管理しているドメインの DNS パネルでサブドメインを作成します。例:\n   mcp.example.jp\n\n2. そのサブドメインをこの VPS の公開 IP に向ける DNS A レコードを作成します。\n   IPv6 を使用する場合は AAAA レコードも作成できます。\n\n3. DNS が解決されるまで待ち、https:// と /mcp を付けずに\n   ホスト名だけを入力してください。\n\n例:\n  mcp.example.jp\n\n",
+    "connect.not_detected": "ChatGPT の system.info 呼び出しはまだ検出されていません。\n\n次を確認してください:\n- MCP アプリが作成されている;\n- OAuth が完了している;\n- チャットで Portico MCP が選択されている;\n- テストメッセージが実際に送信されている。\n\n何も失われていません。必要な修正を行い、Enter を押して再試行してください。\n"
+  },
+  "messages": {
+    "install.profile_prompt": "プロファイル [1]: ",
+    "setup_auth.domain_prompt": "Portico MCP の公開ドメイン: ",
+    "connect.prompt": "[Enter] 接続確認  [T] チュートリアル再表示  [Q] 終了: ",
+    "connect.invalid_choice": "Enter、T、または Q を選択してください。",
+    "connect.tutorial": "=== Portico MCP を ChatGPT に接続 ===\n\nVPS 側の準備は完了しています。最後に Portico MCP を ChatGPT に接続します。\nこの作業は ChatGPT Web で行います。\n\nMCP エンドポイント:\n  {public_url}\n\n1. ブラウザで ChatGPT を開きます。\n2. 開発者モードが未有効なら有効にします。\n3. 設定 > Apps を開き、新しい MCP アプリを作成します。\n4. MCP エンドポイントを求められたら、次をそのまま使用します:\n\n   {public_url}\n\n5. 認証方式として OAuth を選択します。\n6. Portico MCP のログイン画面で次を使用します:\n\n   ユーザー名: {username}\n{email_line}\n   インストール時に作成したオペレーターパスワードを使用します。\n   VPS の SSH/root/Linux パスワードは使用しないでください。\n\n7. 検出されたツールを確認し、アプリ作成を完了します。\n8. Portico MCP を使う新しいチャットを開き、次をそのまま送信します:\n\n   Call system.info on my VPS MCP and tell me the hostname.\n\nこれは安全な接続確認だけです。ChatGPT が認証済み MCP 経由でこの VPS に到達し、\nBroker が呼び出しを監査したことを確認します。\n\n接続作業には必要なだけ時間をかけて構いません。\n",
+    "error.unknown_argument": "エラー: 不明な引数: {arg}",
+    "install.creating_scope": "sudo install で {scope} を作成しています。",
+    "install.scope_missing_prompt": "{scope} は存在しません。今作成しますか? [y/N]: ",
+    "error.scope_missing": "エラー: スコープが存在しません: {scope}",
+    "error.invalid_shell_user": "エラー: 無効な非 root シェルユーザー: {user}",
+    "install.standard_selected": "Standard プロファイルを選択しました。物理上限: {scope}。",
+    "error.scope_absolute": "エラー: --scope は絶対パスである必要があります: {scope}",
+    "error.scope_canonical": "エラー: --scope は正規化されたパスである必要があります（'..'、'.'、末尾スラッシュ不可）: {scope}",
+    "init.ceiling_changed_empty": "物理上限を {old} から {new} に変更しました。静的ルートは空で開始します。",
+    "init.ceiling_changed_preserved": "物理上限を {old} から {new} に変更しました。既存の論理 Policy ルートは保持されました。",
+    "error.scope_symlink": "エラー: VPS_AGENT_SCOPE_ROOT はシンボリックリンクを経由できません: {path}",
+    "error.scope_root_missing": "エラー: VPS_AGENT_SCOPE_ROOT が存在しません: {path}",
+    "error.shell_user_missing": "エラー: シェル実行ユーザーが存在しません: {user}",
+    "error.required_command": "エラー: 必須コマンドが見つかりません: {command}",
+    "error.dns_unresolved": "エラー: {domain} の DNS はまだ解決できません。",
+    "error.auth_already_initialized": "エラー: 統合認証は {domain} 用に既に初期化されています。",
+    "error.operator_email_invalid": "エラー: オペレーターのメールアドレスが無効に見えます: {email}",
+    "error.traefik_multiple_network": "エラー: {network} に複数の Traefik が接続されています。",
+    "error.traefik_candidate_networks": "エラー: Traefik に {count} 個の候補 Docker ネットワークがあります: {networks}",
+    "error.docker_network_missing": "エラー: Docker ネットワークが見つかりません: {network}",
+    "error.oidc_unreachable": "エラー: {url} で OIDC Discovery に到達できませんでした",
+    "error.operator_creation_failed": "エラー: オペレーター作成に失敗しました (curl={curl_status} HTTP={http_code})。",
+    "error.public_url_https": "公開 MCP エンドポイントは HTTPS を使用する必要があります: {url}",
+    "error.expected_401": "未認証 MCP リクエストは HTTP 401 の想定ですが、{code} が返りました。",
+    "verify.local_call_skipped": "認証モード {mode} ではローカル MCP ツール呼び出しを省略します。公開 OAuth 検証を使用します。"
+  }
 }
