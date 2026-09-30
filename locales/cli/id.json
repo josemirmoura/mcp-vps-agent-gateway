@@ -300,6 +300,10 @@
     "remove.public_route_gone": "Route MCP publik sudah hilang (HTTP {code} dari proxy edge yang tersisa).",
     "remove.url_still_live": "Penghapusan belum lengkap: URL MCP masih mengembalikan HTTP {code}, bukannya menghilang.",
     "remove.deleting_source": "Menghapus checkout source Portico MCP terverifikasi: {path}",
-    "diagnose.usage": "penggunaan: {script} [status|health|logs [baris]|audit [limit]|bundle [output.tar.gz]]"
+    "diagnose.usage": "penggunaan: {script} [status|health|logs [baris]|audit [limit]|bundle [output.tar.gz]]",
+    "remove.state_preserved": "DIPERTAHANKAN",
+    "remove.state_deleted": "DIHAPUS",
+    "remove.state_delete": "HAPUS",
+    "remove.state_preserve": "PERTAHANKAN"
   }
 }
