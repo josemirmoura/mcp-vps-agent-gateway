@@ -1,4 +1,4 @@
-## MCP VPS Agent Gateway
+## Portico MCP
 
 - [Home](Home)
 - [Início (PT-BR)](Inicio)
