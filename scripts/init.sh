@@ -127,6 +127,31 @@ fi
 mkdir -p state
 chmod 700 state
 
+# Persist the resolved human-facing locale so commands executed later keep the
+# same language even when the terminal/SSH locale differs.
+python3 - ".env" "$VPS_AGENT_LANG" <<'PY'
+import pathlib
+import shlex
+import sys
+
+path = pathlib.Path(sys.argv[1])
+value = sys.argv[2]
+key = "VPS_AGENT_LANG"
+lines = path.read_text().splitlines()
+replacement = f"{key}={shlex.quote(value)}"
+out = []
+replaced = False
+for line in lines:
+    if line.startswith(key + "="):
+        out.append(replacement)
+        replaced = True
+    else:
+        out.append(line)
+if not replaced:
+    out.append(replacement)
+path.write_text("\n".join(out) + "\n")
+PY
+
 if [ ! -f config/policy.yaml ]; then
   cp config/policy.example.yaml config/policy.yaml
   chmod 600 config/policy.yaml
