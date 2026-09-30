@@ -38,6 +38,9 @@ Deliberate security requirements include:
 - exact subject/resource/action re-authorization;
 - human-approved temporary elevation when enabled;
 - filesystem traversal and symlink-escape resistance;
+- physical-ceiling discovery that exposes directory names only, never project contents;
+- protected secret paths remain locked inside delegated roots unless separately and temporarily approved;
+- hardlink-aware protected-file checks and shell namespace masking;
 - sandboxed scoped shell execution;
 - replay/idempotency controls;
 - redacted operational diagnostics;
