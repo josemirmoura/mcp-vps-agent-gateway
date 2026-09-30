@@ -86,7 +86,7 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     --lang)
-      [ "$#" -ge 2 ] || { echo "ERROR: --lang needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --lang needs a value.' 'ERRO: --lang precisa de um valor.')" >&2; exit 2; }
       LANG_OVERRIDE="$2"
       VPS_AGENT_LANG_EXPLICIT=1
       vps_agent_init_language "$LANG_OVERRIDE"
@@ -195,6 +195,7 @@ PY
       echo "$(vps_agent_text         "Physical ceiling changed from $OLD_SCOPE_ROOT to $SCOPE_OVERRIDE; static roots will start empty."         "Teto físico alterado de $OLD_SCOPE_ROOT para $SCOPE_OVERRIDE; as raízes estáticas começarão vazias.")"
     elif [ "$POLICY_CREATED" -eq 1 ] || [ "$POLICY_PRISTINE_TEMPLATE" -eq 1 ] || [ "$MIGRATE_POLICY_ROOT" -eq 1 ]; then
       python3 - "config/policy.yaml" "$OLD_SCOPE_ROOT" "$SCOPE_OVERRIDE" <<'PY'
+import os
 import pathlib
 import sys
 
@@ -205,9 +206,11 @@ text = path.read_text()
 if old != "/" and old in text:
     text = text.replace(old, new)
     path.write_text(text)
-    print(f"Migrated policy paths from {old} to {new}.")
+    lang=os.environ.get("VPS_AGENT_LANG","en")
+    print((f"Caminhos da policy migrados de {old} para {new}." if lang=="pt-BR" else f"Migrated policy paths from {old} to {new}."))
 else:
-    print("Policy did not contain the previous scoped root; leaving policy paths unchanged.")
+    lang=os.environ.get("VPS_AGENT_LANG","en")
+    print("A policy não continha a raiz Scoped anterior; mantendo os caminhos inalterados." if lang=="pt-BR" else "Policy did not contain the previous scoped root; leaving policy paths unchanged.")
 PY
     else
       echo "$(vps_agent_text         "Physical ceiling changed from $OLD_SCOPE_ROOT to $SCOPE_OVERRIDE. Existing logical policy roots were preserved."         "Teto físico alterado de $OLD_SCOPE_ROOT para $SCOPE_OVERRIDE. As raízes lógicas existentes foram preservadas.")"
