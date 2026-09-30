@@ -17,181 +17,305 @@ const rootApprovalWidgetHTML = `<!doctype html>
 :root {
   color-scheme: light dark;
   --bg: #ffffff;
-  --surface: #f5f7fa;
+  --surface: #f6f7f9;
+  --surface-strong: #eef1f5;
   --text: #17191d;
-  --muted: #596270;
-  --border: #d6dce5;
-  --primary: #0b57d0;
+  --muted: #68717d;
+  --border: #dfe3e8;
+  --primary: #111827;
+  --primary-hover: #273244;
   --primary-text: #ffffff;
   --secondary: #ffffff;
-  --secondary-text: #24272d;
-  --warning-bg: #fff4d6;
-  --warning-text: #5d3a00;
-  --warning-border: #d79800;
-  --success: #176b3a;
-  --focus: #3b82f6;
+  --secondary-text: #252a31;
+  --accent: #2563eb;
+  --accent-soft: #eff6ff;
+  --warning-bg: #fff8e6;
+  --warning-text: #714b00;
+  --warning-border: #e8bf55;
+  --danger-bg: #fff1f2;
+  --danger-text: #881337;
+  --danger-border: #f3a7b7;
+  --success: #167647;
+  --focus: #60a5fa;
+  --shadow: 0 18px 45px rgba(18, 24, 33, .10);
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #17191e;
-    --surface: #22252c;
+    --bg: #181b20;
+    --surface: #21252c;
+    --surface-strong: #292e37;
     --text: #f4f6f8;
-    --muted: #c2c8d0;
-    --border: #464d58;
-    --primary: #8bc1ff;
-    --primary-text: #071321;
-    --secondary: #282c34;
+    --muted: #aeb6c2;
+    --border: #3c434d;
+    --primary: #f3f4f6;
+    --primary-hover: #ffffff;
+    --primary-text: #111827;
+    --secondary: #22262d;
     --secondary-text: #f4f6f8;
-    --warning-bg: #3a2b0e;
-    --warning-text: #ffe2a8;
-    --warning-border: #b98520;
-    --success: #7dd99f;
-    --focus: #9bcaff;
+    --accent: #8ab4ff;
+    --accent-soft: #17233a;
+    --warning-bg: #33280f;
+    --warning-text: #ffe5a5;
+    --warning-border: #8f7028;
+    --danger-bg: #351921;
+    --danger-text: #ffc2cf;
+    --danger-border: #864052;
+    --success: #7bdca6;
+    --focus: #9bc7ff;
+    --shadow: 0 18px 45px rgba(0, 0, 0, .28);
   }
 }
 * { box-sizing: border-box; }
 html, body { min-width: 0; }
 body {
   margin: 0;
-  padding: 10px;
+  padding: 8px;
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: transparent;
   color: var(--text);
 }
 .card {
-  display: grid;
-  gap: 12px;
-  width: 100%;
-  min-width: 0;
-  padding: 14px;
+  width: min(100%, 720px);
+  margin: 0 auto;
+  padding: 18px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 18px;
   background: var(--bg);
   color: var(--text);
+  box-shadow: var(--shadow);
 }
-h2 {
-  font-size: 16px;
-  line-height: 1.3;
-  margin: 0;
-  color: var(--text);
-}
-p { margin: 0; line-height: 1.45; color: var(--text); }
-.details {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
+.header {
   display: grid;
-  gap: 8px;
-  font-size: 13px;
-  min-width: 0;
-}
-.row {
-  display: grid;
-  grid-template-columns: minmax(72px, 88px) minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
   align-items: start;
 }
-.label { color: var(--text); }
-.value {
-  min-width: 0;
-  color: var(--text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+.icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
-.warning {
-  display: none;
-  padding: 10px 12px;
-  border: 1px solid var(--warning-border);
-  border-radius: 10px;
-  background: var(--warning-bg);
-  color: var(--warning-text);
+.icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.eyebrow {
+  margin: 0 0 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.25;
+  letter-spacing: -.015em;
+}
+.intro {
+  margin: 5px 0 0;
+  color: var(--muted);
   font-size: 13px;
   line-height: 1.45;
 }
-.warning.visible { display: block; }
-.warning strong { color: var(--warning-text); }
+.scope {
+  margin-top: 15px;
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.scope-label {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.scope-value {
+  display: block;
+  color: var(--text);
+  font: 650 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 9px;
+}
+.detail {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.detail-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.detail-value {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+.detail-help {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.notice {
+  display: none;
+  margin-top: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--warning-border);
+  border-radius: 12px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.notice.visible { display: block; }
+.notice.sensitive {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+.notice strong { color: inherit; }
 .actions {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 15px;
 }
 button {
-  min-height: 38px;
+  min-height: 40px;
   border: 1px solid var(--border);
-  border-radius: 9px;
-  padding: 8px 12px;
+  border-radius: 10px;
+  padding: 9px 15px;
   font: inherit;
-  font-weight: 650;
+  font-size: 13px;
+  font-weight: 750;
   cursor: pointer;
-  transition: filter .12s ease, opacity .12s ease, transform .06s ease;
+  transition: background .12s ease, opacity .12s ease, transform .06s ease;
 }
-button:hover:not(:disabled) { filter: brightness(1.05); }
 button:active:not(:disabled) { transform: translateY(1px); }
 button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
-button:disabled { opacity: .48; cursor: default; }
+button:disabled { opacity: .45; cursor: default; }
 .primary {
   background: var(--primary);
   color: var(--primary-text);
   border-color: var(--primary);
 }
+.primary:hover:not(:disabled) { background: var(--primary-hover); }
 .secondary {
   background: var(--secondary);
   color: var(--secondary-text);
-  border-color: var(--border);
+}
+.secondary:hover:not(:disabled) { background: var(--surface-strong); }
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border);
 }
 .status {
-  font-size: 13px;
-  line-height: 1.4;
-  min-height: 20px;
-  color: var(--text);
-}
-.status.success { color: var(--success); font-weight: 650; }
-.note {
-  font-size: 12px;
-  line-height: 1.4;
+  min-width: 0;
   color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
 }
-@media (max-width: 380px) {
-  body { padding: 6px; }
-  .card { padding: 12px; }
-  .row { grid-template-columns: 1fr; gap: 2px; }
+.status.success { color: var(--success); font-weight: 700; }
+.note {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.3;
+  text-align: right;
+}
+@media (max-width: 520px) {
+  body { padding: 4px; }
+  .card { padding: 15px; border-radius: 15px; }
+  .details { grid-template-columns: 1fr; }
   .actions { display: grid; grid-template-columns: 1fr; }
   button { width: 100%; }
+  .footer { display: grid; }
+  .note { text-align: left; }
 }
 </style>
 </head>
 <body>
 <main class="card">
-  <h2 id="title">Autorizar acesso à VPS</h2>
-  <p id="intro">O Portico MCP pediu acesso a uma pasta. Confira o escopo antes de autorizar.</p>
+  <header class="header">
+    <div class="icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.7 2.9 8.3 7 10 4.1-1.7 7-5.3 7-10V6l-7-3Z"></path><path d="M9.5 12.2 11.2 14l3.7-4"></path></svg>
+    </div>
+    <div>
+      <p class="eyebrow" id="eyebrow">Portico MCP · Permissão</p>
+      <h2 id="title">Revisar acesso</h2>
+      <p class="intro" id="intro">Confira o que será liberado antes de autorizar.</p>
+    </div>
+  </header>
 
-  <section class="details" aria-label="Detalhes da autorização">
-    <div class="row"><strong class="label" id="rootLabel">Pasta</strong><span class="value" id="root">carregando…</span></div>
-    <div class="row"><strong class="label" id="accessLabel">Acesso</strong><span id="access">—</span></div>
-    <div class="row"><strong class="label" id="durationLabel">Duração</strong><span id="duration">—</span></div>
+  <section class="scope" aria-label="Escopo solicitado">
+    <span class="scope-label" id="scopeLabel">Pasta</span>
+    <span class="scope-value" id="scopeValue">carregando…</span>
   </section>
 
-  <div class="warning" id="ceilingWarning" role="alert"></div>
+  <section class="details" aria-label="Detalhes da autorização">
+    <div class="detail">
+      <span class="detail-label" id="accessLabel">Acesso</span>
+      <span class="detail-value" id="accessValue">—</span>
+      <span class="detail-help" id="accessHelp"></span>
+    </div>
+    <div class="detail">
+      <span class="detail-label" id="durationLabel">Duração</span>
+      <span class="detail-value" id="durationValue">—</span>
+      <span class="detail-help" id="durationHelp"></span>
+    </div>
+  </section>
+
+  <div class="notice" id="notice" role="alert"></div>
 
   <div class="actions">
-    <button class="primary" id="approve" disabled>Autorizar</button>
-    <button class="secondary" id="deny" disabled>Negar</button>
+    <button class="secondary" id="deny" disabled>Agora não</button>
+    <button class="primary" id="approve" disabled>Autorizar acesso</button>
   </div>
 
-  <div class="status" id="status" role="status" aria-live="polite">Preparando aprovação segura…</div>
-  <p class="note" id="note">A autorização usa um token de uso único entregue somente a este card. O modelo não recebe esse token.</p>
+  <footer class="footer">
+    <div class="status" id="status" role="status" aria-live="polite">Preparando aprovação segura…</div>
+    <div class="note" id="note">Você pode revogar depois.</div>
+  </footer>
 </main>
 <script>
 (() => {
-  const rootEl = document.getElementById("root");
-  const accessEl = document.getElementById("access");
-  const durationEl = document.getElementById("duration");
+  const scopeLabelEl = document.getElementById("scopeLabel");
+  const scopeValueEl = document.getElementById("scopeValue");
+  const accessValueEl = document.getElementById("accessValue");
+  const accessHelpEl = document.getElementById("accessHelp");
+  const durationValueEl = document.getElementById("durationValue");
+  const durationHelpEl = document.getElementById("durationHelp");
   const statusEl = document.getElementById("status");
   const approveEl = document.getElementById("approve");
   const denyEl = document.getElementById("deny");
-  const warningEl = document.getElementById("ceilingWarning");
+  const noticeEl = document.getElementById("notice");
 
   let rpcId = 0;
   const pending = new Map();
@@ -204,50 +328,81 @@ button:disabled { opacity: .48; cursor: default; }
   const pt = browserLang.startsWith("pt");
 
   const copy = pt ? {
-    title: "Autorizar acesso à VPS",
-    intro: "O Portico MCP pediu acesso a uma pasta. Confira o escopo antes de autorizar.",
-    root: "Pasta",
+    eyebrowRoot: "Portico MCP · Permissão de pasta",
+    eyebrowSensitive: "Portico MCP · Arquivo protegido",
+    titleRoot: "Revisar acesso ao projeto",
+    titleSensitive: "Liberar arquivo protegido?",
+    introRoot: "O Portico quer trabalhar nesta parte da VPS. Você continua no controle do escopo.",
+    introSensitive: "Este arquivo continua trancado mesmo quando a pasta do projeto já está autorizada.",
+    folder: "Pasta",
+    protectedFile: "Arquivo protegido",
     access: "Acesso",
     duration: "Duração",
-    permanent: "Permanente, até revogação",
-    authorize: "Autorizar",
+    permanent: "Permanente",
+    permanentHelp: "Fica ativo até você revogar.",
+    temporaryHelp: "Expira automaticamente.",
+    read: "Somente leitura",
+    readHelp: "Pode ver o conteúdo, sem alterar.",
+    work: "Trabalho",
+    workHelp: "Pode ler, criar, editar e usar shell confinado.",
+    compose: "Trabalho + Compose",
+    composeHelp: "Inclui operações Compose já permitidas pela política.",
+    sensitiveReadHelp: "Pode ler somente este arquivo protegido.",
+    sensitiveWorkHelp: "Pode ler e alterar somente este arquivo protegido.",
+    authorize: "Autorizar acesso",
+    authorizeSensitive: "Autorizar temporariamente",
     authorizeAll: "Autorizar todo ",
-    deny: "Negar",
-    waiting: "Aguardando sua decisão.",
+    deny: "Agora não",
+    waiting: "Pronto para sua decisão.",
     preparing: "Preparando aprovação segura…",
-    approving: "Autorizando…",
-    denying: "Negando…",
-    approved: "Acesso autorizado.",
-    denied: "Acesso negado.",
+    approving: "Aplicando autorização…",
+    denying: "Mantendo acesso bloqueado…",
+    approved: "Autorização aplicada.",
+    denied: "Acesso mantido bloqueado.",
     failed: "Não foi possível concluir: ",
-    bridgeFailed: "Este cliente não inicializou o card MCP Apps.",
-    note: "A autorização usa um token de uso único entregue somente a este card. O modelo não recebe esse token.",
-    warning: (root) => "<strong>Atenção:</strong> esta autorização cobre todo o teto físico <code>" + escapeHTML(root) + "</code>. O Portico poderá usar o perfil solicitado em qualquer pasta atual ou futura dentro desse caminho enquanto a autorização estiver ativa."
+    bridgeFailed: "O cliente não inicializou o card MCP Apps.",
+    note: "Você pode revogar depois.",
+    ceilingWarning: (root) => "<strong>Escopo amplo:</strong> autorizar <code>" + escapeHTML(root) + "</code> libera o perfil solicitado para todas as pastas atuais e futuras abaixo desse teto. Faça isso apenas se quiser conscientemente esse alcance.",
+    sensitiveWarning: "<strong>Camada extra de proteção:</strong> esta permissão vale somente para este arquivo e é temporária. A autorização normal da pasta não abre arquivos protegidos."
   } : {
-    title: "Authorize VPS access",
-    intro: "Portico MCP requested access to a folder. Review the scope before authorizing.",
-    root: "Folder",
+    eyebrowRoot: "Portico MCP · Folder permission",
+    eyebrowSensitive: "Portico MCP · Protected file",
+    titleRoot: "Review project access",
+    titleSensitive: "Unlock protected file?",
+    introRoot: "Portico wants to work in this part of the VPS. You remain in control of the scope.",
+    introSensitive: "This file stays locked even when the project folder is already authorized.",
+    folder: "Folder",
+    protectedFile: "Protected file",
     access: "Access",
     duration: "Duration",
-    permanent: "Permanent, until revoked",
-    authorize: "Authorize",
+    permanent: "Permanent",
+    permanentHelp: "Remains active until you revoke it.",
+    temporaryHelp: "Expires automatically.",
+    read: "Read only",
+    readHelp: "Can view content without changing it.",
+    work: "Work",
+    workHelp: "Can read, create, edit and use confined shell.",
+    compose: "Work + Compose",
+    composeHelp: "Includes Compose operations already allowed by policy.",
+    sensitiveReadHelp: "Can read only this protected file.",
+    sensitiveWorkHelp: "Can read and modify only this protected file.",
+    authorize: "Authorize access",
+    authorizeSensitive: "Authorize temporarily",
     authorizeAll: "Authorize all of ",
-    deny: "Deny",
-    waiting: "Waiting for your decision.",
+    deny: "Not now",
+    waiting: "Ready for your decision.",
     preparing: "Preparing secure approval…",
-    approving: "Authorizing…",
-    denying: "Denying…",
-    approved: "Access authorized.",
-    denied: "Access denied.",
+    approving: "Applying authorization…",
+    denying: "Keeping access locked…",
+    approved: "Authorization applied.",
+    denied: "Access remains locked.",
     failed: "Could not complete: ",
-    bridgeFailed: "This client did not initialize the MCP Apps card.",
-    note: "Authorization uses a one-time token delivered only to this card. The model never receives that token.",
-    warning: (root) => "<strong>Warning:</strong> this authorization covers the entire physical ceiling <code>" + escapeHTML(root) + "</code>. Portico may use the requested profile in any current or future folder inside that path while the authorization remains active."
+    bridgeFailed: "The client did not initialize the MCP Apps card.",
+    note: "You can revoke this later.",
+    ceilingWarning: (root) => "<strong>Broad scope:</strong> authorizing <code>" + escapeHTML(root) + "</code> applies the requested profile to every current and future folder below this ceiling. Do this only if you intentionally want that reach.",
+    sensitiveWarning: "<strong>Extra protection layer:</strong> this permission applies only to this file and is temporary. Normal folder authorization never unlocks protected files."
   };
 
-  document.getElementById("title").textContent = copy.title;
-  document.getElementById("intro").textContent = copy.intro;
-  document.getElementById("rootLabel").textContent = copy.root;
   document.getElementById("accessLabel").textContent = copy.access;
   document.getElementById("durationLabel").textContent = copy.duration;
   document.getElementById("note").textContent = copy.note;
@@ -291,28 +446,50 @@ button:disabled { opacity: .48; cursor: default; }
 
     const oa = window.openai;
     if (!request && oa?.toolOutput?.request_id) request = oa.toolOutput;
-    if (!approvalToken && oa?.toolResponseMetadata) {
-      approvalToken = findToken(oa.toolResponseMetadata);
-    }
+    if (!approvalToken && oa?.toolResponseMetadata) approvalToken = findToken(oa.toolResponseMetadata);
     render();
   }
 
-  function render() {
-    const ceilingWide = Boolean(request?.ceiling_wide);
-    if (request) {
-      rootEl.textContent = request.root || "—";
-      accessEl.textContent = request.access || "—";
-      const ttl = Number(request.delegation_ttl_seconds || 0);
-      durationEl.textContent = ttl > 0 ? formatDuration(ttl) : copy.permanent;
+  function accessCopy(kind, access) {
+    if (access === "read") return [copy.read, kind === "sensitive" ? copy.sensitiveReadHelp : copy.readHelp];
+    if (access === "work") return [copy.work, kind === "sensitive" ? copy.sensitiveWorkHelp : copy.workHelp];
+    if (access === "compose") return [copy.compose, copy.composeHelp];
+    return [access || "—", ""];
+  }
 
-      if (ceilingWide) {
-        const ceiling = request.physical_ceiling || request.root || "";
-        warningEl.innerHTML = copy.warning(ceiling);
-        warningEl.classList.add("visible");
+  function render() {
+    const kind = request?.kind === "sensitive" ? "sensitive" : "root";
+    const sensitive = kind === "sensitive";
+    const target = sensitive ? (request?.path || "") : (request?.root || "");
+    const ceilingWide = !sensitive && Boolean(request?.ceiling_wide);
+
+    document.getElementById("eyebrow").textContent = sensitive ? copy.eyebrowSensitive : copy.eyebrowRoot;
+    document.getElementById("title").textContent = sensitive ? copy.titleSensitive : copy.titleRoot;
+    document.getElementById("intro").textContent = sensitive ? copy.introSensitive : copy.introRoot;
+    scopeLabelEl.textContent = sensitive ? copy.protectedFile : copy.folder;
+
+    if (request) {
+      scopeValueEl.textContent = target || "—";
+      const [accessTitle, accessHelp] = accessCopy(kind, request.access);
+      accessValueEl.textContent = accessTitle;
+      accessHelpEl.textContent = accessHelp;
+
+      const ttl = Number(request.delegation_ttl_seconds || 0);
+      durationValueEl.textContent = ttl > 0 ? formatDuration(ttl) : copy.permanent;
+      durationHelpEl.textContent = ttl > 0 ? copy.temporaryHelp : copy.permanentHelp;
+
+      noticeEl.classList.remove("visible", "sensitive");
+      noticeEl.textContent = "";
+      if (sensitive) {
+        noticeEl.innerHTML = copy.sensitiveWarning;
+        noticeEl.classList.add("visible", "sensitive");
+        approveEl.textContent = copy.authorizeSensitive;
+      } else if (ceilingWide) {
+        const ceiling = request.physical_ceiling || target;
+        noticeEl.innerHTML = copy.ceilingWarning(ceiling);
+        noticeEl.classList.add("visible");
         approveEl.textContent = copy.authorizeAll + ceiling;
       } else {
-        warningEl.textContent = "";
-        warningEl.classList.remove("visible");
         approveEl.textContent = copy.authorize;
       }
     }
@@ -333,15 +510,17 @@ button:disabled { opacity: .48; cursor: default; }
   }
 
   async function sendModelContext(decision, response) {
-    const root = request?.root || "";
+    const kind = request?.kind === "sensitive" ? "sensitive" : "root";
+    const target = kind === "sensitive" ? (request?.path || "") : (request?.root || "");
     const access = request?.access || "";
     const approved = decision === "approve";
     try {
       await rpcRequest("ui/update-model-context", {
         structuredContent: {
-          vpsAgentRootAccess: {
+          vpsAgentAccess: {
             request_id: request?.request_id,
-            root,
+            kind,
+            target,
             access,
             decision: approved ? "approved" : "denied",
             result: response?.structuredContent || null
@@ -352,11 +531,11 @@ button:disabled { opacity: .48; cursor: default; }
 
     const text = pt
       ? (approved
-          ? "Autorizei o acesso " + access + " a " + root + ". Continue a tarefa original usando essa pasta."
-          : "Neguei o acesso a " + root + ". Não use essa pasta e continue sem ampliar esse escopo.")
+          ? "Autorizei o acesso " + access + " a " + target + ". Continue a tarefa original usando apenas esse escopo."
+          : "Neguei o acesso a " + target + ". Continue sem ampliar esse escopo.")
       : (approved
-          ? "I authorized " + access + " access to " + root + ". Continue the original task using that folder."
-          : "I denied access to " + root + ". Do not use that folder; continue without expanding scope.");
+          ? "I authorized " + access + " access to " + target + ". Continue the original task using only that scope."
+          : "I denied access to " + target + ". Continue without expanding that scope.");
     try {
       await rpcRequest("ui/message", {
         role: "user",
@@ -376,8 +555,11 @@ button:disabled { opacity: .48; cursor: default; }
     statusEl.textContent = decision === "approve" ? copy.approving : copy.denying;
     render();
     try {
+      const toolName = request?.kind === "sensitive"
+        ? "permissions.confirm_sensitive_access"
+        : "permissions.confirm_root_access";
       const response = await rpcRequest("tools/call", {
-        name: "permissions.confirm_root_access",
+        name: toolName,
         arguments: {
           request_id: request.request_id,
           approval_token: approvalToken,
@@ -411,16 +593,14 @@ button:disabled { opacity: .48; cursor: default; }
       return;
     }
 
-    if (message.method === "ui/notifications/tool-result") {
-      hydrate(message.params);
-    }
+    if (message.method === "ui/notifications/tool-result") hydrate(message.params);
   }, { passive: true });
 
   approveEl.addEventListener("click", () => decide("approve"));
   denyEl.addEventListener("click", () => decide("deny"));
 
   const bridgeReady = rpcRequest("ui/initialize", {
-    appInfo: { name: "portico-mcp-root-approval", version: "1.1.0" },
+    appInfo: { name: "portico-mcp-access-approval", version: "1.2.0" },
     appCapabilities: {},
     protocolVersion: "2026-01-26"
   }).then(() => {
@@ -443,9 +623,9 @@ button:disabled { opacity: .48; cursor: default; }
 
 func registerRootApprovalWidget(server *mcp.Server) {
 	server.AddResource(&mcp.Resource{
-		Name:        "portico-mcp-root-approval",
-		Title:       "Portico MCP root access approval",
-		Description: "Interactive card for approving or denying a pending VPS root delegation.",
+		Name:        "portico-mcp-access-approval",
+		Title:       "Portico MCP access approval",
+		Description: "Interactive card for reviewing and deciding a pending Portico MCP authorization request.",
 		URI:         rootApprovalWidgetURI,
 		MIMEType:    "text/html;profile=mcp-app",
 	}, func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
@@ -456,14 +636,14 @@ func registerRootApprovalWidget(server *mcp.Server) {
 				Text:     rootApprovalWidgetHTML,
 				Meta: mcp.Meta{
 					"ui": map[string]any{
-						"prefersBorder": true,
+						"prefersBorder": false,
 						"csp": map[string]any{
 							"connectDomains":  []string{},
 							"resourceDomains": []string{},
 						},
 					},
-					"openai/widgetDescription": "Review and approve or deny one Portico MCP root delegation request.",
-					"openai/widgetPrefersBorder": true,
+					"openai/widgetDescription": "Review exactly what Portico MCP is requesting, then authorize or keep it locked.",
+					"openai/widgetPrefersBorder": false,
 				},
 			}},
 		}, nil
