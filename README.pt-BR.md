@@ -71,9 +71,9 @@ Antes de iniciar a instalação guiada, tenha:
 - pelo menos 2 GB de RAM para o caminho OAuth integrado com ZITADEL;
 - Git, OpenSSL, Python 3 e curl;
 - um domínio/DNS público apontando para a VPS, portas TCP 80/443 disponíveis e HTTPS válido;
-- **ChatGPT Plus ou superior**, com Modo de Desenvolvedor e criação de app MCP personalizado realmente disponíveis no ChatGPT Web da conta.
+- uma conta/workspace do ChatGPT Web em que o Modo de Desenvolvedor e a criação de app MCP personalizado estejam realmente disponíveis.
 
-As capacidades por plano são controladas pela OpenAI e podem mudar conforme plano, conta e rollout. A documentação atual da OpenAI descreve suporte MCP completo, incluindo ações de escrita/alteração, para Business, Enterprise e Edu. Se uma conta expuser apenas capacidades MCP mais restritas de leitura/busca, o Portico MCP não pode elevar essa permissão do lado do ChatGPT.
+A OpenAI controla disponibilidade e permissões por plano, workspace e rollout. A documentação oficial atual lista **suporte MCP completo, incluindo escrita/alteração, para Business, Enterprise e Edu**; usuários Pro podem conectar MCPs personalizados com permissões de leitura/busca no modo de desenvolvedor. O Portico MCP não pode elevar permissões que o próprio ChatGPT não exponha. Antes de depender de um rótulo de plano, confira a interface atual da conta e a documentação oficial da OpenAI.
 
 Veja [compatibilidade](docs/compatibility.md) para a matriz suportada/testada.
 
@@ -88,7 +88,7 @@ bash scripts/install.sh
 O terminal conduz o fluxo suportado:
 
 ~~~text
-Ambiente
+Pré-requisitos
  -> Escopo: Standard / Project / Whole Host
  -> revisão da autoridade efetiva
  -> Containers
