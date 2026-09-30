@@ -40,6 +40,20 @@ if [ "$remove_source" -eq 1 ] && [ "$mode" != "--purge" ]; then
 fi
 
 repo_root="$PWD"
+
+remove_legacy_sandbox() {
+  [ -d /opt/vps-agent-sandbox ] || return 0
+  if rmdir /opt/vps-agent-sandbox >/dev/null 2>&1; then
+    return 0
+  fi
+  command -v sudo >/dev/null 2>&1 || return 0
+  if [ -t 0 ]; then
+    sudo rmdir /opt/vps-agent-sandbox >/dev/null 2>&1 || true
+  else
+    sudo -n rmdir /opt/vps-agent-sandbox >/dev/null 2>&1 || true
+  fi
+}
+
 source_verified=0
 if [ "$remove_source" -eq 1 ]; then
   git_top="$(git rev-parse --show-toplevel 2>/dev/null || true)"
@@ -96,7 +110,7 @@ if [ ! -f .env ] && [ -z "$project_ids" ]; then
     rm -rf -- state backups
     rm -f -- config/policy.yaml
     docker image rm mcp-vps-agent-gateway:local mcp-vps-agent-broker:local >/dev/null 2>&1 || true
-    rmdir /opt/vps-agent-sandbox >/dev/null 2>&1 || true
+    remove_legacy_sandbox
   fi
   echo "Runtime already absent; removal is idempotently complete."
   if [ "$remove_source" -eq 1 ] && [ "$source_verified" -eq 1 ]; then
@@ -207,22 +221,9 @@ rm -f -- .env config/policy.yaml
 # images configured by the operator or images merely used by managed workloads.
 docker image rm   mcp-vps-agent-gateway:local   mcp-vps-agent-broker:local   >/dev/null 2>&1 || true
 
-# Legacy pre-Portico scaffold. rmdir is intentionally used instead of rm -rf:
+# Legacy pre-Portico scaffold. The helper uses rmdir, never rm -rf:
 # a non-empty directory is preserved rather than risking user data.
-legacy_sandbox_removed=0
-if [ -d /opt/vps-agent-sandbox ]; then
-  if rmdir /opt/vps-agent-sandbox >/dev/null 2>&1; then
-    legacy_sandbox_removed=1
-  elif command -v sudo >/dev/null 2>&1; then
-    if [ -t 0 ]; then
-      if sudo rmdir /opt/vps-agent-sandbox >/dev/null 2>&1; then
-        legacy_sandbox_removed=1
-      fi
-    elif sudo -n rmdir /opt/vps-agent-sandbox >/dev/null 2>&1; then
-      legacy_sandbox_removed=1
-    fi
-  fi
-fi
+remove_legacy_sandbox
 
 cat <<EOF
 
