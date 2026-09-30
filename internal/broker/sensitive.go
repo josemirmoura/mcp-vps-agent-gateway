@@ -122,25 +122,37 @@ func (b *Broker) guardSensitiveRequest(ctx context.Context, req wire.Request) *w
 		checks = append(checks, check{path: req.Resource})
 	case "file.write", "file.write_test", "file.patch", "file.remove", "file.chmod", "file.chown":
 		checks = append(checks, check{path: req.Resource, write: true})
-	case "file.copy":
+	case "file.copy", "file.move":
 		var in struct {
 			Destination string `json:"destination"`
 		}
 		if json.Unmarshal(req.Args, &in) == nil && in.Destination != "" {
+			readRoots, writeRoots, err := b.effectiveFileRoots(ctx, req.Subject)
+			if err != nil {
+				resp := deny(req.ID, "sensitive_path_check_failed", err.Error())
+				return &resp
+			}
+			sourceProtected, err := sensitive.IsProtected(
+				os.Getenv("VPS_AGENT_HOST_ROOT"),
+				req.Resource,
+				readRoots,
+				sensitive.DefaultScanLimit,
+			)
+			if err != nil {
+				resp := deny(req.ID, "sensitive_path_check_failed", err.Error())
+				return &resp
+			}
+			if sourceProtected && !sensitive.ProtectedName(in.Destination) {
+				resp := deny(req.ID, "sensitive_path_locked",
+					"protected secret material cannot be copied or moved to an unprotected filename")
+				return &resp
+			}
+			sourceWrite := req.Tool == "file.move"
 			checks = append(checks,
-				check{path: req.Resource},
+				check{path: req.Resource, write: sourceWrite},
 				check{path: in.Destination, write: true},
 			)
-		}
-	case "file.move":
-		var in struct {
-			Destination string `json:"destination"`
-		}
-		if json.Unmarshal(req.Args, &in) == nil && in.Destination != "" {
-			checks = append(checks,
-				check{path: req.Resource, write: true},
-				check{path: in.Destination, write: true},
-			)
+			_ = writeRoots
 		}
 	default:
 		return nil
