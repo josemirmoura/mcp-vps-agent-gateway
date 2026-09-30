@@ -55,7 +55,9 @@ Advanced operators can reproduce that bootstrap explicitly:
 bash scripts/init.sh --scope /opt --dynamic-baseline
 ~~~
 
-The bootstrap checks Docker Compose, creates `.env` with random local secrets and a stable instance ID when needed, creates `config/policy.yaml` from the versioned template, persists the selected physical ceiling, configures the confined shell to use a real non-root host user, creates the local state directory, and validates Compose syntax.
+Before bootstrap mutates Portico state, the guided installer runs `scripts/preflight.py`. It checks the supported host/runtime prerequisites and, for the public path, whether an existing Traefik can be reused or whether the bundled proxy can safely own ports 80/443. Missing mandatory prerequisites stop before `.env`, policy or runtime state is created.
+
+The bootstrap then checks Docker Compose, creates `.env` with random local secrets and a stable instance ID when needed, creates `config/policy.yaml` from the versioned template, persists the selected physical ceiling, configures the confined shell to use a real non-root host user, creates the local state directory, and validates Compose syntax.
 
 ## Physical filesystem ceiling
 
@@ -80,6 +82,8 @@ permissions.request_root_access
 `read` grants filesystem read. `work` grants filesystem read/write plus scoped shell cwd. `compose` adds Compose authority only for Compose actions already enabled by the static action policy.
 
 Advanced operators may still define static roots with `scripts/delegate-root.sh`. Manual editing of `config/policy.yaml` is not required by the normal guided installation.
+
+Dynamic approval may target a subdirectory or, after a stronger explicit warning, the exact configured physical ceiling. The ceiling is still the hard maximum boundary; no dynamic approval can escape it.
 
 systemd, Docker/Compose actions, network, packages, users/groups, firewall, and temporary elevation remain separately constrained by static server policy.
 
@@ -112,7 +116,7 @@ A local verification success means the runtime is ready. It does **not** mean in
 
 ChatGPT needs a reachable remote HTTPS MCP endpoint, but the operator should not have to assemble an identity provider by hand.
 
-The package does not control the user's DNS provider, so DNS is an unavoidable manual platform action. Create a DNS A/AAAA record pointing a hostname at the VPS. The setup script validates that the hostname resolves before it proceeds, and the public verifier later confirms valid HTTPS.
+The package does not control the user's DNS provider, so DNS is an unavoidable manual platform action. The guided setup explains how to create a subdomain, point a DNS A/AAAA record at the VPS and enter only the hostname. The setup script validates that the hostname resolves before it proceeds, and the public verifier later confirms valid HTTPS.
 
 Then run:
 
@@ -120,7 +124,7 @@ Then run:
 bash scripts/setup-integrated-auth.sh
 ~~~
 
-The script reuses a single existing Traefik when one is present. If none is present and ports 80/443 are free, it starts the bundled Traefik. It then starts ZITADEL + PostgreSQL, creates the dedicated non-admin operator identity, creates an MCP-only OAuth resource audience plus a private introspection client, enables MCP-compatible Dynamic Client Registration, configures the Gateway/Broker identity binding and runs the public verification.
+The script reuses a single existing Traefik when one is present. If none is present and ports 80/443 are free, it starts the bundled Traefik. It then starts ZITADEL + PostgreSQL, creates the dedicated non-admin operator identity, shows the OAuth username and email that will be used at login, creates an MCP-only OAuth resource audience plus a private introspection client, enables MCP-compatible Dynamic Client Registration, configures the Gateway/Broker identity binding and runs the public verification.
 
 A successful phase ends with:
 
@@ -163,9 +167,9 @@ Installation is NOT complete.
 
 ## Phase 8 — Verify the real ChatGPT connection
 
-The connection script waits for an audited call from the configured subject.
+The connection script first records a validated audit baseline. In an interactive terminal, the user completes ChatGPT setup at their own pace and returns to press Enter when ready to verify.
 
-The user asks ChatGPT to call system.info.
+The user asks ChatGPT to call system.info. Each Enter checks for a matching audited call after the fixed baseline. If it is not present, Portico explains what to check and allows another attempt without restarting the installation.
 
 Success requires:
 
