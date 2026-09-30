@@ -118,7 +118,7 @@ vps_agent_banner() {
   printf '| %-58s |\n' "$VPS_AGENT_PRODUCT_NAME"
   printf '| %-58s |\n' "$tagline"
   printf '| %-58s |\n' "$author"
-  printf '| %-58s |\n' "Version: $version"
+  printf '| %-58s |\n' "$(vps_agent_text "Version: $version" "Versão: $version")"
   printf '+------------------------------------------------------------+\n\n'
 }
 
