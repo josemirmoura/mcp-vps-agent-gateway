@@ -242,7 +242,9 @@
     "Stopping Portico MCP containers...": "Menghentikan kontainer Portico MCP...",
     "Public MCP endpoint is no longer reachable from this host.": "Endpoint MCP publik tidak lagi dapat dijangkau dari host ini.",
     "Check for a stale proxy route before considering removal complete.": "Periksa route proxy lama sebelum menganggap penghapusan selesai.",
-    "Reloading Broker with the updated policy...": "Memuat ulang Broker dengan policy yang diperbarui..."
+    "Reloading Broker with the updated policy...": "Memuat ulang Broker dengan policy yang diperbarui...",
+    "health": "kesehatan",
+    "restarts": "restart"
   },
   "blocks": {
     "install.usage": "penggunaan: bash scripts/install.sh [opsi]\n\nInstalasi Portico MCP yang terpandu dan transparan.\n\nProfil:\n  custom       Rekomendasi: batas /opt dengan persetujuan root dinamis.\n  project      Batasi Portico MCP ke satu root proyek/filesystem.\n  whole-host   Batas fisik filesystem \"/\". Tidak otomatis mengaktifkan Full.\n\nOpsi:\n  --profile PROFILE         custom | project | whole-host\n  --scope PATH              Batas/root yang sudah ada untuk custom/project.\n  --create-scope            Buat cakupan yang belum ada secara eksplisit.\n  --run-as USER             Pengguna non-root untuk job shell terbatas.\n  --lang LANG               en | pt-BR | es | de | fr | ja | id\n  --domain HOSTNAME         Hostname publik MCP/OAuth.\n  --operator-email EMAIL    Email operator OAuth khusus.\n  --operator-username NAME  Nama pengguna login OAuth.\n  --local-only              Berhenti setelah verifikasi runtime lokal.\n  --yes                     Terima otoritas efektif yang ditampilkan.\n  --ack-whole-host          Wajib bersama --yes untuk whole-host.\n  -h, --help                Tampilkan bantuan ini.\n",
@@ -251,7 +253,13 @@
     "init.usage": "penggunaan: bash scripts/init.sh [--scope /path/absolut/yang/ada] [opsi]\n\nOpsi:\n  --scope PATH          Atur batas fisik filesystem pada mode Scoped.\n  --dynamic-baseline    Mulai tanpa root proyek logis statis.\n                        Root proyek diotorisasi nanti melalui persetujuan dinamis.\n  --run-as USER         Pengguna host non-root untuk job shell terbatas.\n  --migrate-policy-root Ganti referensi root sebelumnya di policy.yaml.\n                        Gunakan untuk memindahkan root proyek, bukan memperluas batas.\n  --lang LANG           Bahasa: en | pt-BR | es | de | fr | ja | id.\n  -h, --help            Tampilkan bantuan ini.\n",
     "setup_auth.usage": "penggunaan: bash scripts/setup-integrated-auth.sh [--domain mcp.contoh.id] [opsi]\n\nKonfigurasikan jalur publik yang didukung untuk ChatGPT: OAuth/OIDC self-hosted\ndengan ZITADEL, PostgreSQL, dan Portico Gateway/Broker yang ada.\n\nOpsi:\n  --domain DOMAIN          Nama DNS publik untuk MCP + OAuth.\n  --operator-email EMAIL   Email login operator Portico.\n  --operator-username NAME Nama pengguna login (bawaan: vps-operator).\n  --edge-network NETWORK   Jaringan Docker Traefik yang sudah ada.\n  --certresolver NAME      Resolver ACME Traefik yang sudah ada.\n  --bundled-proxy          Paksa Traefik bawaan alih-alih menggunakan yang ada.\n  -h, --help               Tampilkan bantuan ini.\n\nKata sandi operator OAuth khusus dimasukkan secara lokal tanpa ditampilkan.\nIni bukan kata sandi VPS/SSH Anda dan tidak boleh diberikan kepada ChatGPT.\n",
     "setup_auth.domain_help": "\nUntuk menghubungkan ChatGPT ke Portico MCP, VPS ini memerlukan hostname publik.\n\n1. Di panel DNS domain yang Anda kendalikan, buat subdomain, misalnya:\n   mcp.contoh.id\n\n2. Buat record DNS A yang mengarah ke IP publik VPS ini.\n   Jika menggunakan IPv6, Anda juga dapat membuat record AAAA.\n\n3. Tunggu DNS teresolusi, lalu masukkan hanya hostname di bawah,\n   tanpa https:// dan tanpa /mcp.\n\nContoh:\n  mcp.contoh.id\n\n",
-    "connect.not_detected": "Panggilan system.info dari ChatGPT belum terdeteksi.\n\nPeriksa bahwa:\n- app MCP sudah dibuat;\n- OAuth sudah selesai;\n- Portico MCP dipilih di chat;\n- pesan pengujian benar-benar sudah dikirim.\n\nTidak ada yang hilang. Perbaiki yang diperlukan lalu tekan Enter untuk mencoba lagi.\n"
+    "connect.not_detected": "Panggilan system.info dari ChatGPT belum terdeteksi.\n\nPeriksa bahwa:\n- app MCP sudah dibuat;\n- OAuth sudah selesai;\n- Portico MCP dipilih di chat;\n- pesan pengujian benar-benar sudah dikirim.\n\nTidak ada yang hilang. Perbaiki yang diperlukan lalu tekan Enter untuk mencoba lagi.\n",
+    "remove.usage": "penggunaan: bash scripts/remove.sh [safe|--purge] [--remove-source]\n\nsafe             Hentikan Portico MCP dan rotasi kredensial lokal sambil mempertahankan\n                 konfigurasi, policy, audit, dan identitas terintegrasi.\n--purge          Hapus runtime, volume, state/konfigurasi lokal milik MCP,\n                 image lokal bawaan, dan struktur lama yang kosong.\n--remove-source  Hanya bersama --purge: hapus juga checkout Git ini setelah\n                 konfirmasi eksplisit kedua.\n",
+    "remove.summary": "Mode penghapusan: {mode}\nRuntime: Gateway + Broker + proxy paket (jika dikonfigurasi)\nResource VPS terkelola: DIPERTAHANKAN\nPolicy/audit operator: {policy_state}\nCheckout source: {source_state}\n",
+    "remove.safe_complete": "\nPENGHAPUSAN AMAN SELESAI\nDihapus:\n  runtime Gateway/Broker/proxy paket\n  grant sementara aktif\nDibatalkan:\n  kredensial bearer lokal admin/static sebelumnya\nDipertahankan:\n  .env (dengan kredensial lokal yang telah dirotasi)\n  config/policy.yaml\n  audit state/ dan riwayat operasi\n  state identitas terintegrasi\n  semua resource VPS yang boleh dikelola Portico\n",
+    "remove.purge_complete": "\nPURGE PENUH SELESAI\nArtefak lokal Portico yang dihapus:\n  runtime/volume\n  image lokal bawaan Gateway/Broker (jika ada)\n  .env\n  config/policy.yaml\n  state/\n  backups/\n  /opt/vps-agent-sandbox lama yang kosong (jika ada)\nDipertahankan:\n  aplikasi, situs, database, image/kontainer pihak ketiga, service, dan file terdelegasi\n",
+    "delegate.usage": "penggunaan:\n  bash scripts/delegate-root.sh add /opt/proyek [--access read|work|compose] [--apply]\n  bash scripts/delegate-root.sh remove /opt/proyek [--apply]\n  bash scripts/delegate-root.sh list\n\nProfil akses:\n  read      hanya baca filesystem\n  work      baca/tulis + cwd shell terbatas (bawaan)\n  compose   work + inspeksi/kelola Docker Compose untuk direktori proyek tersebut\n\nPath harus berada di dalam VPS_AGENT_SCOPE_ROOT. Mendelegasikan batas fisik itu sendiri\nmemerlukan --allow-ceiling saat dilakukan manual dari terminal.\n",
+    "delegate.pending": "\nPolicy diperbarui, tetapi Broker yang sedang berjalan belum dimuat ulang.\nTinjau terlebih dahulu:\n  python3 scripts/authority-summary.py\n\nLalu terapkan:\n  bash scripts/delegate-root.sh list\n  docker compose up -d --force-recreate broker\n  bash scripts/verify.sh\n\nAtau jalankan ulang perintah add/remove dengan --apply.\n"
   },
   "messages": {
     "install.profile_prompt": "Profil [1]: ",
@@ -284,6 +292,14 @@
     "error.public_url_https": "Endpoint MCP publik harus menggunakan HTTPS: {url}",
     "error.expected_401": "Diharapkan HTTP 401 dari permintaan MCP tanpa autentikasi, tetapi mendapat {code}.",
     "verify.local_call_skipped": "Panggilan tool MCP lokal dilewati untuk mode autentikasi {mode}; verifikasi OAuth publik akan digunakan.",
-    "connect.email_line": "   Email akun: {email}"
+    "connect.email_line": "   Email akun: {email}",
+    "update.non_ff": "Pembaruan non-fast-forward ditolak: target {target} bukan turunan dari {current}.",
+    "update.rollback": "Pembaruan gagal; rollback ke {current}...",
+    "remove.usage_line": "penggunaan: {script} [safe|--purge] [--remove-source]",
+    "remove.incomplete_containers": "Penghapusan belum lengkap: kontainer paket masih ada: {containers}",
+    "remove.public_route_gone": "Route MCP publik sudah hilang (HTTP {code} dari proxy edge yang tersisa).",
+    "remove.url_still_live": "Penghapusan belum lengkap: URL MCP masih mengembalikan HTTP {code}, bukannya menghilang.",
+    "remove.deleting_source": "Menghapus checkout source Portico MCP terverifikasi: {path}",
+    "diagnose.usage": "penggunaan: {script} [status|health|logs [baris]|audit [limit]|bundle [output.tar.gz]]"
   }
 }
