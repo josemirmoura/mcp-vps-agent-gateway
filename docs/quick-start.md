@@ -93,7 +93,7 @@ native MCP client confirmation (elicitation)
 Broker activates read / work / compose for that root
 ~~~
 
-The model cannot approve its own permission expansion. The approval token is delivered only to the app UI and the Broker binds the decision to the authenticated subject and pending request.
+The model cannot approve its own permission expansion. On elicitation-capable clients, opaque approval state travels only through the protocol round trip; the model does not receive a self-approval tool or usable approval token. The Broker binds the decision to the authenticated subject and pending request.
 
 ## Project-locked profile
 
