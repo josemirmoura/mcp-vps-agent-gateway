@@ -15,7 +15,19 @@ for arg in "$@"; do
     --purge) mode="--purge" ;;
     --remove-source) remove_source=1 ;;
     -h|--help)
-      cat <<'EOF'
+      if vps_agent_is_pt_br; then
+        cat <<'EOF'
+uso: bash scripts/remove.sh [safe|--purge] [--remove-source]
+
+safe             Para o Portico MCP e gira credenciais locais, preservando
+                 configuração, policy, auditoria e identidade integrada.
+--purge          Remove runtime, volumes, estado/configuração local,
+                 imagens locais padrão e estruturas legadas vazias.
+--remove-source  Apenas com --purge: remove também este checkout Git após
+                 uma segunda confirmação explícita.
+EOF
+      else
+        cat <<'EOF'
 usage: bash scripts/remove.sh [safe|--purge] [--remove-source]
 
 safe             Stop Portico MCP and rotate local credentials while preserving
@@ -25,17 +37,18 @@ safe             Stop Portico MCP and rotate local credentials while preserving
 --remove-source  With --purge only: also delete this Git checkout after a
                  separate explicit confirmation.
 EOF
+      fi
       exit 0
       ;;
     *)
-      echo "usage: $0 [safe|--purge] [--remove-source]" >&2
+      echo "$(vps_agent_text "usage: $0 [safe|--purge] [--remove-source]" "uso: $0 [safe|--purge] [--remove-source]")" >&2
       exit 2
       ;;
   esac
 done
 
 if [ "$remove_source" -eq 1 ] && [ "$mode" != "--purge" ]; then
-  echo "ERROR: --remove-source requires --purge." >&2
+  echo "$(vps_agent_text 'ERROR: --remove-source requires --purge.' 'ERRO: --remove-source requer --purge.')" >&2
   exit 2
 fi
 
@@ -58,7 +71,7 @@ source_verified=0
 if [ "$remove_source" -eq 1 ]; then
   git_top="$(git rev-parse --show-toplevel 2>/dev/null || true)"
   if [ "$git_top" != "$repo_root" ] || ! grep -q '^module github.com/josemirmoura/mcp-vps-agent-gateway$' go.mod 2>/dev/null; then
-    echo "ERROR: refusing source deletion because this directory cannot be verified as a Portico MCP checkout." >&2
+    echo "$(vps_agent_text 'ERROR: refusing source deletion because this directory cannot be verified as a Portico MCP checkout.' 'ERRO: remoção do código recusada porque este diretório não pôde ser verificado como checkout do Portico MCP.')" >&2
     exit 1
   fi
   source_verified=1
@@ -72,26 +85,26 @@ fi
 
 if [ "$mode" = "--purge" ] && [ "${VPS_AGENT_PURGE_CONFIRM:-}" != "PURGE" ]; then
   if [ ! -t 0 ]; then
-    echo "Full purge requires VPS_AGENT_PURGE_CONFIRM=PURGE in non-interactive mode." >&2
+    echo "$(vps_agent_text 'Full purge requires VPS_AGENT_PURGE_CONFIRM=PURGE in non-interactive mode.' 'O purge completo requer VPS_AGENT_PURGE_CONFIRM=PURGE em modo não interativo.')" >&2
     exit 1
   fi
-  printf 'Type PURGE to delete this Portico MCP installation configuration/state: '
+  printf '%s' "$(vps_agent_text 'Type PURGE to delete this Portico MCP installation configuration/state: ' 'Digite PURGE para apagar a configuração/estado desta instalação do Portico MCP: ')"
   read -r answer
   if [ "$answer" != "PURGE" ]; then
-    echo "Purge cancelled."
+    echo "$(vps_agent_text 'Purge cancelled.' 'Purge cancelado.')"
     exit 1
   fi
 fi
 
 if [ "$remove_source" -eq 1 ] && [ "${VPS_AGENT_REMOVE_SOURCE_CONFIRM:-}" != "REMOVE_SOURCE" ]; then
   if [ ! -t 0 ]; then
-    echo "Source deletion requires VPS_AGENT_REMOVE_SOURCE_CONFIRM=REMOVE_SOURCE in non-interactive mode." >&2
+    echo "$(vps_agent_text 'Source deletion requires VPS_AGENT_REMOVE_SOURCE_CONFIRM=REMOVE_SOURCE in non-interactive mode.' 'A remoção do código requer VPS_AGENT_REMOVE_SOURCE_CONFIRM=REMOVE_SOURCE em modo não interativo.')" >&2
     exit 1
   fi
-  printf 'Type REMOVE_SOURCE to also delete this Git checkout: '
+  printf '%s' "$(vps_agent_text 'Type REMOVE_SOURCE to also delete this Git checkout: ' 'Digite REMOVE_SOURCE para apagar também este checkout Git: ')"
   read -r source_answer
   if [ "$source_answer" != "REMOVE_SOURCE" ]; then
-    echo "Source deletion cancelled."
+    echo "$(vps_agent_text 'Source deletion cancelled.' 'Remoção do código cancelada.')"
     exit 1
   fi
 fi
@@ -112,7 +125,7 @@ if [ ! -f .env ] && [ -z "$project_ids" ]; then
     docker image rm mcp-vps-agent-gateway:local mcp-vps-agent-broker:local >/dev/null 2>&1 || true
     remove_legacy_sandbox
   fi
-  echo "Runtime already absent; removal is idempotently complete."
+  echo "$(vps_agent_text 'Runtime already absent; removal is idempotently complete.' 'O runtime já está ausente; a remoção idempotente está concluída.')"
   if [ "$remove_source" -eq 1 ] && [ "$source_verified" -eq 1 ]; then
     parent="$(dirname "$repo_root")"
     cd /
@@ -120,7 +133,7 @@ if [ ! -f .env ] && [ -z "$project_ids" ]; then
     if [ "$(basename "$parent")" = "vps-agent-lab" ]; then
       rmdir "$parent" >/dev/null 2>&1 || true
     fi
-    echo "Portico MCP source checkout removed."
+    echo "$(vps_agent_text 'Portico MCP source checkout removed.' 'Checkout do Portico MCP removido.')"
   fi
   exit 0
 fi
@@ -137,7 +150,7 @@ if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ] && [ -f compose.integrated-auth
 fi
 
 if [ -f .env ] && [ -n "$project_ids" ]; then
-  echo "Revoking temporary grants before shutdown..."
+  echo "$(vps_agent_text 'Revoking temporary grants before shutdown...' 'Revogando autorizações temporárias antes do desligamento...')"
   docker compose exec -T broker /usr/local/bin/vps-agent revoke-all --socket /run/vps-agent/broker.sock >/dev/null 2>&1 || true
 fi
 
@@ -156,10 +169,10 @@ if old_static: text=text.replace(old_static,new_static)
 p.write_text(text)
 PY
   chmod 600 .env
-  echo "Local admin/static credentials rotated."
+  echo "$(vps_agent_text 'Local admin/static credentials rotated.' 'Credenciais locais admin/static foram rotacionadas.')"
 fi
 
-echo "Stopping Portico MCP containers..."
+echo "$(vps_agent_text 'Stopping Portico MCP containers...' 'Parando os contêineres do Portico MCP...')"
 if [ -f .env ]; then
   "${compose[@]}" down --remove-orphans
 else
@@ -168,7 +181,7 @@ fi
 
 left="$(docker ps -aq --filter label=com.docker.compose.project=mcp-vps-agent 2>/dev/null || true)"
 if [ -n "$left" ]; then
-  echo "Removal incomplete: package containers still exist: $left" >&2
+  echo "$(vps_agent_text "Removal incomplete: package containers still exist: $left" "Remoção incompleta: ainda existem contêineres do pacote: $left")" >&2
   exit 1
 fi
 
@@ -176,14 +189,14 @@ if [ -n "${VPS_AGENT_PUBLIC_URL:-}" ]; then
   code="$(curl --silent --show-error --max-time 5 --output /dev/null --write-out '%{http_code}' "${VPS_AGENT_PUBLIC_URL}" 2>/dev/null || true)"
   case "$code" in
     000|"")
-      echo "Public MCP endpoint is no longer reachable from this host."
+      echo "$(vps_agent_text 'Public MCP endpoint is no longer reachable from this host.' 'O endpoint MCP público não está mais acessível a partir deste host.')"
       ;;
     404|410)
-      echo "Public MCP route is gone (HTTP $code from the remaining edge proxy)."
+      echo "$(vps_agent_text "Public MCP route is gone (HTTP $code from the remaining edge proxy)." "A rota MCP pública foi removida (HTTP $code no proxy de borda remanescente).")"
       ;;
     *)
       echo "Removal incomplete: the MCP URL still returned HTTP $code instead of disappearing." >&2
-      echo "Check for a stale proxy route before considering removal complete." >&2
+      echo "$(vps_agent_text 'Check for a stale proxy route before considering removal complete.' 'Verifique uma possível rota antiga no proxy antes de considerar a remoção concluída.')" >&2
       exit 1
       ;;
   esac
@@ -242,11 +255,11 @@ EOF
 
 if [ "$remove_source" -eq 1 ] && [ "$source_verified" -eq 1 ]; then
   parent="$(dirname "$repo_root")"
-  echo "Deleting verified Portico MCP source checkout: $repo_root"
+  echo "$(vps_agent_text "Deleting verified Portico MCP source checkout: $repo_root" "Apagando o checkout verificado do Portico MCP: $repo_root")"
   cd /
   rm -rf -- "$repo_root"
   if [ "$(basename "$parent")" = "vps-agent-lab" ]; then
     rmdir "$parent" >/dev/null 2>&1 || true
   fi
-  echo "Portico MCP source checkout removed."
+  echo "$(vps_agent_text 'Portico MCP source checkout removed.' 'Checkout do Portico MCP removido.')"
 fi
