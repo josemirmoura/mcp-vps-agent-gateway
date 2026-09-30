@@ -1,4 +1,4 @@
-# Docker first-run flow
+# Portico MCP first-run flow
 
 ## Product objective
 
@@ -39,40 +39,49 @@ Advanced operators can still execute the phases individually.
 
 ## Phase 1 — Bootstrap
 
+The supported guided entry point is:
+
 ~~~bash
 git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
 cd mcp-vps-agent-gateway
-sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 /opt/vps-agent-sandbox
-bash scripts/init.sh --scope /opt/vps-agent-sandbox
+bash scripts/install.sh
 ~~~
 
-The user supplies the scoped root explicitly. The bootstrap checks Docker Compose, creates .env with random local secrets and a stable instance ID when needed, creates config/policy.yaml from the versioned template, persists the selected scope, migrates template policy paths from the previous scope, creates the local state directory, and validates Compose syntax. If the scoped root does not exist, bootstrap fails before the Docker build instead of allowing Compose to fail later.
+The recommended interactive profile is **Standard**: physical ceiling `/opt` with no static project roots. Project roots are authorized later through the dynamic approval flow.
+
+Advanced operators can reproduce that bootstrap explicitly:
+
+~~~bash
+bash scripts/init.sh --scope /opt --dynamic-baseline
+~~~
+
+The bootstrap checks Docker Compose, creates `.env` with random local secrets and a stable instance ID when needed, creates `config/policy.yaml` from the versioned template, persists the selected physical ceiling, configures the confined shell to use a real non-root host user, creates the local state directory, and validates Compose syntax.
 
 ## Physical filesystem ceiling
 
 The default `compose.yaml` bind-mounts only `VPS_AGENT_SCOPE_ROOT` into the Broker under `/host`. The Broker validates that filesystem, shell cwd and Compose paths in policy remain inside that physical root. A policy escape makes the Broker fail closed.
 
-Changing `VPS_AGENT_SCOPE_ROOT` on an existing installation changes only this physical ceiling. Existing logical roots in `config/policy.yaml` are preserved by default, so widening a ceiling such as `/opt/vps-agent-sandbox` to `/opt` does not silently authorize all of `/opt`. `scripts/init.sh --migrate-policy-root` is an explicit opt-in for a real project-root move.
+Changing `VPS_AGENT_SCOPE_ROOT` on an existing installation changes only this physical ceiling. Existing logical roots in `config/policy.yaml` are preserved by default. The Standard fresh-install path uses `--dynamic-baseline`, so choosing `/opt` does not create a static `/opt` authorization. `scripts/init.sh --migrate-policy-root` remains an explicit opt-in for a real project-root move.
 
 For deliberate whole-host filesystem authority, set `VPS_AGENT_WHOLE_HOST=1` in `.env` **and** add `compose.host.yaml`. The persisted flag lets lifecycle commands reuse the same deployment mode; the override sets the Broker's physical root to `/`. Neither is part of the default Scoped command.
 ## Phase 2 — The user chooses MCP authority
 
-The operator may edit config/policy.yaml after bootstrap for finer-grained authority. The user decides exactly which VPS resources are delegated.
+With the recommended Standard profile, no project root is authorized during installation.
 
-One root or several logical roots are valid when they fit under `VPS_AGENT_SCOPE_ROOT`. Whole-host `/` requires the explicit `compose.host.yaml` override.
+After the MCP is connected, project roots are granted through explicit runtime approval:
 
-For routine multi-project delegation, use the policy helper instead of editing the ceiling:
-
-~~~bash
-bash scripts/delegate-root.sh add /opt/project-a --access work --apply
-bash scripts/delegate-root.sh add /opt/project-b --access compose --apply
-bash scripts/delegate-root.sh list
-bash scripts/delegate-root.sh remove /opt/project-a --apply
+~~~text
+permissions.request_root_access
+        -> pending Broker request
+        -> in-chat Authorize / Deny card
+        -> active subject-bound delegation
 ~~~
 
-The helper edits only logical policy roots, backs up the previous policy, refuses paths outside the physical ceiling, rejects symlinked ancestors, and refuses to delegate the ceiling itself unless explicitly overridden. The Broker is recreated and verified only when `--apply` is supplied.
+`read` grants filesystem read. `work` grants filesystem read/write plus scoped shell cwd. `compose` adds Compose authority only for Compose actions already enabled by the static action policy.
 
-systemd, Docker/Compose, shell, network, packages, users/groups, firewall, and temporary elevation are scoped separately.
+Advanced operators may still define static roots with `scripts/delegate-root.sh`. Manual editing of `config/policy.yaml` is not required by the normal guided installation.
+
+systemd, Docker/Compose actions, network, packages, users/groups, firewall, and temporary elevation remain separately constrained by static server policy.
 
 ## Phase 3 — Start
 
@@ -206,4 +215,14 @@ Safe removal stops the package while preserving configuration/audit state. Full 
 VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge
 ~~~
 
-The package never deletes applications, services, containers, databases or files merely because it was authorized to manage them.
+It also removes the default locally built Portico MCP Gateway/Broker images and removes the legacy `/opt/vps-agent-sandbox` only when that directory is empty.
+
+Deleting the Git checkout itself requires a second explicit confirmation:
+
+~~~bash
+VPS_AGENT_PURGE_CONFIRM=PURGE \
+VPS_AGENT_REMOVE_SOURCE_CONFIRM=REMOVE_SOURCE \
+bash scripts/remove.sh --purge --remove-source
+~~~
+
+The package never deletes arbitrary delegated project directories, third-party images, applications, services, containers, databases or files merely because it was authorized to manage them.

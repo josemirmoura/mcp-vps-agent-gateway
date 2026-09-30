@@ -2,45 +2,102 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=scripts/lib/product.sh
+source scripts/lib/product.sh
+
 usage() {
-  cat <<'EOF'
-usage: bash scripts/init.sh [--scope /absolute/existing/path] [--migrate-policy-root]
+  if vps_agent_is_pt_br; then
+    cat <<'EOF'
+uso: bash scripts/init.sh [--scope /caminho/absoluto/existente] [opções]
+
+Opções:
+  --scope PATH          Define o teto físico do filesystem no modo Scoped.
+  --dynamic-baseline    Inicia sem raízes lógicas estáticas de projeto.
+                        As raízes serão autorizadas depois pelo fluxo dinâmico.
+  --run-as USER         Usuário não-root para jobs shell confinados.
+  --migrate-policy-root Substitui referências da raiz anterior em policy.yaml.
+                        Use para mover uma raiz de projeto, não para ampliar o teto.
+  --lang LANG           Idioma: pt-BR ou en.
+  -h, --help            Mostra esta ajuda.
+EOF
+  else
+    cat <<'EOF'
+usage: bash scripts/init.sh [--scope /absolute/existing/path] [options]
 
 Options:
-  --scope PATH   Set the physical Scoped filesystem ceiling in .env.
-                 Existing operator policy roots are preserved by default.
-  --migrate-policy-root
-                 Replace references to the previous scope in policy.yaml.
-                 Intended for an explicit project-root move, not for widening
-                 the physical ceiling around existing delegated roots.
-  -h, --help     Show this help.
+  --scope PATH          Set the physical Scoped filesystem ceiling.
+  --dynamic-baseline    Start with no static logical project roots.
+                        Project roots are authorized later through dynamic approval.
+  --run-as USER         Non-root host user for confined shell jobs.
+  --migrate-policy-root Replace references to the previous root in policy.yaml.
+                        Use for a project-root move, not for widening the ceiling.
+  --lang LANG           Language: pt-BR or en.
+  -h, --help            Show this help.
 EOF
+  fi
 }
 
 SCOPE_OVERRIDE=""
 MIGRATE_POLICY_ROOT=0
+DYNAMIC_BASELINE=0
+RUN_AS_OVERRIDE=""
+LANG_OVERRIDE=""
 POLICY_CREATED=0
 POLICY_PRISTINE_TEMPLATE=0
+
+# Resolve --lang first so --help can be localized regardless of argument order.
+previous=""
+for arg in "$@"; do
+  if [ "$previous" = "--lang" ]; then
+    LANG_OVERRIDE="$arg"
+    break
+  fi
+  previous="$arg"
+done
+if [ -n "$LANG_OVERRIDE" ]; then
+  VPS_AGENT_LANG_EXPLICIT=1
+fi
+vps_agent_init_language "$LANG_OVERRIDE"
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --scope)
       if [ "$#" -lt 2 ] || [ -z "$2" ]; then
-        echo "ERROR: --scope requires an absolute path." >&2
+        echo "$(vps_agent_text 'ERROR: --scope requires an absolute path.' 'ERRO: --scope requer um caminho absoluto.')" >&2
         exit 2
       fi
       SCOPE_OVERRIDE="$2"
+      shift 2
+      ;;
+    --dynamic-baseline)
+      DYNAMIC_BASELINE=1
+      shift
+      ;;
+    --run-as)
+      if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+        echo "$(vps_agent_text 'ERROR: --run-as requires a username.' 'ERRO: --run-as requer um nome de usuário.')" >&2
+        exit 2
+      fi
+      RUN_AS_OVERRIDE="$2"
       shift 2
       ;;
     --migrate-policy-root)
       MIGRATE_POLICY_ROOT=1
       shift
       ;;
+    --lang)
+      [ "$#" -ge 2 ] || { echo "ERROR: --lang needs a value." >&2; exit 2; }
+      LANG_OVERRIDE="$2"
+      VPS_AGENT_LANG_EXPLICIT=1
+      vps_agent_init_language "$LANG_OVERRIDE"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
       ;;
     *)
-      echo "ERROR: unknown argument: $1" >&2
+      echo "$(vps_agent_text "ERROR: unknown argument: $1" "ERRO: argumento desconhecido: $1")" >&2
       usage >&2
       exit 2
       ;;
@@ -48,7 +105,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "Docker is required." >&2
+  echo "$(vps_agent_text 'Docker is required.' 'Docker é obrigatório.')" >&2
   exit 1
 fi
 docker compose version >/dev/null
@@ -62,9 +119,9 @@ if [ ! -f .env ]; then
   sed -i "s/CHANGE_ME_MCP_TOKEN/$MCP_TOKEN/" .env
   sed -i "s/CHANGE_ME_INSTANCE_ID/$INSTANCE_ID/" .env
   chmod 600 .env
-  echo "Created .env with random tokens."
+  echo "$(vps_agent_text 'Created .env with random tokens.' 'Criado .env com tokens aleatórios.')"
 else
-  echo ".env already exists; preserving existing secrets and identity."
+  echo "$(vps_agent_text '.env already exists; preserving existing secrets and identity.' '.env já existe; preservando segredos e identidade existentes.')"
 fi
 
 mkdir -p state
@@ -74,9 +131,9 @@ if [ ! -f config/policy.yaml ]; then
   cp config/policy.example.yaml config/policy.yaml
   chmod 600 config/policy.yaml
   POLICY_CREATED=1
-  echo "Created config/policy.yaml from the versioned template."
+  echo "$(vps_agent_text 'Created config/policy.yaml from the versioned template.' 'Criado config/policy.yaml a partir do modelo versionado.')"
 else
-  echo "config/policy.yaml already exists; preserving operator policy."
+  echo "$(vps_agent_text 'config/policy.yaml already exists; preserving operator policy.' 'config/policy.yaml já existe; preservando a policy do operador.')"
 fi
 
 if cmp -s config/policy.yaml config/policy.example.yaml; then
@@ -84,7 +141,7 @@ if cmp -s config/policy.yaml config/policy.example.yaml; then
 fi
 
 if grep -q 'CHANGE_ME_' .env; then
-  echo "ERROR: .env still contains CHANGE_ME values." >&2
+  echo "$(vps_agent_text 'ERROR: .env still contains CHANGE_ME values.' 'ERRO: .env ainda contém valores CHANGE_ME.')" >&2
   exit 1
 fi
 
@@ -95,7 +152,7 @@ OLD_SCOPE_ROOT="${VPS_AGENT_SCOPE_ROOT:-}"
 
 if [ -n "$SCOPE_OVERRIDE" ]; then
   if [[ "$SCOPE_OVERRIDE" != /* ]]; then
-    echo "ERROR: --scope must be an absolute path: $SCOPE_OVERRIDE" >&2
+    echo "$(vps_agent_text "ERROR: --scope must be an absolute path: $SCOPE_OVERRIDE" "ERRO: --scope deve ser um caminho absoluto: $SCOPE_OVERRIDE")" >&2
     exit 1
   fi
 
@@ -106,7 +163,7 @@ print(os.path.normpath(sys.argv[1]))
 PY
 )"
   if [ "$NORMALIZED_OVERRIDE" != "$SCOPE_OVERRIDE" ]; then
-    echo "ERROR: --scope must be canonical (no '..', '.' or trailing slash): $SCOPE_OVERRIDE" >&2
+    echo "$(vps_agent_text "ERROR: --scope must be canonical (no '..', '.' or trailing slash): $SCOPE_OVERRIDE" "ERRO: --scope deve ser canônico (sem '..', '.' ou barra final): $SCOPE_OVERRIDE")" >&2
     exit 1
   fi
 
@@ -134,7 +191,9 @@ path.write_text("\n".join(out) + "\n")
 PY
 
   if [ -n "$OLD_SCOPE_ROOT" ] && [ "$OLD_SCOPE_ROOT" != "$SCOPE_OVERRIDE" ]; then
-    if [ "$POLICY_CREATED" -eq 1 ] || [ "$POLICY_PRISTINE_TEMPLATE" -eq 1 ] || [ "$MIGRATE_POLICY_ROOT" -eq 1 ]; then
+    if [ "$DYNAMIC_BASELINE" -eq 1 ] && { [ "$POLICY_CREATED" -eq 1 ] || [ "$POLICY_PRISTINE_TEMPLATE" -eq 1 ]; }; then
+      echo "$(vps_agent_text         "Physical ceiling changed from $OLD_SCOPE_ROOT to $SCOPE_OVERRIDE; static roots will start empty."         "Teto físico alterado de $OLD_SCOPE_ROOT para $SCOPE_OVERRIDE; as raízes estáticas começarão vazias.")"
+    elif [ "$POLICY_CREATED" -eq 1 ] || [ "$POLICY_PRISTINE_TEMPLATE" -eq 1 ] || [ "$MIGRATE_POLICY_ROOT" -eq 1 ]; then
       python3 - "config/policy.yaml" "$OLD_SCOPE_ROOT" "$SCOPE_OVERRIDE" <<'PY'
 import pathlib
 import sys
@@ -151,9 +210,7 @@ else:
     print("Policy did not contain the previous scoped root; leaving policy paths unchanged.")
 PY
     else
-      echo "Physical ceiling changed from $OLD_SCOPE_ROOT to $SCOPE_OVERRIDE."
-      echo "Existing logical policy roots were preserved."
-      echo "Use scripts/delegate-root.sh to add or revoke delegated roots."
+      echo "$(vps_agent_text         "Physical ceiling changed from $OLD_SCOPE_ROOT to $SCOPE_OVERRIDE. Existing logical policy roots were preserved."         "Teto físico alterado de $OLD_SCOPE_ROOT para $SCOPE_OVERRIDE. As raízes lógicas existentes foram preservadas.")"
     fi
   fi
 
@@ -162,11 +219,11 @@ fi
 
 SCOPE_ROOT="${VPS_AGENT_SCOPE_ROOT:-}"
 if [ -z "$SCOPE_ROOT" ]; then
-  echo "ERROR: set VPS_AGENT_SCOPE_ROOT in .env or pass --scope /absolute/path." >&2
+  echo "$(vps_agent_text 'ERROR: set VPS_AGENT_SCOPE_ROOT in .env or pass --scope /absolute/path.' 'ERRO: defina VPS_AGENT_SCOPE_ROOT no .env ou use --scope /caminho/absoluto.')" >&2
   exit 1
 fi
 if [[ "$SCOPE_ROOT" != /* ]]; then
-  echo "ERROR: VPS_AGENT_SCOPE_ROOT must be an absolute path." >&2
+  echo "$(vps_agent_text 'ERROR: VPS_AGENT_SCOPE_ROOT must be an absolute path.' 'ERRO: VPS_AGENT_SCOPE_ROOT deve ser um caminho absoluto.')" >&2
   exit 1
 fi
 NORMALIZED_SCOPE_ROOT="$(python3 - "$SCOPE_ROOT" <<'PY'
@@ -176,17 +233,17 @@ print(os.path.normpath(sys.argv[1]))
 PY
 )"
 if [ "$NORMALIZED_SCOPE_ROOT" != "$SCOPE_ROOT" ]; then
-  echo "ERROR: VPS_AGENT_SCOPE_ROOT must be canonical (no '..', '.' or trailing slash): $SCOPE_ROOT" >&2
+  echo "$(vps_agent_text 'ERROR: VPS_AGENT_SCOPE_ROOT must be canonical (no dots or trailing slash).' 'ERRO: VPS_AGENT_SCOPE_ROOT deve ser canônico (sem pontos ou barra final).')" >&2
   exit 1
 fi
 
 if [ "$SCOPE_ROOT" = "/" ]; then
-  echo "NOTE: whole-host authority requires the explicit compose.host.yaml override."
+  echo "$(vps_agent_text 'NOTE: whole-host authority requires the explicit compose.host.yaml override.' 'NOTA: autoridade de host inteiro requer o override explícito compose.host.yaml.')"
 else
   CHECK_PATH="$SCOPE_ROOT"
   while [ "$CHECK_PATH" != "/" ]; do
     if [ -L "$CHECK_PATH" ]; then
-      echo "ERROR: VPS_AGENT_SCOPE_ROOT may not traverse symlinks: $CHECK_PATH" >&2
+      echo "$(vps_agent_text "ERROR: VPS_AGENT_SCOPE_ROOT may not traverse symlinks: $CHECK_PATH" "ERRO: VPS_AGENT_SCOPE_ROOT não pode atravessar links simbólicos: $CHECK_PATH")" >&2
       exit 1
     fi
     CHECK_PATH="$(dirname "$CHECK_PATH")"
@@ -194,38 +251,105 @@ else
 
   if [ ! -d "$SCOPE_ROOT" ]; then
     cat >&2 <<EOF
-ERROR: VPS_AGENT_SCOPE_ROOT does not exist: $SCOPE_ROOT
+$(vps_agent_text "ERROR: VPS_AGENT_SCOPE_ROOT does not exist: $SCOPE_ROOT" "ERRO: VPS_AGENT_SCOPE_ROOT não existe: $SCOPE_ROOT")
 
-Create it first, for example:
-  sudo install -d -o "\$USER" -g "\$(id -gn)" -m 0750 "$SCOPE_ROOT"
-
-Or choose an existing directory:
-  bash scripts/init.sh --scope /absolute/existing/path
-
-Nothing has been started.
+$(vps_agent_text "Create it first, or choose an existing directory." "Crie o diretório primeiro ou escolha um diretório existente.")
 EOF
     exit 1
   fi
+fi
+
+if [ "$DYNAMIC_BASELINE" -eq 1 ] && { [ "$POLICY_CREATED" -eq 1 ] || [ "$POLICY_PRISTINE_TEMPLATE" -eq 1 ]; }; then
+  python3 - "config/policy.yaml" <<'PY'
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+lines = path.read_text().splitlines()
+targets = {
+    ("filesystem", "read"),
+    ("filesystem", "write"),
+    ("shell", "cwd_roots"),
+}
+out = []
+section = None
+i = 0
+while i < len(lines):
+    line = lines[i]
+    if line and not line.startswith(" ") and line.endswith(":"):
+        section = line[:-1]
+    stripped = line.strip()
+    if line.startswith("  ") and not line.startswith("    ") and stripped.endswith(":"):
+        key = stripped[:-1]
+        if (section, key) in targets:
+            out.append(f"  {key}: []")
+            i += 1
+            while i < len(lines) and lines[i].startswith("    - "):
+                i += 1
+            continue
+    out.append(line)
+    i += 1
+path.write_text("\n".join(out) + "\n")
+PY
+  echo "$(vps_agent_text     'Dynamic baseline enabled: no static project roots are authorized.'     'Baseline dinâmica ativada: nenhuma raiz de projeto está autorizada estaticamente.')"
+fi
+
+if [ -z "$RUN_AS_OVERRIDE" ]; then
+  candidate="${SUDO_USER:-$(id -un)}"
+  if [ "$candidate" != "root" ]; then
+    RUN_AS_OVERRIDE="$candidate"
+  fi
+fi
+
+if [ -n "$RUN_AS_OVERRIDE" ]; then
+  if [ "$RUN_AS_OVERRIDE" = "root" ]; then
+    echo "$(vps_agent_text 'ERROR: normal scoped shell jobs may not run as root.' 'ERRO: jobs shell normais em modo Scoped não podem executar como root.')" >&2
+    exit 1
+  fi
+  if ! id -u "$RUN_AS_OVERRIDE" >/dev/null 2>&1; then
+    echo "$(vps_agent_text "ERROR: shell execution user does not exist: $RUN_AS_OVERRIDE" "ERRO: usuário de execução shell não existe: $RUN_AS_OVERRIDE")" >&2
+    exit 1
+  fi
+  python3 - "config/policy.yaml" "$RUN_AS_OVERRIDE" <<'PY'
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+user = sys.argv[2]
+lines = path.read_text().splitlines()
+out = []
+section = None
+changed = False
+for line in lines:
+    if line and not line.startswith(" ") and line.endswith(":"):
+        section = line[:-1]
+    if section == "shell" and line.startswith("  run_as:"):
+        out.append(f"  run_as: {user}")
+        changed = True
+    else:
+        out.append(line)
+if not changed:
+    raise SystemExit("shell.run_as not found in policy")
+path.write_text("\n".join(out) + "\n")
+PY
 fi
 
 docker compose config -q
 
 cat <<EOF
 
-Bootstrap ready.
+$(vps_agent_text 'Bootstrap ready.' 'Bootstrap pronto.')
 
-Scoped filesystem ceiling:
+$(vps_agent_text 'Physical filesystem ceiling:' 'Teto físico do filesystem:')
   $SCOPE_ROOT
 
-Optional: review .env and config/policy.yaml before startup.
+$(vps_agent_text 'Confined shell user:' 'Usuário do shell confinado:')
+  ${RUN_AS_OVERRIDE:-vps-agent-exec}
 
-Start Scoped mode:
+$(vps_agent_text 'Start Scoped mode:' 'Iniciar modo Scoped:')
   docker compose up -d --build
 
-Whole-host is a separate explicit override:
-  docker compose -f compose.yaml -f compose.host.yaml up -d --build
-
-Verify:
+$(vps_agent_text 'Verify:' 'Verificar:')
   bash scripts/verify.sh
 
 EOF

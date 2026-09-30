@@ -89,6 +89,61 @@ for path in ROOT.rglob("*"):
         if pattern.search(text):
             errors.append(f"{rel}: sensitive credential material matched repository guard")
 
+# Portico MCP guided-product invariants discovered through clean-install E2E.
+installer_text = (ROOT / "scripts/install.sh").read_text(errors="replace")
+init_text = (ROOT / "scripts/init.sh").read_text(errors="replace")
+product_text = (ROOT / "scripts/lib/product.sh").read_text(errors="replace")
+remove_text = (ROOT / "scripts/remove.sh").read_text(errors="replace")
+quick_text = texts.get("docs/quick-start.md", "")
+
+product_requirements = {
+    "scripts/install.sh": [
+        "--dynamic-baseline",
+        'SCOPE="/opt"',
+        "--run-as",
+        "--lang",
+    ],
+    "scripts/init.sh": [
+        "--dynamic-baseline",
+        "static project roots are authorized",
+        "run_as:",
+    ],
+    "scripts/lib/product.sh": [
+        'VPS_AGENT_PRODUCT_NAME="Portico MCP"',
+        "Feito por",
+        "github.com/josemirmoura",
+        "pt-BR",
+    ],
+    "scripts/remove.sh": [
+        "mcp-vps-agent-gateway:local",
+        "mcp-vps-agent-broker:local",
+        "--remove-source",
+        "/opt/vps-agent-sandbox",
+    ],
+    "docs/quick-start.md": [
+        "Portico MCP Quick Start",
+        "static project roots:        none",
+        "permissions.request_root_access",
+    ],
+}
+source_map = {
+    "scripts/install.sh": installer_text,
+    "scripts/init.sh": init_text,
+    "scripts/lib/product.sh": product_text,
+    "scripts/remove.sh": remove_text,
+    "docs/quick-start.md": quick_text,
+}
+for rel, markers in product_requirements.items():
+    source = source_map[rel]
+    for required in markers:
+        if required not in source:
+            errors.append(f"{rel}: Portico guided-product invariant missing: {required}")
+
+if "Refine config/policy.yaml" in installer_text or "Edit config/policy.yaml now" in installer_text:
+    errors.append("scripts/install.sh: normal guided flow still requires manual policy YAML editing")
+if "--scope /opt/vps-agent-sandbox" in quick_text or "install -d" in quick_text and "/opt/vps-agent-sandbox" in quick_text:
+    errors.append("docs/quick-start.md: legacy sandbox must not be the normal installation path")
+
 required_flow = {
     "docs/quick-start.md": ["scripts/install.sh", "INSTALLATION COMPLETE"],
     "README.md": ["scripts/install.sh"],

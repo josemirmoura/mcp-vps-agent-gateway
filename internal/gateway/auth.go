@@ -38,7 +38,7 @@ func (a AuthConfig) ProtectedResourceMetadataHandler() http.Handler {
 		AuthorizationServers:   a.AuthorizationServers,
 		ScopesSupported:        a.RequiredScopes,
 		BearerMethodsSupported: []string{"header"},
-		ResourceName:           "MCP VPS Agent Gateway",
+		ResourceName:           "Portico MCP",
 	})
 }
 

@@ -130,4 +130,16 @@ The guided installer reuses preserved operator state/configuration.
 VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge
 ~~~
 
-Purge removes MCP-owned local artifacts only. It does not delete applications, sites, databases, third-party containers, system services or delegated files merely because the MCP previously managed them.
+Purge removes Portico MCP-owned runtime, volumes, local policy/state, backups and the default locally built Gateway/Broker images. It also attempts to remove the legacy `/opt/vps-agent-sandbox` directory with `rmdir`; a non-empty directory is preserved.
+
+The source checkout is preserved by default. Deleting it requires a second explicit confirmation:
+
+~~~bash
+VPS_AGENT_PURGE_CONFIRM=PURGE \
+VPS_AGENT_REMOVE_SOURCE_CONFIRM=REMOVE_SOURCE \
+bash scripts/remove.sh --purge --remove-source
+~~~
+
+Source deletion is allowed only when the running directory is verified as this project's Git checkout.
+
+Purge does not delete arbitrary delegated project directories, applications, sites, databases, third-party images/containers, system services or files merely because Portico MCP previously managed them.

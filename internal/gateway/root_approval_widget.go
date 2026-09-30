@@ -254,7 +254,7 @@ button:disabled { opacity: .55; cursor: default; }
 func registerRootApprovalWidget(server *mcp.Server) {
 	server.AddResource(&mcp.Resource{
 		Name:        "vps-agent-root-approval",
-		Title:       "VPS root access approval",
+		Title:       "Portico MCP root access approval",
 		Description: "Interactive card for approving or denying a pending VPS root delegation.",
 		URI:         rootApprovalWidgetURI,
 		MIMEType:    "text/html;profile=mcp-app",

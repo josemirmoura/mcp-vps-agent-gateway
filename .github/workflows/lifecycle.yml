@@ -125,13 +125,17 @@ jobs:
           docker compose up -d --build
           bash scripts/verify.sh
 
-      - name: Full purge removes only MCP-owned local state
+      - name: Full purge removes MCP-owned state, images and empty legacy sandbox
         run: |
+          sudo install -d -m 0755 /opt/vps-agent-sandbox
           VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge
           test ! -e .env
           test ! -e config/policy.yaml
           test ! -e state
           test -d /opt/vps-agent-lifecycle-scope
+          test ! -d /opt/vps-agent-sandbox
+          ! docker image inspect mcp-vps-agent-gateway:local >/dev/null 2>&1
+          ! docker image inspect mcp-vps-agent-broker:local >/dev/null 2>&1
 
       - name: Cleanup
         if: always()
@@ -147,24 +151,30 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run guided Project installation to local checkpoint
+      - name: Run guided Standard installation to local checkpoint in PT-BR
         shell: bash
         run: |
           set -euo pipefail
-          sudo rm -rf /opt/vps-agent-guided-scope
+          bash -c 'source scripts/lib/product.sh; unset VPS_AGENT_LANG LC_ALL LC_MESSAGES; LANG=pt_BR.UTF-8; vps_agent_init_language ""; test "$VPS_AGENT_LANG" = "pt-BR"'
+          bash -c 'source scripts/lib/product.sh; unset VPS_AGENT_LANG LC_ALL LC_MESSAGES; LANG=en_US.UTF-8; vps_agent_init_language ""; test "$VPS_AGENT_LANG" = "en"'
           bash scripts/install.sh \
-            --profile project \
-            --scope /opt/vps-agent-guided-scope \
-            --create-scope \
+            --lang pt-BR \
+            --profile custom \
+            --scope /opt \
             --local-only \
             --yes | tee /tmp/guided-install.txt
-          grep -q 'LOCAL CHECKPOINT COMPLETE' /tmp/guided-install.txt
-          grep -q 'Installation is NOT complete' /tmp/guided-install.txt
-          test -f .env
-          test -f config/policy.yaml
+          grep -q 'Portico MCP' /tmp/guided-install.txt
+          grep -Fq 'Feito por Josemir Moura | github.com/josemirmoura' /tmp/guided-install.txt
+          grep -q 'CHECKPOINT LOCAL CONCLUÍDO' /tmp/guided-install.txt
+          grep -q 'A instalação NÃO está concluída' /tmp/guided-install.txt
+          grep -q '^VPS_AGENT_SCOPE_ROOT=/opt$' .env
+          grep -q '^  read: \[\]$' config/policy.yaml
+          grep -q '^  write: \[\]$' config/policy.yaml
+          grep -q '^  cwd_roots: \[\]$' config/policy.yaml
+          grep -q "^  run_as: $(id -un)$" config/policy.yaml
           test -f state/state.db
           bash scripts/diagnose.sh status | tee /tmp/guided-status.txt
-          grep -q 'MCP VPS Agent Gateway' /tmp/guided-status.txt
+          grep -q 'Portico MCP' /tmp/guided-status.txt
           python3 scripts/authority-summary.py | tee /tmp/guided-authority.txt
           grep -q 'Whole-host mount override:   no' /tmp/guided-authority.txt
 
@@ -180,5 +190,4 @@ jobs:
         if: always()
         run: |
           docker compose down -v --remove-orphans || true
-          sudo rm -rf /opt/vps-agent-guided-scope
 
