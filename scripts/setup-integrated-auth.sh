@@ -474,28 +474,28 @@ if [ "$NEEDS_OPERATOR" -eq 1 ]; then
   PASSWORD="${VPS_AGENT_OPERATOR_PASSWORD:-}"
   if [ -z "$PASSWORD" ]; then
     if [ ! -t 0 ]; then
-      echo "ERROR: set VPS_AGENT_OPERATOR_PASSWORD for non-interactive bootstrap." >&2
+      echo "$(vps_agent_text 'ERROR: set VPS_AGENT_OPERATOR_PASSWORD for non-interactive bootstrap.' 'ERRO: defina VPS_AGENT_OPERATOR_PASSWORD para o bootstrap não interativo.')" >&2
       exit 1
     fi
     while :; do
-      printf 'Create operator password (12+ characters): ' >&2
+      printf '%s' "$(vps_agent_text 'Create operator password (12+ characters): ' 'Crie a senha do operador (12+ caracteres): ')" >&2
       read -r -s PASSWORD
       echo >&2
-      printf 'Repeat operator password: ' >&2
+      printf '%s' "$(vps_agent_text 'Repeat operator password: ' 'Repita a senha do operador: ')" >&2
       read -r -s PASSWORD2
       echo >&2
       if [ "$PASSWORD" != "$PASSWORD2" ]; then
-        echo "Passwords do not match." >&2
+        echo "$(vps_agent_text 'Passwords do not match.' 'As senhas não coincidem.')" >&2
         continue
       fi
       if [ "${#PASSWORD}" -lt 12 ]; then
-        echo "Use at least 12 characters." >&2
+        echo "$(vps_agent_text 'Use at least 12 characters.' 'Use pelo menos 12 caracteres.')" >&2
         continue
       fi
       break
     done
   elif [ "${#PASSWORD}" -lt 12 ]; then
-    echo "ERROR: VPS_AGENT_OPERATOR_PASSWORD must contain at least 12 characters." >&2
+    echo "$(vps_agent_text 'ERROR: VPS_AGENT_OPERATOR_PASSWORD must contain at least 12 characters.' 'ERRO: VPS_AGENT_OPERATOR_PASSWORD deve conter pelo menos 12 caracteres.')" >&2
     exit 1
   fi
 
@@ -505,9 +505,9 @@ if [ "$NEEDS_OPERATOR" -eq 1 ]; then
   trap 'rm -f "$REQUEST_FILE"' EXIT
 
   # Password travels on a private inherited file descriptor, never argv.
-  python3 - "$REQUEST_FILE" "$OPERATOR_ID" "$OPERATOR_USERNAME" "$OPERATOR_EMAIL" 3<<<"$PASSWORD" <<'PY'
+  python3 - "$REQUEST_FILE" "$OPERATOR_ID" "$OPERATOR_USERNAME" "$OPERATOR_EMAIL" "$VPS_AGENT_LANG" 3<<<"$PASSWORD" <<'PY'
 import json,os,sys
-path,user_id,username,email=sys.argv[1:]
+path,user_id,username,email,lang=sys.argv[1:]
 password=os.fdopen(3).read()
 if password.endswith("\n"):
     password=password[:-1]
@@ -517,8 +517,8 @@ payload={
   "profile": {
     "givenName": "VPS",
     "familyName": "Operator",
-    "displayName": "VPS Operator",
-    "preferredLanguage": "en"
+    "displayName": "Portico MCP Operator",
+    "preferredLanguage": "pt" if lang == "pt-BR" else "en"
   },
   "email": {"email": email, "isVerified": True},
   "password": {"password": password, "changeRequired": False}
@@ -528,7 +528,7 @@ with open(path,"w") as f:
 PY
   unset PASSWORD PASSWORD2 2>/dev/null || true
 
-  echo "Creating the dedicated non-admin VPS operator identity..."
+  echo "$(vps_agent_text 'Creating the dedicated non-admin Portico operator identity...' 'Criando a identidade dedicada e não administrativa do operador Portico...')"
   set +e
   HTTP_CODE="$(
     curl_zitadel_internal \
@@ -584,7 +584,7 @@ if [ "$NEEDS_RESOURCE" -eq 1 ]; then
       --url "http://127.0.0.1:8080/management/v1/projects" \
       --header "Authorization: Bearer $BOOTSTRAP_PAT" \
       --header 'Content-Type: application/json' \
-      --data '{"name":"MCP VPS Agent Resource"}' \
+      --data '{"name":"Portico MCP Resource"}' \
       >"$RESOURCE_RESPONSE"
     RESOURCE_PROJECT_ID="$(python3 - "$RESOURCE_RESPONSE" <<'PY'
 import json,sys
@@ -607,7 +607,7 @@ PY
       --url "http://127.0.0.1:8080/management/v1/projects/$RESOURCE_PROJECT_ID/apps/api" \
       --header "Authorization: Bearer $BOOTSTRAP_PAT" \
       --header 'Content-Type: application/json' \
-      --data '{"name":"MCP VPS Agent Introspector","authMethodType":"API_AUTH_METHOD_TYPE_BASIC"}' \
+      --data '{"name":"Portico MCP Introspector","authMethodType":"API_AUTH_METHOD_TYPE_BASIC"}' \
       >"$APP_RESPONSE"
 
     readarray -t APP_VALUES < <(
@@ -768,23 +768,20 @@ done
 
 bash scripts/verify-public.sh
 
-cat <<EOF
-
-INTEGRATED AUTH: READY
-
-MCP endpoint:
-  https://$DOMAIN/mcp
-
-OAuth/OIDC issuer:
-  https://$DOMAIN
-
-Operator login:
-  $OPERATOR_EMAIL
-
-The dedicated OAuth operator password was not written to this installer state
-and was never requested by ChatGPT.
-
-Next:
-  bash scripts/connect-chatgpt.sh
-
-EOF
+echo
+echo "$(vps_agent_text 'INTEGRATED AUTH: READY' 'AUTENTICAÇÃO INTEGRADA: PRONTA')"
+echo
+echo "$(vps_agent_text 'MCP endpoint:' 'Endpoint MCP:')"
+echo "  https://$DOMAIN/mcp"
+echo
+echo "OAuth/OIDC issuer:"
+echo "  https://$DOMAIN"
+echo
+echo "$(vps_agent_text 'Portico operator login:' 'Login do operador Portico:')"
+echo "  $(vps_agent_text 'Username' 'Nome de usuário'): $OPERATOR_USERNAME"
+echo "  $(vps_agent_text 'Email' 'E-mail'): $OPERATOR_EMAIL"
+echo
+echo "$(vps_agent_text   'The operator password was not written to installer state and must never be replaced with VPS/SSH credentials.'   'A senha do operador não foi gravada no estado do instalador e nunca deve ser substituída por credenciais VPS/SSH.')"
+echo
+echo "$(vps_agent_text 'Next:' 'Próximo:')"
+echo "  bash scripts/connect-chatgpt.sh"
