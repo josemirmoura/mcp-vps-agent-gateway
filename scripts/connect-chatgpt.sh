@@ -47,9 +47,8 @@ fi
 
 bash ./scripts/verify-public.sh
 
-BASELINE="$(
-  docker compose exec -T broker /usr/local/bin/vps-agent wait-tool     --subject "$SUBJECT"     --tool system.info     --baseline-only
-)"
+wait_tool=(docker compose exec -T broker /usr/local/bin/vps-agent wait-tool --subject "$SUBJECT" --tool system.info)
+BASELINE="$("${wait_tool[@]}" --baseline-only)"
 [[ "$BASELINE" =~ ^[0-9]+$ ]] || {
   echo "$(vps_agent_text 'ERROR: could not establish the audit verification baseline.' 'ERRO: não foi possível estabelecer a linha de base da auditoria.')" >&2
   exit 1
@@ -142,14 +141,14 @@ EOF
 }
 
 verify_now() {
-  docker compose exec -T broker /usr/local/bin/vps-agent wait-tool     --subject "$SUBJECT"     --tool system.info     --after-seq "$BASELINE"     --timeout 1s     --poll 200ms     --quiet
+  "${wait_tool[@]}" --after-seq "$BASELINE" --timeout 1s --poll 200ms --quiet
 }
 
 show_tutorial
 
 if [ ! -t 0 ]; then
   echo "$(vps_agent_text     'Waiting for the real audited ChatGPT call in non-interactive mode...'     'Aguardando a chamada real e auditada do ChatGPT em modo não interativo...')"
-  docker compose exec -T broker /usr/local/bin/vps-agent wait-tool     --subject "$SUBJECT"     --tool system.info     --after-seq "$BASELINE"     --timeout "${VPS_AGENT_CHATGPT_VERIFY_TIMEOUT:-10m}"
+  "${wait_tool[@]}" --after-seq "$BASELINE" --timeout "${VPS_AGENT_CHATGPT_VERIFY_TIMEOUT:-10m}"
 else
   while :; do
     echo
@@ -208,8 +207,9 @@ EOF
 fi
 
 mkdir -p state
-printf '{"verified_at":"%s","endpoint":"%s","subject":"%s","after_audit_seq":%s}
-'   "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$PUBLIC_URL" "$SUBJECT" "$BASELINE"   > state/chatgpt-verified.json
+printf '{"verified_at":"%s","endpoint":"%s","subject":"%s","after_audit_seq":%s}\n' \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$PUBLIC_URL" "$SUBJECT" "$BASELINE" \
+  > state/chatgpt-verified.json
 chmod 600 state/chatgpt-verified.json
 
 echo
