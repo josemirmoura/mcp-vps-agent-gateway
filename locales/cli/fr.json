@@ -246,6 +246,7 @@
     "error.operator_creation_failed": "ERREUR : échec de création de l’opérateur (curl={curl_status} HTTP={http_code}).",
     "error.public_url_https": "Le point de terminaison MCP public doit utiliser HTTPS : {url}",
     "error.expected_401": "HTTP 401 attendu pour la requête MCP non authentifiée, reçu : {code}.",
-    "verify.local_call_skipped": "Appel d’outil MCP local ignoré pour le mode d’authentification {mode} ; la vérification OAuth publique sera utilisée."
+    "verify.local_call_skipped": "Appel d’outil MCP local ignoré pour le mode d’authentification {mode} ; la vérification OAuth publique sera utilisée.",
+    "connect.email_line": "   E-mail du compte : {email}"
   }
 }
