@@ -40,7 +40,7 @@ Feito por Josemir Moura | github.com/josemirmoura
 ## Guided flow
 
 ~~~text
-Environment
+Prerequisites
  -> Scope
  -> Effective authority
  -> Containers
@@ -50,6 +50,10 @@ Environment
  -> real audited MCP call
  -> INSTALLATION COMPLETE
 ~~~
+
+Before creating Portico state, the installer runs an explicit prerequisite preflight. It checks the supported Linux/runtime basics, Docker Engine/Compose, host tools, systemd, memory and (for the public path) the edge-proxy situation. Missing mandatory prerequisites stop the flow with an official upstream installation link.
+
+If one existing Traefik is detected, Portico reuses it. If none is detected and ports 80/443 are free, Portico provisions its bundled Traefik. It never replaces an unknown service already occupying those ports.
 
 The installer can be safely rerun after an interrupted phase. Existing local operator state is preserved by the lifecycle scripts unless an explicit purge is requested.
 
@@ -65,7 +69,9 @@ static project roots:        none
 project authority:           granted later through explicit approval
 ~~~
 
-The physical ceiling defines where Portico MCP may ever be allowed to operate. It does **not** authorize `/opt` itself.
+The physical ceiling defines where Portico MCP may ever be allowed to operate. It does **not** authorize `/opt` itself at install time.
+
+Later, the operator may explicitly approve either a subdirectory or the exact physical ceiling. Approving the exact ceiling is shown with a stronger warning because it grants the selected access profile to all current and future paths under that ceiling until revocation.
 
 Equivalent non-interactive command:
 
@@ -153,6 +159,25 @@ Access profiles:
 Dynamic roots can be permanent or time-limited and take effect without restarting the Broker.
 
 Advanced operators can still manage static roots from the terminal with `scripts/delegate-root.sh`, but this is not required by the normal guided installation.
+
+## Public hostname and OAuth operator
+
+For the public ChatGPT path, the guided installer explains how to create a DNS hostname such as `mcp.example.com`, point an A/AAAA record to the VPS and enter the hostname without `https://` or `/mcp`. It verifies DNS before continuing.
+
+The integrated OAuth setup creates a dedicated Portico operator identity. The installer shows both:
+
+~~~text
+Username: vps-operator
+Email:    operator@example.com
+~~~
+
+The OAuth login screen uses the username. This identity is separate from Linux/SSH/root credentials.
+
+## ChatGPT completion
+
+After public OAuth verification, `scripts/connect-chatgpt.sh` shows a short connection tutorial with the exact MCP endpoint and operator username.
+
+Interactive installs do not have a hidden countdown. Complete the ChatGPT app/OAuth setup at your own pace, send the harmless `system.info` test call, then return to the terminal and press Enter. If the audited call is not present yet, Portico explains what to check and lets you retry.
 
 ## Local-only validation
 
