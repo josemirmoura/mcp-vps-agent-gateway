@@ -11,9 +11,9 @@ Before running the guided flow:
 - at least 2 GB RAM for the bundled ZITADEL path;
 - Git, OpenSSL, Python 3 and curl;
 - public DNS for the MCP hostname, TCP 80/443 available and valid HTTPS;
-- **ChatGPT Plus or higher**, with Developer Mode and custom MCP app creation actually exposed in ChatGPT Web for that account.
+- a ChatGPT Web account/workspace where Developer Mode and custom MCP app creation are actually exposed.
 
-OpenAI controls plan availability and rollout. Recheck the current ChatGPT product surface before public setup.
+OpenAI controls plan/workspace availability and rollout. Current official documentation lists full MCP write/modify support for Business, Enterprise and Edu, while Pro can connect custom MCPs with read/fetch permissions in developer mode. Recheck the current product surface and official documentation before public setup.
 
 ## Start here
 
