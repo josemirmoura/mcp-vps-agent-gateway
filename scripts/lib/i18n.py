@@ -78,16 +78,20 @@ def t(en: str, pt: str) -> str:
     return en
 
 
-def tr(key: str, en: str, pt: str, **values: object) -> str:
+def tr(key: str, en: str = "", pt: str = "", **values: object) -> str:
     lang = current_lang()
-    if lang == "en":
-        template = en
-    elif lang == "pt-BR":
-        template = pt
-    else:
-        template = catalog(lang)["messages"].get(key, en)
-        if template == en and os.environ.get("VPS_AGENT_I18N_STRICT") == "1":
+    template = catalog(lang)["messages"].get(key)
+    if template is None:
+        if lang == "pt-BR" and pt:
+            template = pt
+        elif en:
+            template = en
+        else:
+            template = catalog("en")["messages"].get(key)
+    if template is None:
+        if os.environ.get("VPS_AGENT_I18N_STRICT") == "1":
             raise KeyError(f"missing {lang} message translation for: {key}")
+        template = key
     return template.format(**values)
 
 
