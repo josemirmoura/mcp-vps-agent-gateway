@@ -45,12 +45,7 @@ func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
 	if req.ID == "" {
 		req.ID = fmt.Sprintf("req-%d", time.Now().UnixNano())
 	}
-	var resp wire.Response
-	if guarded := b.guardSensitiveRequest(ctx, req); guarded != nil {
-		resp = *guarded
-	} else {
-		resp = b.handle(ctx, req)
-	}
+	resp := b.handle(ctx, req)
 	decision := "allow"
 	if !resp.OK {
 		decision = "deny"
@@ -79,6 +74,9 @@ func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
 func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 	if !strings.HasPrefix(req.Tool, "admin.") && b.ExpectedSubject != "" && req.Subject != b.ExpectedSubject {
 		return deny(req.ID, "identity_mismatch", "subject is not authorized for this Broker")
+	}
+	if guarded := b.guardSensitiveRequest(ctx, req); guarded != nil {
+		return *guarded
 	}
 	switch req.Tool {
 	case "system.info":
