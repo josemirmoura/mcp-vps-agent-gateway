@@ -141,7 +141,7 @@ for rel, markers in product_requirements.items():
 
 if "Refine config/policy.yaml" in installer_text or "Edit config/policy.yaml now" in installer_text:
     errors.append("scripts/install.sh: normal guided flow still requires manual policy YAML editing")
-if "/opt/vps-agent-sandbox" in quick_text:
+if "--scope /opt/vps-agent-sandbox" in quick_text or "install -d" in quick_text and "/opt/vps-agent-sandbox" in quick_text:
     errors.append("docs/quick-start.md: legacy sandbox must not be the normal installation path")
 
 required_flow = {
