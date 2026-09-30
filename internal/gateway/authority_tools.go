@@ -20,7 +20,7 @@ type sensitiveAccessRevokeInput struct {
 }
 
 func registerAuthorityTools(server *mcp.Server, s *Server) {
-	mcp.AddTool(server, &mcp.Tool{
+	addAnnotatedTool(server, &mcp.Tool{
 		Name: "permissions.discover_scope",
 		Description: "List only the immediate directory names under the configured physical filesystem ceiling. This is discovery-only: directory contents remain locked until separately authorized.",
 		Annotations: &mcp.ToolAnnotations{
@@ -35,7 +35,7 @@ func registerAuthorityTools(server *mcp.Server, s *Server) {
 		return nil, out, nil
 	})
 
-	mcp.AddTool(server, &mcp.Tool{
+	addAnnotatedTool(server, &mcp.Tool{
 		Name: "permissions.request_sensitive_access",
 		Description: "Request temporary human-approved access to one protected secret file such as .env inside an already-authorized root. Normal root delegation never unlocks protected secrets. On clients with MCP elicitation support, the host renders the native approval UI.",
 		Annotations: &mcp.ToolAnnotations{
@@ -79,7 +79,7 @@ func registerAuthorityTools(server *mcp.Server, s *Server) {
 	})
 
 
-	mcp.AddTool(server, &mcp.Tool{
+	addAnnotatedTool(server, &mcp.Tool{
 		Name: "permissions.list_sensitive_access",
 		Description: "List this authenticated subject's active temporary protected-file grants.",
 		Annotations: &mcp.ToolAnnotations{
@@ -93,7 +93,7 @@ func registerAuthorityTools(server *mcp.Server, s *Server) {
 		return nil, out, nil
 	})
 
-	mcp.AddTool(server, &mcp.Tool{
+	addAnnotatedTool(server, &mcp.Tool{
 		Name: "permissions.revoke_sensitive_access",
 		Description: "Immediately revoke this authenticated subject's temporary access to one protected secret path.",
 		Annotations: &mcp.ToolAnnotations{
