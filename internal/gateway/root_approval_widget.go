@@ -165,8 +165,8 @@ button:disabled { opacity: .55; cursor: default; }
     } catch (_) {}
 
     const text = approved
-      ? `Autorizei o acesso ${access} a ${root}. Continue a tarefa original usando essa pasta.`
-      : `Neguei o acesso a ${root}. Não use essa pasta e continue sem ampliar esse escopo.`;
+      ? "Autorizei o acesso " + access + " a " + root + ". Continue a tarefa original usando essa pasta."
+      : "Neguei o acesso a " + root + ". Não use essa pasta e continue sem ampliar esse escopo.";
     try {
       await rpcRequest("ui/message", {
         role: "user",
