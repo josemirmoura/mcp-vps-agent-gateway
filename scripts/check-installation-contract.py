@@ -154,6 +154,7 @@ connect_text = (ROOT / "scripts/connect-chatgpt.sh").read_text(errors="replace")
 native_approval_text = (ROOT / "internal/gateway/native_approval.go").read_text(errors="replace")
 authority_tools_text = (ROOT / "internal/gateway/authority_tools.go").read_text(errors="replace")
 gateway_text = (ROOT / "internal/gateway/gateway.go").read_text(errors="replace")
+tool_annotations_text = (ROOT / "internal/gateway/tool_annotations.go").read_text(errors="replace")
 broker_text = (ROOT / "internal/broker/broker.go").read_text(errors="replace")
 if (ROOT / "internal/gateway/root_approval_widget.go").exists():
     errors.append("internal/gateway/root_approval_widget.go: custom approval iframe must not return as the normal approval surface")
@@ -210,6 +211,15 @@ ux_requirements = {
         '"permissions.request_sensitive_access"',
         'nativeApprovalDecision(req, "sensitive")',
         'nativeApprovalResult("sensitive"',
+        'annotatedTool(',
+    ],
+    "internal/gateway/tool_annotations.go": [
+        "func toolSafetyFor",
+        "func annotatedTool",
+        "ReadOnlyHint",
+        "DestructiveHint",
+        "IdempotentHint",
+        "OpenWorldHint",
     ],
     "internal/broker/broker.go": [
         '"ceiling_wide": root == physical',
@@ -227,6 +237,7 @@ ux_sources = {
     "internal/gateway/native_approval.go": native_approval_text,
     "internal/gateway/gateway.go": gateway_text,
     "internal/gateway/authority_tools.go": authority_tools_text,
+    "internal/gateway/tool_annotations.go": tool_annotations_text,
     "internal/broker/broker.go": broker_text,
 }
 for rel, markers in ux_requirements.items():
@@ -239,8 +250,10 @@ if "dynamic delegation of the entire physical ceiling is not allowed" in broker_
     errors.append("internal/broker/broker.go: physical ceiling is still hard-blocked despite explicit human approval")
 if "rootApprovalWidgetURI" in gateway_text or "openai/outputTemplate" in gateway_text or "openai/outputTemplate" in authority_tools_text:
     errors.append("internal/gateway: custom MCP Apps approval UI metadata returned instead of native elicitation")
-if '"permissions.confirm_root_access"' in gateway_text.split('mcp.AddTool(server, &mcp.Tool{')[-1]:
-    errors.append("internal/gateway/gateway.go: model-visible root confirmation tool returned")
+if 'annotatedTool("permissions.confirm_root_access"' in gateway_text or 'annotatedTool("permissions.confirm_sensitive_access"' in authority_tools_text:
+    errors.append("internal/gateway: model-visible approval confirmation tool returned")
+if "mcp.AddTool(server, &mcp.Tool{" in gateway_text or "mcp.AddTool(server, &mcp.Tool{" in authority_tools_text:
+    errors.append("internal/gateway: public tools must use centralized annotatedTool classification")
 if 'wait-tool \\\n  --subject' in connect_text and '--after-seq "$BASELINE"' not in connect_text:
     errors.append("scripts/connect-chatgpt.sh: ChatGPT verification lost its fixed audit baseline")
 if "VPS_AGENT_CHATGPT_VERIFY_TIMEOUT:-10m" in connect_text and 'if [ ! -t 0 ]' not in connect_text:
