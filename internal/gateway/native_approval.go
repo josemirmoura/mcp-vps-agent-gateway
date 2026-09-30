@@ -1,0 +1,225 @@
+package gateway
+
+import (
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+
+	"github.com/google/jsonschema-go/jsonschema"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+const nativeApprovalInputKey = "portico_approval"
+
+type nativeApprovalState struct {
+	Version       int    `json:"v"`
+	Kind          string `json:"kind"`
+	RequestID     string `json:"request_id"`
+	ApprovalToken string `json:"approval_token"`
+}
+
+func supportsNativeElicitation(req *mcp.CallToolRequest) bool {
+	if req == nil {
+		return false
+	}
+	caps := req.ClientCapabilities()
+	return caps != nil && caps.Elicitation != nil
+}
+
+func encodeNativeApprovalState(state nativeApprovalState) (string, error) {
+	if state.Version == 0 {
+		state.Version = 1
+	}
+	if state.Kind == "" || state.RequestID == "" || state.ApprovalToken == "" {
+		return "", errors.New("incomplete approval state")
+	}
+	raw, err := json.Marshal(state)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+func decodeNativeApprovalState(raw, expectedKind string) (nativeApprovalState, error) {
+	var state nativeApprovalState
+	payload, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil {
+		return state, errors.New("invalid approval request state")
+	}
+	if err := json.Unmarshal(payload, &state); err != nil {
+		return state, errors.New("invalid approval request state")
+	}
+	if state.Version != 1 || state.Kind != expectedKind || state.RequestID == "" || state.ApprovalToken == "" {
+		return state, errors.New("approval request state does not match this operation")
+	}
+	return state, nil
+}
+
+func nativeApprovalResult(kind string, brokerResult map[string]any, approvalToken string) (*mcp.CallToolResult, error) {
+	requestID, _ := brokerResult["request_id"].(string)
+	state, err := encodeNativeApprovalState(nativeApprovalState{
+		Version:       1,
+		Kind:          kind,
+		RequestID:     requestID,
+		ApprovalToken: approvalToken,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &mcp.CallToolResult{
+		InputRequests: mcp.InputRequestMap{
+			nativeApprovalInputKey: &mcp.ElicitParams{
+				Message: approvalMessage(kind, brokerResult),
+				RequestedSchema: &jsonschema.Schema{
+					Type: "object",
+				},
+			},
+		},
+		RequestState: state,
+	}, nil
+}
+
+func nativeApprovalDecision(req *mcp.CallToolRequest, expectedKind string) (nativeApprovalState, string, bool, error) {
+	if req == nil || len(req.Params.InputResponses) == 0 {
+		return nativeApprovalState{}, "", false, nil
+	}
+	state, err := decodeNativeApprovalState(req.Params.RequestState, expectedKind)
+	if err != nil {
+		return nativeApprovalState{}, "", true, err
+	}
+	raw, ok := req.Params.InputResponses[nativeApprovalInputKey]
+	if !ok {
+		return nativeApprovalState{}, "", true, errors.New("native approval response is missing")
+	}
+	result, ok := raw.(*mcp.ElicitResult)
+	if !ok || result == nil {
+		return nativeApprovalState{}, "", true, errors.New("native approval response has an unexpected type")
+	}
+	switch result.Action {
+	case "accept":
+		return state, "approve", true, nil
+	case "decline", "cancel":
+		return state, "deny", true, nil
+	default:
+		return nativeApprovalState{}, "", true, fmt.Errorf("unsupported approval action %q", result.Action)
+	}
+}
+
+func approvalMessage(kind string, values map[string]any) string {
+	pt := strings.EqualFold(strings.TrimSpace(os.Getenv("VPS_AGENT_LANG")), "pt-BR")
+	access := stringValue(values["access"])
+	duration := durationValue(values["delegation_ttl_seconds"], pt)
+	ceiling := stringValue(values["physical_ceiling"])
+
+	if kind == "sensitive" {
+		target := stringValue(values["path"])
+		if pt {
+			return fmt.Sprintf(
+				"Autorizar acesso temporário a um arquivo protegido do Portico MCP?\n\nArquivo: %s\nAcesso: %s\nDuração: %s\nTeto físico: %s\n\nArquivos protegidos, como .env, continuam bloqueados mesmo quando a pasta do projeto está autorizada. Esta exceção vale somente para o arquivo acima e expira automaticamente. Aceite apenas se você realmente quiser liberar esse segredo para a tarefa atual.",
+				target, accessLabel(access, true), duration, ceiling,
+			)
+		}
+		return fmt.Sprintf(
+			"Authorize temporary access to a protected Portico MCP file?\n\nFile: %s\nAccess: %s\nDuration: %s\nPhysical ceiling: %s\n\nProtected files such as .env stay locked even when the project folder is authorized. This exception applies only to the file above and expires automatically. Accept only if you intentionally want to expose this secret for the current task.",
+			target, accessLabel(access, false), duration, ceiling,
+		)
+	}
+
+	target := stringValue(values["root"])
+	ceilingWide, _ := values["ceiling_wide"].(bool)
+	if pt {
+		message := fmt.Sprintf(
+			"Autorizar acesso do Portico MCP?\n\nPasta: %s\nAcesso: %s\nDuração: %s\nTeto físico: %s\n\nO teto físico é o limite máximo da IA; ele não concede acesso por si só. Esta autorização libera somente o perfil acima dentro da pasta solicitada. Arquivos protegidos, como .env, continuam bloqueados.",
+			target, accessLabel(access, true), duration, ceiling,
+		)
+		if ceilingWide {
+			message += "\n\nATENÇÃO: você está autorizando o próprio teto físico. O perfil solicitado passará a valer para todas as pastas atuais e futuras abaixo desse teto enquanto a autorização estiver ativa."
+		}
+		message += "\n\nVocê poderá revogar esta autorização depois."
+		return message
+	}
+	message := fmt.Sprintf(
+		"Authorize Portico MCP access?\n\nFolder: %s\nAccess: %s\nDuration: %s\nPhysical ceiling: %s\n\nThe physical ceiling is the AI's maximum boundary; it grants no access by itself. This authorization enables only the profile above inside the requested folder. Protected files such as .env remain locked.",
+		target, accessLabel(access, false), duration, ceiling,
+	)
+	if ceilingWide {
+		message += "\n\nWARNING: you are authorizing the physical ceiling itself. The requested profile will apply to every current and future folder below that ceiling while the authorization remains active."
+	}
+	message += "\n\nYou can revoke this authorization later."
+	return message
+}
+
+func accessLabel(access string, pt bool) string {
+	switch access {
+	case "read":
+		if pt {
+			return "Somente leitura"
+		}
+		return "Read only"
+	case "work":
+		if pt {
+			return "Trabalho (ler, criar, editar, excluir e usar shell confinado)"
+		}
+		return "Work (read, create, edit, delete, and use confined shell)"
+	case "compose":
+		if pt {
+			return "Trabalho + Compose já permitido pela política"
+		}
+		return "Work + Compose actions already allowed by policy"
+	default:
+		return access
+	}
+}
+
+func durationValue(value any, pt bool) string {
+	seconds := int64Value(value)
+	if seconds <= 0 {
+		if pt {
+			return "Permanente, até revogação"
+		}
+		return "Permanent, until revoked"
+	}
+	if seconds%3600 == 0 {
+		return fmt.Sprintf("%d h", seconds/3600)
+	}
+	if seconds%60 == 0 {
+		return fmt.Sprintf("%d min", seconds/60)
+	}
+	if pt {
+		return fmt.Sprintf("%d s", seconds)
+	}
+	return fmt.Sprintf("%d sec", seconds)
+}
+
+func stringValue(value any) string {
+	if value == nil {
+		return "—"
+	}
+	if s, ok := value.(string); ok && s != "" {
+		return s
+	}
+	return fmt.Sprint(value)
+}
+
+func int64Value(value any) int64 {
+	switch v := value.(type) {
+	case int:
+		return int64(v)
+	case int64:
+		return v
+	case float64:
+		return int64(v)
+	case json.Number:
+		n, _ := v.Int64()
+		return n
+	case string:
+		n, _ := strconv.ParseInt(v, 10, 64)
+		return n
+	default:
+		return 0
+	}
+}

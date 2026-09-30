@@ -44,7 +44,15 @@ The same principle applies independently to systemd units, Docker resources, net
 
 ## Convenience profiles
 
-The installer may offer three shortcuts:
+The installer offers three shortcuts:
+
+### Standard
+
+Recommended default for multi-project hosts. The operator chooses one physical filesystem ceiling, defaulting to `/opt`. No project root is authorized at installation time.
+
+Portico may discover only the immediate directory names below that ceiling. Project contents stay locked until the operator approves a specific root with `read`, `work`, or `compose`.
+
+Protected secret files remain a separate nested boundary even after project approval.
 
 ### Project
 
@@ -62,17 +70,9 @@ Typical enabled capabilities:
 - selected systemd units
 - selected outbound network destinations
 
-### Custom
+### Advanced/static policy
 
-The operator selects multiple filesystem roots and resource groups, for example:
-
-~~~text
-/opt/app-a
-/var/www/site
-/srv/data
-~~~
-
-The same capability catalog is available, but policy limits where each capability can act.
+Advanced operators may define several static filesystem roots and resource groups directly in policy. This remains available for explicit operator-managed deployments, but the guided Standard profile prefers runtime root delegation instead of asking a new user to edit YAML.
 
 ### Whole host
 
@@ -230,7 +230,7 @@ The product supports the operation; policy decides whether the current installat
 The operator or assisting AI edits the declarative policy to choose:
 
 1. Which exact filesystem roots/resources are delegated to MCP.
-2. Optional convenience preset: Project, Custom, or Whole host.
+2. Optional convenience preset: Standard, Project, or Whole Host.
 3. Allowed filesystem roots.
 4. Filesystem capabilities.
 5. Shell access and sandbox roots.
@@ -283,7 +283,7 @@ The primary operator flow is intentionally terminal- and AI-friendly:
 bash scripts/install.sh
 ~~~
 
-`scripts/install.sh` is a transparent orchestration layer over the existing bootstrap, Docker Compose, verification, integrated OAuth and ChatGPT connection scripts. It exposes Project, Custom and Whole Host choices, displays effective authority before startup, and can be rerun after an interrupted phase.
+`scripts/install.sh` is a transparent orchestration layer over the existing bootstrap, Docker Compose, verification, integrated OAuth and ChatGPT connection scripts. It exposes Standard, Project and Whole Host choices, displays effective authority before startup, and can be rerun after an interrupted phase.
 
 The individual commands remain available for inspection and advanced operation. There is no proprietary installer or alternate native-install product flow. The supported installation boundary is defined by [installation-contract.md](installation-contract.md): development-session access workarounds are not user installation requirements, and deterministic setup work should be automated by the package.
 

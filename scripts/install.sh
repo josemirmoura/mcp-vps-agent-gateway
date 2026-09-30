@@ -153,8 +153,9 @@ if [ -z "$PROFILE" ]; then
 Escolha como o Portico MCP poderá acessar sua VPS:
 
   1) Standard (recomendado)
-     O Portico pode trabalhar dentro de /opt, mas nenhum projeto começa liberado.
-     Você autoriza cada pasta depois, quando o ChatGPT precisar.
+     /opt é apenas o teto físico padrão: o limite máximo da IA, não uma autorização.
+     O Portico pode descobrir os nomes das pastas logo abaixo do teto, mas não abrir seu conteúdo.
+     Você autoriza cada projeto depois, quando o ChatGPT precisar.
 
   2) Project
      O Portico fica limitado a uma única pasta desde a instalação.
@@ -171,8 +172,9 @@ EOF
 Choose how Portico MCP may access your VPS:
 
   1) Standard (recommended)
-     Portico may work inside /opt, but no project starts authorized.
-     You approve each folder later when ChatGPT needs it.
+     /opt is only the default physical ceiling: the AI's maximum boundary, not an authorization.
+     Portico may discover immediate folder names below the ceiling, but cannot open their contents.
+     You approve each project later when ChatGPT needs it.
 
   2) Project
      Portico is limited to one folder from installation time.
@@ -294,7 +296,8 @@ chmod 600 .env
 if [ "$PROFILE" = "custom" ]; then
   echo
   echo "$(vps_agent_text     "Standard profile selected. Physical ceiling: $SCOPE."     "Perfil Standard selecionado. Teto físico: $SCOPE.")"
-  echo "$(vps_agent_text     'No project root is authorized yet. Portico MCP will request each project root later through explicit approval.'     'Nenhuma raiz de projeto está autorizada ainda. O Portico MCP solicitará cada projeto depois por aprovação explícita.')"
+  echo "$(vps_agent_text     'No project root is authorized yet. Portico may discover immediate folder names under the ceiling, but contents stay locked until explicit approval.'     'Nenhuma raiz de projeto está autorizada ainda. O Portico pode descobrir os nomes das pastas imediatamente abaixo do teto, mas o conteúdo fica bloqueado até aprovação explícita.')"
+  echo "$(vps_agent_text     'Protected files such as .env remain locked even inside an authorized project and require a separate temporary approval.'     'Arquivos protegidos como .env continuam trancados mesmo dentro de um projeto autorizado e exigem uma autorização temporária separada.')"
 fi
 
 vps_agent_step "$(vps_agent_text '3/7 Effective authority' '3/7 Autoridade efetiva')"

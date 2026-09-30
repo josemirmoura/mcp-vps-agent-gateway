@@ -151,8 +151,12 @@ authority_text = (ROOT / "scripts/authority-summary.py").read_text(errors="repla
 preflight_text = (ROOT / "scripts/preflight.py").read_text(errors="replace")
 auth_text = (ROOT / "scripts/setup-integrated-auth.sh").read_text(errors="replace")
 connect_text = (ROOT / "scripts/connect-chatgpt.sh").read_text(errors="replace")
-widget_text = (ROOT / "internal/gateway/root_approval_widget.go").read_text(errors="replace")
+native_approval_text = (ROOT / "internal/gateway/native_approval.go").read_text(errors="replace")
+authority_tools_text = (ROOT / "internal/gateway/authority_tools.go").read_text(errors="replace")
+gateway_text = (ROOT / "internal/gateway/gateway.go").read_text(errors="replace")
 broker_text = (ROOT / "internal/broker/broker.go").read_text(errors="replace")
+if (ROOT / "internal/gateway/root_approval_widget.go").exists():
+    errors.append("internal/gateway/root_approval_widget.go: custom approval iframe must not return as the normal approval surface")
 
 ux_requirements = {
     "scripts/authority-summary.py": [
@@ -169,7 +173,9 @@ ux_requirements = {
     ],
     "scripts/install.sh": [
         "Escolha como o Portico MCP poderá acessar sua VPS",
-        "Você autoriza cada pasta depois",
+        "nomes das pastas imediatamente abaixo do teto",
+        "conteúdo fica bloqueado até aprovação explícita",
+        "Arquivos protegidos como .env continuam trancados",
         "python3 scripts/preflight.py",
     ],
     "scripts/setup-integrated-auth.sh": [
@@ -185,16 +191,31 @@ ux_requirements = {
         "--after-seq",
         "Ainda não detectamos a chamada system.info",
     ],
-    "internal/gateway/root_approval_widget.go": [
-        "@media (prefers-color-scheme: dark)",
-        "ceiling_wide",
-        "Autorizar todo ",
-        "overflow-wrap: anywhere",
-        "button:focus-visible",
+    "internal/gateway/native_approval.go": [
+        "mcp.InputRequestMap",
+        "mcp.ElicitParams",
+        "RequestState",
+        "ClientCapabilities",
+        "decline",
+        "cancel",
+        "ATENÇÃO",
+        ".env",
+    ],
+    "internal/gateway/gateway.go": [
+        '"permissions.request_root_access"',
+        'nativeApprovalDecision(req, "root")',
+        'nativeApprovalResult("root"',
+    ],
+    "internal/gateway/authority_tools.go": [
+        '"permissions.request_sensitive_access"',
+        'nativeApprovalDecision(req, "sensitive")',
+        'nativeApprovalResult("sensitive"',
     ],
     "internal/broker/broker.go": [
         '"ceiling_wide": root == physical',
         '"physical_ceiling": physical',
+        '"permissions.discover_scope"',
+        '"permissions.request_sensitive_access"',
     ],
 }
 ux_sources = {
@@ -203,7 +224,9 @@ ux_sources = {
     "scripts/install.sh": installer_text,
     "scripts/setup-integrated-auth.sh": auth_text,
     "scripts/connect-chatgpt.sh": connect_text,
-    "internal/gateway/root_approval_widget.go": widget_text,
+    "internal/gateway/native_approval.go": native_approval_text,
+    "internal/gateway/gateway.go": gateway_text,
+    "internal/gateway/authority_tools.go": authority_tools_text,
     "internal/broker/broker.go": broker_text,
 }
 for rel, markers in ux_requirements.items():
@@ -214,8 +237,10 @@ for rel, markers in ux_requirements.items():
 
 if "dynamic delegation of the entire physical ceiling is not allowed" in broker_text:
     errors.append("internal/broker/broker.go: physical ceiling is still hard-blocked despite explicit human approval")
-if "currentColor" in widget_text or "color: var(--color-text-primary, inherit)" in widget_text:
-    errors.append("internal/gateway/root_approval_widget.go: unsafe host-theme color fallback returned")
+if "rootApprovalWidgetURI" in gateway_text or "openai/outputTemplate" in gateway_text or "openai/outputTemplate" in authority_tools_text:
+    errors.append("internal/gateway: custom MCP Apps approval UI metadata returned instead of native elicitation")
+if '"permissions.confirm_root_access"' in gateway_text.split('mcp.AddTool(server, &mcp.Tool{')[-1]:
+    errors.append("internal/gateway/gateway.go: model-visible root confirmation tool returned")
 if 'wait-tool \\\n  --subject' in connect_text and '--after-seq "$BASELINE"' not in connect_text:
     errors.append("scripts/connect-chatgpt.sh: ChatGPT verification lost its fixed audit baseline")
 if "VPS_AGENT_CHATGPT_VERIFY_TIMEOUT:-10m" in connect_text and 'if [ ! -t 0 ]' not in connect_text:

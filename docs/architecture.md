@@ -62,7 +62,6 @@ It may:
 - normalize tool names and resources
 - perform non-authoritative preflight checks
 - call the Broker through a Unix socket
-- later host a human approval web route
 
 It must not:
 
@@ -113,7 +112,9 @@ A user may authorize:
 - several selected roots/resources
 - the whole host
 
-For multi-project deployments, the physical ceiling and logical roots are deliberately separate. The static policy supplies the baseline roots. Additional roots can be represented as Broker-owned dynamic delegations bound to the authenticated subject, an access profile (`read`, `work`, or `compose`) and an optional expiry. Creating a pending request is not authorization. On MCP Apps-compatible clients, the request renders an inline approval card whose one-time token is hidden from the model in tool-result metadata; the app-only confirmation call activates the delegation only after the authenticated user acts on that card. The existing admin approval path remains a fallback for clients without interactive MCP Apps UI. Revocation takes effect from Broker state without a container restart.
+For multi-project deployments, the physical ceiling and logical roots are deliberately separate. The ceiling is the maximum boundary, not a read grant. The Standard profile may expose only the immediate directory names below that ceiling through a discovery-only Broker operation so the client can request the correct project without opening it. The static policy supplies the baseline roots. Additional roots can be represented as Broker-owned dynamic delegations bound to the authenticated subject, an access profile (`read`, `work`, or `compose`) and an optional expiry. Creating a pending request is not authorization. On clients that advertise MCP elicitation, the Gateway returns a multi-round-trip elicitation request and the MCP client renders its own native human-confirmation surface. The opaque approval state is returned only through the protocol round trip and the Broker independently validates the pending request, authenticated subject and one-time approval token before activating the delegation. The confirmation tools are not published in the model-visible tool catalog. Clients without elicitation fail closed into the separate operator fallback. Revocation takes effect from Broker state without a container restart.
+
+Secret-bearing files form a nested boundary inside an authorized root. Protected paths such as `.env` require a second exact-path, temporary, human-approved grant. Common template files remain ordinary project content. The Broker enforces this rule for generic filesystem operations, and the shell sandbox masks protected paths so a root delegation cannot be used as an alternate plaintext-secret retrieval path.
 
 Filesystem scope is only one dimension. systemd units, Docker resources, shell roots, network destinations and administrative actions are independently scoped.
 
@@ -139,15 +140,7 @@ Routine work should use Scoped and require no human interruption.
 
 If temporary elevation is later enabled, the agent may create a request, but approval occurs outside the MCP action channel.
 
-A separate Approval Service process is not required by the reference design. A human route may live in the unprivileged Gateway if:
-
-- the human uses OAuth/OIDC step-up, MFA or passkey
-- approval is bound to a one-time nonce
-- the Broker independently validates the signed assertion and nonce
-- no MCP tool can approve the request
-- replay is prevented
-
-A separate approval service remains an option for larger deployments.
+A separate Approval Service process is not required by the reference design. For routine dynamic root and protected-file grants, the preferred path is native MCP elicitation rendered by the connected client. The Broker still owns the security decision: approval is bound to the authenticated subject and a one-time nonce/token, replay is prevented, and no model-visible MCP tool can approve its own request. A separate operator/admin route remains the fallback for clients without elicitation and an option for stronger step-up flows such as MFA or passkeys.
 
 ## Full
 

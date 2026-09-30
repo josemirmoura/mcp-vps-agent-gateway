@@ -83,6 +83,7 @@ services:
       VPS_AGENT_RESOURCE_METADATA_URL: ${VPS_AGENT_RESOURCE_METADATA_URL:-}
       VPS_AGENT_INSTANCE_ID: ${VPS_AGENT_INSTANCE_ID:-}
       VPS_AGENT_INSTANCE_NAME: ${VPS_AGENT_INSTANCE_NAME:-vps-agent}
+      VPS_AGENT_LANG: ${VPS_AGENT_LANG:-en}
     volumes:
       - broker-run:/run/vps-agent
     ports:

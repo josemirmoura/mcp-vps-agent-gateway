@@ -454,6 +454,81 @@ func (s *Store) ValidateGrant(ctx context.Context, grantID, subject, capability 
 	return false, nil
 }
 
+func (s *Store) ListActiveGrants(ctx context.Context, subject string) ([]Grant, error) {
+	if subject == "" {
+		return nil, errors.New("subject is required")
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT grant_id, capabilities, expires_at
+		  FROM grants
+		  WHERE subject=? AND revoked_at IS NULL AND expires_at>?
+		  ORDER BY expires_at`,
+		subject, time.Now().UnixNano())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Grant
+	for rows.Next() {
+		var g Grant
+		var rawCaps string
+		var expires int64
+		if err := rows.Scan(&g.ID, &rawCaps, &expires); err != nil {
+			return nil, err
+		}
+		g.Subject = subject
+		g.ExpiresAt = time.Unix(0, expires)
+		if err := json.Unmarshal([]byte(rawCaps), &g.Capabilities); err != nil {
+			return nil, err
+		}
+		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) RevokeGrantsByCapability(ctx context.Context, subject string, capabilities ...string) (int64, error) {
+	if subject == "" {
+		return 0, errors.New("subject is required")
+	}
+	want := map[string]struct{}{}
+	for _, cap := range canonicalCaps(capabilities) {
+		want[cap] = struct{}{}
+	}
+	if len(want) == 0 {
+		return 0, errors.New("at least one capability is required")
+	}
+	grants, err := s.ListActiveGrants(ctx, subject)
+	if err != nil {
+		return 0, err
+	}
+	now := time.Now().UnixNano()
+	var revoked int64
+	for _, g := range grants {
+		match := false
+		for _, cap := range g.Capabilities {
+			if _, ok := want[cap]; ok {
+				match = true
+				break
+			}
+		}
+		if !match {
+			continue
+		}
+		res, err := s.db.ExecContext(ctx,
+			`UPDATE grants SET revoked_at=? WHERE grant_id=? AND subject=? AND revoked_at IS NULL`,
+			now, g.ID, subject)
+		if err != nil {
+			return revoked, err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return revoked, err
+		}
+		revoked += n
+	}
+	return revoked, nil
+}
+
 func (s *Store) RevokeAll(ctx context.Context) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

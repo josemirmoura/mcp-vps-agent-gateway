@@ -267,6 +267,26 @@ jobs:
           /tmp/mcp-call file.remove '{"path":"/tmp/vps-agent-docker-proof/work/tree","recursive":true}' | tee evidence/fs-remove-recursive.json
           test ! -e /tmp/vps-agent-docker-proof/work/tree
 
+      - name: Protected secrets stay locked inside an authorized root
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'SAMPLE_VALUE=1\n' | sudo tee /tmp/vps-agent-docker-proof/work/.env.example >/dev/null
+          printf 'PROTECTED_VALUE=placeholder\n' | sudo tee /tmp/vps-agent-docker-proof/work/.env >/dev/null
+          sudo ln /tmp/vps-agent-docker-proof/work/.env /tmp/vps-agent-docker-proof/work/settings.txt
+
+          /tmp/mcp-call file.read '{"path":"/tmp/vps-agent-docker-proof/work/.env.example"}' | tee evidence/env-template-readable.json
+
+          set -a; . ./.env; set +a
+          docker compose exec -T gateway /usr/local/bin/vps-agent-mcp-call             --endpoint http://127.0.0.1:8080/mcp             --token "$VPS_AGENT_STATIC_TOKEN"             --tool file.read             --args '{"path":"/tmp/vps-agent-docker-proof/work/.env"}'             --expect-error | tee evidence/env-protected.json
+
+          docker compose exec -T gateway /usr/local/bin/vps-agent-mcp-call             --endpoint http://127.0.0.1:8080/mcp             --token "$VPS_AGENT_STATIC_TOKEN"             --tool file.read             --args '{"path":"/tmp/vps-agent-docker-proof/work/settings.txt"}'             --expect-error | tee evidence/env-hardlink-protected.json
+
+          /tmp/mcp-call shell.exec '{"command":"if cat .env > env-copy 2>/dev/null; then echo LEAKED > env-result; else echo DENIED > env-result; fi","cwd":"/tmp/vps-agent-docker-proof/work","runtime_seconds":20}' | tee evidence/env-shell-start.json
+          for _ in $(seq 1 30); do test -f /tmp/vps-agent-docker-proof/work/env-result && break; sleep 1; done
+          test "$(sudo cat /tmp/vps-agent-docker-proof/work/env-result)" = "DENIED"
+          test ! -s /tmp/vps-agent-docker-proof/work/env-copy
+
       - name: Filesystem escape must be denied
         shell: bash
         run: |

@@ -36,7 +36,7 @@ whole filesystem:  /
 
 Filesystem scope is only one dimension. The policy separately controls shell roots, systemd units, Docker/Compose resources, network, packages, users/groups, firewall, and temporary administration.
 
-For multi-project hosts, a broader physical ceiling such as `/opt` can contain several explicitly delegated roots. Widening the ceiling does not authorize it. Static roots remain in `config/policy.yaml`; production runtime delegation can be requested through MCP, approved through the Broker's separate operator boundary, listed from chat, and revoked from chat without rewriting policy or restarting the Broker. The local `scripts/delegate-root.sh` helper remains available for bootstrap and operator-managed static roots.
+For multi-project hosts, a broader physical ceiling such as `/opt` can contain several explicitly delegated roots. Widening the ceiling does not authorize it. Static roots remain in `config/policy.yaml`; production runtime delegation can be requested through MCP and, when the client supports elicitation, the MCP client itself renders the native human-confirmation surface. The Broker remains authoritative, and delegations can be listed and revoked from chat without rewriting policy or restarting the Broker. The local `scripts/delegate-root.sh` helper remains available for bootstrap and operator-managed static roots.
 
 **The LLM is never the security boundary. The server decides.**
 
