@@ -246,6 +246,7 @@
     "error.operator_creation_failed": "ERROR: falló la creación del operador (curl={curl_status} HTTP={http_code}).",
     "error.public_url_https": "El endpoint MCP público debe usar HTTPS: {url}",
     "error.expected_401": "Se esperaba HTTP 401 de la solicitud MCP no autenticada; se recibió {code}.",
-    "verify.local_call_skipped": "Se omitió la llamada MCP local para el modo de autenticación {mode}; se usará la verificación OAuth pública."
+    "verify.local_call_skipped": "Se omitió la llamada MCP local para el modo de autenticación {mode}; se usará la verificación OAuth pública.",
+    "connect.email_line": "   Correo de la cuenta: {email}"
   }
 }
