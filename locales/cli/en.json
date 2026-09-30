@@ -41,6 +41,7 @@
     "error.operator_creation_failed": "ERROR: operator creation failed (curl={curl_status} HTTP={http_code}).",
     "error.public_url_https": "Public MCP endpoint must use HTTPS: {url}",
     "error.expected_401": "Expected HTTP 401 from unauthenticated MCP request, got {code}.",
-    "verify.local_call_skipped": "Local MCP tool call skipped for auth mode {mode}; public OAuth verification will be used."
+    "verify.local_call_skipped": "Local MCP tool call skipped for auth mode {mode}; public OAuth verification will be used.",
+    "connect.email_line": "   Account email: {email}"
   }
 }
