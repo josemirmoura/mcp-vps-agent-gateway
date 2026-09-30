@@ -306,7 +306,9 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 	s := &Server{Executor: exec, Metrics: metrics}
 	server := mcp.NewServer(
 		&mcp.Implementation{Name: "portico-mcp", Version: "v0.1.0"},
-		&mcp.ServerOptions{Capabilities: &mcp.ServerCapabilities{
+		&mcp.ServerOptions{
+			Instructions: serverInstructions(),
+			Capabilities: &mcp.ServerCapabilities{
 			Logging: &mcp.LoggingCapabilities{},
 			Extensions: map[string]any{
 				"io.modelcontextprotocol/ui": map[string]any{
