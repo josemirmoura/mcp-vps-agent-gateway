@@ -1,6 +1,6 @@
 # Support policy
 
-MCP VPS Agent Gateway is an open-source project.
+Portico MCP is an open-source project.
 
 ## Supported release line
 
