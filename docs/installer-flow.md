@@ -77,13 +77,13 @@ After the MCP is connected, project roots are granted through explicit runtime a
 ~~~text
 permissions.request_root_access
         -> pending Broker request
-        -> in-chat Authorize / Deny card
+        -> native MCP elicitation / host-owned confirmation UI
         -> active subject-bound delegation
 ~~~
 
-`read` grants filesystem read. `work` grants filesystem read/write plus scoped shell cwd. `compose` adds Compose authority only for Compose actions already enabled by the static action policy.
+`read` grants filesystem read. `work` grants filesystem read/write plus scoped shell cwd. `compose` adds Compose authority only for Compose actions already enabled by the static action policy. On clients that advertise MCP elicitation, Portico asks the client to render the human confirmation natively; no custom approval iframe is part of the normal ChatGPT path. Clients without elicitation leave the request pending for the separate operator fallback.
 
-Protected secret-bearing paths form a second boundary inside authorized projects. By default `.env` and `.env.*` remain locked while `.env.example`, `.env.sample` and `.env.template` remain ordinary readable templates. Reading or modifying a protected path requires a separate temporary `permissions.request_sensitive_access` approval. The grant is exact-path, subject-bound, auditable, expiring and independently revocable. Scoped shell jobs mask protected paths, including hardlink aliases discovered inside the delegated roots, unless a temporary protected-file `work` grant explicitly exposes that exact path.
+Protected secret-bearing paths form a second boundary inside authorized projects. Their temporary exception uses the same native MCP elicitation flow when the client supports it. By default `.env` and `.env.*` remain locked while `.env.example`, `.env.sample` and `.env.template` remain ordinary readable templates. Reading or modifying a protected path requires a separate temporary `permissions.request_sensitive_access` approval. The grant is exact-path, subject-bound, auditable, expiring and independently revocable. Scoped shell jobs mask protected paths, including hardlink aliases discovered inside the delegated roots, unless a temporary protected-file `work` grant explicitly exposes that exact path.
 
 Advanced operators may still define static roots with `scripts/delegate-root.sh`. Manual editing of `config/policy.yaml` is not required by the normal guided installation.
 
