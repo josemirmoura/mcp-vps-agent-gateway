@@ -12,8 +12,8 @@ Do not run it casually on an important existing MCP installation. Prefer a clean
 - provide at least 2 GB RAM for the bundled ZITADEL path;
 - control DNS for the public MCP hostname;
 - have public TCP 80/443 available through the supported edge path;
-- use ChatGPT Plus or higher and confirm Developer Mode / custom MCP app creation is actually available in ChatGPT Web for the account;
-- for acceptance of write/modify capabilities, confirm that the account's current ChatGPT plan/product surface exposes those actions; OpenAI currently documents full MCP write/modify support for Business, Enterprise and Edu.
+- use a ChatGPT Web account/workspace where Developer Mode / custom MCP app creation is actually available;
+- for acceptance of write/modify capabilities, confirm that the current ChatGPT product surface exposes those actions; OpenAI currently documents full MCP write/modify support for Business, Enterprise and Edu, while Pro custom MCP access is read/fetch-limited.
 
 Record:
 
@@ -30,7 +30,7 @@ Do not record passwords, tokens, private keys or .env contents.
 Clone the exact RC tag and enter the guided flow.
 
 ~~~bash
-git clone --branch v0.1.0-rc.3 https://github.com/josemirmoura/mcp-vps-agent-gateway.git
+git clone --branch v0.1.0-rc.4 https://github.com/josemirmoura/mcp-vps-agent-gateway.git
 cd mcp-vps-agent-gateway
 bash scripts/install.sh
 ~~~
@@ -39,8 +39,9 @@ Confirm:
 
 - product/version banner is correct;
 - requirements are checked;
-- Project / Custom / Whole Host choice is understandable;
+- Standard / Project / Whole Host choice is understandable;
 - effective authority is shown before startup;
+- Standard starts with /opt as the physical ceiling and no project root authorized;
 - no silent privilege escalation occurs;
 - no VPS/SSH credential is requested by ChatGPT or documentation.
 
@@ -64,7 +65,8 @@ In ChatGPT web:
 - enable/use Developer Mode/custom app according to current OpenAI workspace controls;
 - create the app using the HTTPS `/mcp` endpoint;
 - complete OAuth with the dedicated operator identity;
-- invoke `system.info`.
+- invoke `system.info`;
+- return to the terminal and press Enter to verify the audited call.
 
 The terminal must not print `INSTALLATION COMPLETE` until the authenticated call is observed through Gateway -> Broker -> policy -> execution -> audit.
 
