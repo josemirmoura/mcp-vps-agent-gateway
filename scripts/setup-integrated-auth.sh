@@ -2,32 +2,56 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=scripts/lib/product.sh
+source scripts/lib/product.sh
+vps_agent_init_language ""
+
 usage() {
-  cat <<'EOF'
+  if vps_agent_is_pt_br; then
+    cat <<'EOF'
+uso: bash scripts/setup-integrated-auth.sh [--domain mcp.exemplo.com] [opções]
+
+Configura o acesso público suportado ao ChatGPT com OAuth/OIDC auto-hospedado,
+ZITADEL, PostgreSQL e o Gateway/Broker do Portico.
+
+Opções:
+  --domain DOMINIO          Nome DNS público do MCP + OAuth.
+  --operator-email EMAIL    E-mail da conta de operador.
+  --operator-username NOME  Nome de usuário do login (padrão: vps-operator).
+  --edge-network REDE       Rede Docker de um Traefik existente.
+  --certresolver NOME       Resolvedor ACME do Traefik existente.
+  --bundled-proxy           Força o Traefik embutido em vez de reutilizar um.
+  -h, --help                Mostra esta ajuda.
+
+A senha dedicada do operador OAuth é solicitada localmente sem aparecer no
+terminal. Ela não é a senha VPS/SSH e não deve ser fornecida ao ChatGPT.
+EOF
+  else
+    cat <<'EOF'
 usage: bash scripts/setup-integrated-auth.sh [--domain mcp.example.com] [options]
 
 Configure the supported public ChatGPT path: self-hosted OAuth/OIDC with
-ZITADEL, PostgreSQL and the existing package Gateway/Broker.
+ZITADEL, PostgreSQL and the existing Portico Gateway/Broker.
 
 Options:
   --domain DOMAIN          Public DNS name for MCP + OAuth.
-  --operator-email EMAIL   Login email for the VPS operator.
+  --operator-email EMAIL   Login email for the Portico operator.
   --operator-username NAME Login username (default: vps-operator).
   --edge-network NETWORK   Existing Traefik Docker network.
   --certresolver NAME      Existing Traefik ACME resolver.
-  --bundled-proxy          Force the package Traefik instead of reusing one.
+  --bundled-proxy          Force the bundled Traefik instead of reusing one.
   -h, --help               Show this help.
 
 The dedicated OAuth operator password is requested locally without terminal
 echo. It is not the VPS/SSH password and must not be supplied to ChatGPT.
-For CI/automation, VPS_AGENT_OPERATOR_PASSWORD may be supplied in the
-environment; do not put a real password on a shared command line.
 EOF
+  fi
 }
 
 DOMAIN=""
 OPERATOR_EMAIL=""
 OPERATOR_USERNAME="vps-operator"
+OPERATOR_USERNAME_EXPLICIT=0
 EDGE_NETWORK=""
 CERTRESOLVER=""
 BUNDLED_PROXY=0
@@ -35,51 +59,90 @@ BUNDLED_PROXY=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --domain)
-      [ "$#" -ge 2 ] || { echo "ERROR: --domain needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --domain needs a value.' 'ERRO: --domain precisa de um valor.')" >&2; exit 2; }
       DOMAIN="$2"; shift 2 ;;
     --operator-email)
-      [ "$#" -ge 2 ] || { echo "ERROR: --operator-email needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --operator-email needs a value.' 'ERRO: --operator-email precisa de um valor.')" >&2; exit 2; }
       OPERATOR_EMAIL="$2"; shift 2 ;;
     --operator-username)
-      [ "$#" -ge 2 ] || { echo "ERROR: --operator-username needs a value." >&2; exit 2; }
-      OPERATOR_USERNAME="$2"; shift 2 ;;
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --operator-username needs a value.' 'ERRO: --operator-username precisa de um valor.')" >&2; exit 2; }
+      OPERATOR_USERNAME="$2"; OPERATOR_USERNAME_EXPLICIT=1; shift 2 ;;
     --edge-network)
-      [ "$#" -ge 2 ] || { echo "ERROR: --edge-network needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --edge-network needs a value.' 'ERRO: --edge-network precisa de um valor.')" >&2; exit 2; }
       EDGE_NETWORK="$2"; shift 2 ;;
     --certresolver)
-      [ "$#" -ge 2 ] || { echo "ERROR: --certresolver needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --certresolver needs a value.' 'ERRO: --certresolver precisa de um valor.')" >&2; exit 2; }
       CERTRESOLVER="$2"; shift 2 ;;
     --bundled-proxy) BUNDLED_PROXY=1; shift ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "ERROR: unknown argument: $1" >&2; usage >&2; exit 2 ;;
+    *) echo "$(vps_agent_text "ERROR: unknown argument: $1" "ERRO: argumento desconhecido: $1")" >&2; usage >&2; exit 2 ;;
   esac
 done
 
 if [ ! -f .env ] || [ ! -f config/policy.yaml ]; then
-  echo "ERROR: run scripts/init.sh and bash scripts/verify.sh first." >&2
+  echo "$(vps_agent_text 'ERROR: run scripts/init.sh and bash scripts/verify.sh first.' 'ERRO: execute scripts/init.sh e scripts/verify.sh primeiro.')" >&2
   exit 1
 fi
 
 if [ -z "$DOMAIN" ]; then
   if [ -t 0 ]; then
-    printf 'Public MCP domain (for example mcp.example.com): '
+    if vps_agent_is_pt_br; then
+      cat <<'EOF'
+
+Para conectar o ChatGPT ao Portico MCP, você precisa de um endereço público
+para esta VPS.
+
+1. No painel onde você gerencia seu domínio, crie um subdomínio, por exemplo:
+   mcp.seudominio.com.br
+
+2. Crie um registro DNS A apontando esse subdomínio para o IP público desta VPS.
+   Se você usa IPv6, também pode criar um registro AAAA.
+
+3. Aguarde o DNS responder e informe abaixo apenas o nome criado, sem https://
+   e sem /mcp.
+
+Exemplo:
+  mcp.seudominio.com.br
+
+EOF
+      printf 'Domínio público do Portico MCP: '
+    else
+      cat <<'EOF'
+
+To connect ChatGPT to Portico MCP, this VPS needs a public hostname.
+
+1. In the DNS panel for a domain you control, create a subdomain, for example:
+   mcp.example.com
+
+2. Create a DNS A record pointing that subdomain to this VPS public IP.
+   If you use IPv6, you may also create an AAAA record.
+
+3. Wait for DNS to resolve, then enter only the hostname below, without
+   https:// and without /mcp.
+
+Example:
+  mcp.example.com
+
+EOF
+      printf 'Public Portico MCP domain: '
+    fi
     read -r DOMAIN
   else
-    echo "ERROR: --domain is required in non-interactive mode." >&2
+    echo "$(vps_agent_text 'ERROR: --domain is required in non-interactive mode.' 'ERRO: --domain é obrigatório em modo não interativo.')" >&2
     exit 2
   fi
 fi
 if [[ "$DOMAIN" == *"://"* || "$DOMAIN" == */* || "$DOMAIN" == *" "* || "$DOMAIN" == .* || "$DOMAIN" == *. ]]; then
-  echo "ERROR: --domain must be a hostname only, for example mcp.example.com." >&2
+  echo "$(vps_agent_text 'ERROR: --domain must be a hostname only, for example mcp.example.com.' 'ERRO: --domain deve conter apenas o hostname, por exemplo mcp.exemplo.com.')" >&2
   exit 2
 fi
 if [[ ! "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]]; then
-  echo "ERROR: --domain contains unsupported characters." >&2
+  echo "$(vps_agent_text 'ERROR: --domain contains unsupported characters.' 'ERRO: --domain contém caracteres não suportados.')" >&2
   exit 2
 fi
 
 for cmd in docker curl openssl python3 ss getent; do
-  command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: required command not found: $cmd" >&2; exit 1; }
+  command -v "$cmd" >/dev/null 2>&1 || { echo "$(vps_agent_text "ERROR: required command not found: $cmd" "ERRO: comando obrigatório não encontrado: $cmd")" >&2; exit 1; }
 done
 docker compose version >/dev/null
 
@@ -139,17 +202,19 @@ PY
 }
 
 if ! getent ahosts "$DOMAIN" >/dev/null 2>&1; then
-  echo "ERROR: DNS for $DOMAIN does not resolve yet." >&2
-  echo "Create the A/AAAA record pointing to this VPS, wait for DNS propagation, and rerun." >&2
+  echo "$(vps_agent_text "ERROR: DNS for $DOMAIN does not resolve yet." "ERRO: o DNS de $DOMAIN ainda não está respondendo.")" >&2
+  echo "$(vps_agent_text     'Create the A/AAAA record pointing to this VPS, wait for DNS propagation, and rerun.'     'Crie o registro A/AAAA apontando para esta VPS, aguarde a propagação do DNS e tente novamente.')" >&2
   exit 1
 fi
+DNS_ADDRS="$(getent ahosts "$DOMAIN" 2>/dev/null | awk '{print $1}' | sort -u | paste -sd, -)"
+echo "$(vps_agent_text 'DNS resolved:' 'DNS resolvido:') $DOMAIN -> ${DNS_ADDRS:-?}"
 
 MARKER="state/integrated-auth.json"
 CURRENT_SUBJECT="$(env_value VPS_AGENT_SUBJECT || true)"
 MARKER_DOMAIN="$(marker_value "$MARKER" domain || true)"
 if [ -s "$MARKER" ] && [ -n "$MARKER_DOMAIN" ] && [ "$MARKER_DOMAIN" != "$DOMAIN" ]; then
-  echo "ERROR: integrated auth was already initialized for $MARKER_DOMAIN." >&2
-  echo "Automatic issuer/domain migration is intentionally not supported." >&2
+  echo "$(vps_agent_text "ERROR: integrated auth was already initialized for $MARKER_DOMAIN." "ERRO: a autenticação integrada já foi inicializada para $MARKER_DOMAIN.")" >&2
+  echo "$(vps_agent_text 'Automatic issuer/domain migration is intentionally not supported.' 'A migração automática de issuer/domínio não é suportada intencionalmente.')" >&2
   exit 1
 fi
 
@@ -159,27 +224,38 @@ if [ -s "$MARKER" ] && [ -n "$CURRENT_SUBJECT" ]; then
 fi
 
 if [ "$NEEDS_OPERATOR" -eq 1 ]; then
+  if [ "$OPERATOR_USERNAME_EXPLICIT" -ne 1 ] && [ -t 0 ]; then
+    printf '%s' "$(vps_agent_text 'OAuth login username [vps-operator]: ' 'Nome de usuário do login OAuth [vps-operator]: ')"
+    read -r operator_username_answer
+    OPERATOR_USERNAME="${operator_username_answer:-vps-operator}"
+  fi
   if [ -z "$OPERATOR_EMAIL" ]; then
     if [ -t 0 ]; then
-      printf 'Operator login email: '
+      printf '%s' "$(vps_agent_text 'Operator login email: ' 'E-mail da conta de operador: ')"
       read -r OPERATOR_EMAIL
     else
-      echo "ERROR: --operator-email is required in non-interactive mode." >&2
+      echo "$(vps_agent_text 'ERROR: --operator-email is required in non-interactive mode.' 'ERRO: --operator-email é obrigatório em modo não interativo.')" >&2
       exit 2
     fi
   fi
   if [[ "$OPERATOR_EMAIL" != *@*.* ]]; then
-    echo "ERROR: operator email does not look valid: $OPERATOR_EMAIL" >&2
+    echo "$(vps_agent_text "ERROR: operator email does not look valid: $OPERATOR_EMAIL" "ERRO: o e-mail do operador parece inválido: $OPERATOR_EMAIL")" >&2
     exit 2
   fi
   if [[ ! "$OPERATOR_USERNAME" =~ ^[A-Za-z0-9._-]+$ ]]; then
-    echo "ERROR: operator username may contain only letters, numbers, dot, underscore and hyphen." >&2
+    echo "$(vps_agent_text       'ERROR: operator username may contain only letters, numbers, dot, underscore and hyphen.'       'ERRO: o nome de usuário pode conter apenas letras, números, ponto, sublinhado e hífen.')" >&2
     exit 2
   fi
+  echo
+  echo "$(vps_agent_text 'Portico MCP operator account' 'Conta de operador do Portico MCP')"
+  echo "  $(vps_agent_text 'Email' 'E-mail'): $OPERATOR_EMAIL"
+  echo "  $(vps_agent_text 'Username' 'Nome de usuário'): $OPERATOR_USERNAME"
+  echo "  $(vps_agent_text     'This username will be used on the OAuth login screen. It is not your Linux/SSH user.'     'Esse nome de usuário será usado na tela de login OAuth. Ele não é seu usuário Linux/SSH.')"
 else
   OPERATOR_EMAIL="$(marker_value "$MARKER" email || true)"
   OPERATOR_USERNAME="$(marker_value "$MARKER" username || true)"
-  echo "Existing integrated operator identity detected; bootstrap will be reused."
+  echo "$(vps_agent_text     'Existing integrated operator identity detected; bootstrap will be reused.'     'Identidade de operador existente detectada; o bootstrap será reutilizado.')"
+  echo "  $(vps_agent_text 'Username' 'Nome de usuário'): $OPERATOR_USERNAME"
 fi
 
 mapfile -t TRAEFIK_IDS < <(
@@ -199,7 +275,7 @@ else
       if docker inspect "$id" --format '{{range $name, $cfg := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' |
           grep -Fxq "$EDGE_NETWORK"; then
         if [ -n "$TRAEFIK_ID" ]; then
-          echo "ERROR: more than one Traefik is attached to $EDGE_NETWORK." >&2
+          echo "$(vps_agent_text "ERROR: more than one Traefik is attached to $EDGE_NETWORK." "ERRO: mais de um Traefik está conectado à rede $EDGE_NETWORK.")" >&2
           exit 1
         fi
         TRAEFIK_ID="$id"
@@ -208,18 +284,18 @@ else
   elif [ "${#TRAEFIK_IDS[@]}" -eq 1 ]; then
     TRAEFIK_ID="${TRAEFIK_IDS[0]}"
   elif [ "${#TRAEFIK_IDS[@]}" -gt 1 ]; then
-    echo "ERROR: multiple running Traefik containers found." >&2
-    echo "Pass --edge-network NETWORK to select the edge explicitly." >&2
+    echo "$(vps_agent_text 'ERROR: multiple running Traefik containers found.' 'ERRO: mais de um contêiner Traefik em execução foi encontrado.')" >&2
+    echo "$(vps_agent_text 'Pass --edge-network NETWORK to select the edge explicitly.' 'Informe --edge-network REDE para selecionar explicitamente a borda.')" >&2
     exit 1
   fi
 
   if [ -z "$TRAEFIK_ID" ]; then
     if ss -ltnH | awk '{print $4}' | grep -Eq '(^|:)(80|443)$'; then
-      echo "ERROR: no reusable Traefik was found, but host ports 80/443 are already in use." >&2
-      echo "The installer will not replace an unknown web server." >&2
+      echo "$(vps_agent_text 'ERROR: no reusable Traefik was found, but host ports 80/443 are already in use.' 'ERRO: nenhum Traefik reutilizável foi encontrado, mas as portas 80/443 já estão em uso.')" >&2
+      echo "$(vps_agent_text 'The installer will not replace an unknown web server.' 'O instalador não substituirá um servidor web desconhecido.')" >&2
       exit 1
     fi
-    echo "No existing Traefik found and ports 80/443 are free; using the bundled Traefik."
+    echo "$(vps_agent_text       'No existing Traefik was found and ports 80/443 are free. Portico will provision its bundled Traefik automatically.'       'Nenhum Traefik existente foi encontrado e as portas 80/443 estão livres. O Portico instalará automaticamente seu Traefik embutido.')"
     BUNDLED_PROXY=1
     EDGE_NETWORK="${EDGE_NETWORK:-mcp-vps-agent-edge}"
     CERTRESOLVER="${CERTRESOLVER:-letsencrypt}"
@@ -232,14 +308,14 @@ else
           sed '/^$/d'
       )
       if [ "${#NETWORKS[@]}" -ne 1 ]; then
-        echo "ERROR: Traefik has ${#NETWORKS[@]} candidate Docker networks: ${NETWORKS[*]:-none}" >&2
-        echo "Pass --edge-network NETWORK." >&2
+        echo "$(vps_agent_text "ERROR: Traefik has ${#NETWORKS[@]} candidate Docker networks: ${NETWORKS[*]:-none}" "ERRO: o Traefik possui ${#NETWORKS[@]} redes Docker candidatas: ${NETWORKS[*]:-nenhuma}")" >&2
+        echo "$(vps_agent_text 'Pass --edge-network NETWORK.' 'Informe --edge-network REDE.')" >&2
         exit 1
       fi
       EDGE_NETWORK="${NETWORKS[0]}"
     fi
     docker network inspect "$EDGE_NETWORK" >/dev/null 2>&1 || {
-      echo "ERROR: Docker network not found: $EDGE_NETWORK" >&2
+      echo "$(vps_agent_text "ERROR: Docker network not found: $EDGE_NETWORK" "ERRO: rede Docker não encontrada: $EDGE_NETWORK")" >&2
       exit 1
     }
 
@@ -255,10 +331,11 @@ print(values[0] if len(values)==1 else "")
       )"
     fi
     if [ -z "$CERTRESOLVER" ]; then
-      echo "ERROR: could not uniquely discover the Traefik ACME certificate resolver." >&2
-      echo "Pass --certresolver NAME." >&2
+      echo "$(vps_agent_text         'ERROR: could not uniquely discover the Traefik ACME certificate resolver.'         'ERRO: não foi possível descobrir de forma única o resolvedor ACME do Traefik.')" >&2
+      echo "$(vps_agent_text 'Pass --certresolver NAME.' 'Informe --certresolver NOME.')" >&2
       exit 1
     fi
+    echo "$(vps_agent_text       "Existing Traefik detected and will be reused. No new proxy will be installed."       "Traefik existente detectado e será reutilizado. Nenhum novo proxy será instalado.")"
   fi
 fi
 
@@ -297,11 +374,15 @@ if [ "$BUNDLED_PROXY" -eq 1 ]; then
 fi
 
 echo
-echo "Integrated auth plan:"
+echo "$(vps_agent_text 'Integrated authentication plan:' 'Plano de autenticação integrada:')"
 echo "  MCP + issuer: https://$DOMAIN"
-echo "  edge network: $EDGE_NETWORK"
-echo "  cert resolver: $CERTRESOLVER"
-echo "  proxy: $([ "$BUNDLED_PROXY" -eq 1 ] && echo bundled || echo existing)"
+echo "  $(vps_agent_text 'edge network' 'rede de borda'): $EDGE_NETWORK"
+echo "  $(vps_agent_text 'certificate resolver' 'resolvedor de certificado'): $CERTRESOLVER"
+if [ "$BUNDLED_PROXY" -eq 1 ]; then
+  echo "  proxy: $(vps_agent_text 'bundled Traefik (Portico-managed)' 'Traefik embutido (gerenciado pelo Portico)')"
+else
+  echo "  proxy: $(vps_agent_text 'existing Traefik (reused)' 'Traefik existente (reutilizado)')"
+fi
 echo
 
 "${compose[@]}" config -q
@@ -311,7 +392,7 @@ fi
 "${compose[@]}" up -d zitadel-postgres zitadel-api zitadel-login
 
 OIDC_URL="https://$DOMAIN/.well-known/openid-configuration"
-echo "Waiting for public OIDC discovery and TLS..."
+echo "$(vps_agent_text 'Waiting for public OIDC discovery and TLS...' 'Aguardando descoberta OIDC pública e TLS...')"
 rm -f /tmp/vps-agent-oidc.json
 for _ in $(seq 1 90); do
   if curl -fsS --max-time 5 "$OIDC_URL" >/tmp/vps-agent-oidc.json 2>/dev/null; then
@@ -320,18 +401,18 @@ for _ in $(seq 1 90); do
   sleep 2
 done
 if ! test -s /tmp/vps-agent-oidc.json; then
-  echo "ERROR: OIDC discovery did not become reachable at $OIDC_URL" >&2
-  echo "Check DNS, firewall/ports 80/443 and Traefik, then rerun." >&2
+  echo "$(vps_agent_text "ERROR: OIDC discovery did not become reachable at $OIDC_URL" "ERRO: a descoberta OIDC não ficou acessível em $OIDC_URL")" >&2
+  echo "$(vps_agent_text 'Check DNS, firewall/ports 80/443 and Traefik, then rerun.' 'Confira DNS, firewall/portas 80/443 e Traefik e tente novamente.')" >&2
   "${compose[@]}" ps >&2 || true
   exit 1
 fi
-python3 - "$DOMAIN" <<'PY'
-import json,sys
+VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - "$DOMAIN" <<'PY'
+import json,os,sys
 domain=sys.argv[1]
 data=json.load(open("/tmp/vps-agent-oidc.json"))
 issuer=data.get("issuer","").rstrip("/")
 assert issuer == f"https://{domain}", issuer
-print("OIDC DISCOVERY: PASS")
+print("DESCOBERTA OIDC: OK" if os.environ.get("VPS_AGENT_LANG")=="pt-BR" else "OIDC DISCOVERY: PASS")
 PY
 
 DCR_READY="$(python3 - <<'PY'
@@ -369,14 +450,14 @@ if [ "$NEEDS_BOOTSTRAP" -eq 1 ]; then
       cat /zitadel/bootstrap/bootstrap-admin.pat 2>/dev/null || true
   )"
   if [ -z "$BOOTSTRAP_PAT" ]; then
-    echo "ERROR: integrated OAuth bootstrap is incomplete but its short-lived admin PAT is unavailable." >&2
-    echo "Restore the identity backup or purge this incomplete identity stack and rerun setup." >&2
+    echo "$(vps_agent_text 'ERROR: integrated OAuth bootstrap is incomplete but its short-lived admin PAT is unavailable.' 'ERRO: o bootstrap OAuth integrado está incompleto, mas o PAT administrativo temporário não está disponível.')" >&2
+    echo "$(vps_agent_text 'Restore the identity backup or purge this incomplete identity stack and rerun setup.' 'Restaure o backup de identidade ou remova esta stack incompleta e execute a configuração novamente.')" >&2
     exit 1
   fi
 
   ZITADEL_CID="$("${compose[@]}" ps -q zitadel-api)"
   if [ -z "$ZITADEL_CID" ]; then
-    echo "ERROR: ZITADEL API container is not running." >&2
+    echo "$(vps_agent_text 'ERROR: ZITADEL API container is not running.' 'ERRO: o contêiner da API ZITADEL não está em execução.')" >&2
     exit 1
   fi
 
@@ -397,7 +478,7 @@ if [ "$NEEDS_BOOTSTRAP" -eq 1 ]; then
     sh -c 'chmod 600 /zitadel/bootstrap/*.pat 2>/dev/null || true'
 
   if [ "$DCR_READY" != "1" ]; then
-    echo "Enabling MCP-compatible Dynamic Client Registration privately..."
+    echo "$(vps_agent_text 'Enabling MCP-compatible Dynamic Client Registration privately...' 'Habilitando o registro dinâmico de cliente compatível com MCP de forma privada...')"
     curl_zitadel_internal --fail \
       --request PUT \
       --url "http://127.0.0.1:8080/v2/settings/security" \
@@ -412,28 +493,28 @@ if [ "$NEEDS_OPERATOR" -eq 1 ]; then
   PASSWORD="${VPS_AGENT_OPERATOR_PASSWORD:-}"
   if [ -z "$PASSWORD" ]; then
     if [ ! -t 0 ]; then
-      echo "ERROR: set VPS_AGENT_OPERATOR_PASSWORD for non-interactive bootstrap." >&2
+      echo "$(vps_agent_text 'ERROR: set VPS_AGENT_OPERATOR_PASSWORD for non-interactive bootstrap.' 'ERRO: defina VPS_AGENT_OPERATOR_PASSWORD para o bootstrap não interativo.')" >&2
       exit 1
     fi
     while :; do
-      printf 'Create operator password (12+ characters): ' >&2
+      printf '%s' "$(vps_agent_text 'Create operator password (12+ characters): ' 'Crie a senha do operador (12+ caracteres): ')" >&2
       read -r -s PASSWORD
       echo >&2
-      printf 'Repeat operator password: ' >&2
+      printf '%s' "$(vps_agent_text 'Repeat operator password: ' 'Repita a senha do operador: ')" >&2
       read -r -s PASSWORD2
       echo >&2
       if [ "$PASSWORD" != "$PASSWORD2" ]; then
-        echo "Passwords do not match." >&2
+        echo "$(vps_agent_text 'Passwords do not match.' 'As senhas não coincidem.')" >&2
         continue
       fi
       if [ "${#PASSWORD}" -lt 12 ]; then
-        echo "Use at least 12 characters." >&2
+        echo "$(vps_agent_text 'Use at least 12 characters.' 'Use pelo menos 12 caracteres.')" >&2
         continue
       fi
       break
     done
   elif [ "${#PASSWORD}" -lt 12 ]; then
-    echo "ERROR: VPS_AGENT_OPERATOR_PASSWORD must contain at least 12 characters." >&2
+    echo "$(vps_agent_text 'ERROR: VPS_AGENT_OPERATOR_PASSWORD must contain at least 12 characters.' 'ERRO: VPS_AGENT_OPERATOR_PASSWORD deve conter pelo menos 12 caracteres.')" >&2
     exit 1
   fi
 
@@ -443,9 +524,9 @@ if [ "$NEEDS_OPERATOR" -eq 1 ]; then
   trap 'rm -f "$REQUEST_FILE"' EXIT
 
   # Password travels on a private inherited file descriptor, never argv.
-  python3 - "$REQUEST_FILE" "$OPERATOR_ID" "$OPERATOR_USERNAME" "$OPERATOR_EMAIL" 3<<<"$PASSWORD" <<'PY'
+  python3 - "$REQUEST_FILE" "$OPERATOR_ID" "$OPERATOR_USERNAME" "$OPERATOR_EMAIL" "$VPS_AGENT_LANG" 3<<<"$PASSWORD" <<'PY'
 import json,os,sys
-path,user_id,username,email=sys.argv[1:]
+path,user_id,username,email,lang=sys.argv[1:]
 password=os.fdopen(3).read()
 if password.endswith("\n"):
     password=password[:-1]
@@ -455,8 +536,8 @@ payload={
   "profile": {
     "givenName": "VPS",
     "familyName": "Operator",
-    "displayName": "VPS Operator",
-    "preferredLanguage": "en"
+    "displayName": "Portico MCP Operator",
+    "preferredLanguage": "pt" if lang == "pt-BR" else "en"
   },
   "email": {"email": email, "isVerified": True},
   "password": {"password": password, "changeRequired": False}
@@ -466,7 +547,7 @@ with open(path,"w") as f:
 PY
   unset PASSWORD PASSWORD2 2>/dev/null || true
 
-  echo "Creating the dedicated non-admin VPS operator identity..."
+  echo "$(vps_agent_text 'Creating the dedicated non-admin Portico operator identity...' 'Criando a identidade dedicada e não administrativa do operador Portico...')"
   set +e
   HTTP_CODE="$(
     curl_zitadel_internal \
@@ -485,7 +566,7 @@ PY
   trap - EXIT
 
   if [ "$CURL_STATUS" -ne 0 ] || { [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; }; then
-    echo "ERROR: operator creation failed (curl=$CURL_STATUS HTTP=${HTTP_CODE:-none})." >&2
+    echo "$(vps_agent_text "ERROR: operator creation failed (curl=$CURL_STATUS HTTP=${HTTP_CODE:-none})." "ERRO: falha ao criar o operador (curl=$CURL_STATUS HTTP=${HTTP_CODE:-nenhum}).")" >&2
     cat /tmp/vps-agent-create-operator.json >&2 2>/dev/null || true
     exit 1
   fi
@@ -514,7 +595,7 @@ fi
 
 if [ "$NEEDS_RESOURCE" -eq 1 ]; then
   if [ -z "$RESOURCE_PROJECT_ID" ]; then
-    echo "Creating the dedicated OAuth resource/audience project..."
+    echo "$(vps_agent_text 'Creating the dedicated OAuth resource/audience project...' 'Criando o projeto OAuth dedicado de recurso/audiência...')"
     RESOURCE_RESPONSE="$(mktemp)"
     chmod 600 "$RESOURCE_RESPONSE"
     curl_zitadel_internal --fail \
@@ -522,7 +603,7 @@ if [ "$NEEDS_RESOURCE" -eq 1 ]; then
       --url "http://127.0.0.1:8080/management/v1/projects" \
       --header "Authorization: Bearer $BOOTSTRAP_PAT" \
       --header 'Content-Type: application/json' \
-      --data '{"name":"MCP VPS Agent Resource"}' \
+      --data '{"name":"Portico MCP Resource"}' \
       >"$RESOURCE_RESPONSE"
     RESOURCE_PROJECT_ID="$(python3 - "$RESOURCE_RESPONSE" <<'PY'
 import json,sys
@@ -537,7 +618,7 @@ PY
   fi
 
   if [ -z "$INTROSPECTION_CLIENT_ID" ] || [ -z "$INTROSPECTION_CLIENT_SECRET" ]; then
-    echo "Creating the private token-introspection API client..."
+    echo "$(vps_agent_text 'Creating the private token-introspection API client...' 'Criando o cliente privado de API para introspecção de token...')"
     APP_RESPONSE="$(mktemp)"
     chmod 600 "$APP_RESPONSE"
     curl_zitadel_internal --fail \
@@ -545,7 +626,7 @@ PY
       --url "http://127.0.0.1:8080/management/v1/projects/$RESOURCE_PROJECT_ID/apps/api" \
       --header "Authorization: Bearer $BOOTSTRAP_PAT" \
       --header 'Content-Type: application/json' \
-      --data '{"name":"MCP VPS Agent Introspector","authMethodType":"API_AUTH_METHOD_TYPE_BASIC"}' \
+      --data '{"name":"Portico MCP Introspector","authMethodType":"API_AUTH_METHOD_TYPE_BASIC"}' \
       >"$APP_RESPONSE"
 
     readarray -t APP_VALUES < <(
@@ -560,7 +641,7 @@ for value in values:
     print(value)
 PY
     )
-    [ "${#APP_VALUES[@]}" -eq 3 ] || { echo "ERROR: incomplete introspection client response." >&2; exit 1; }
+    [ "${#APP_VALUES[@]}" -eq 3 ] || { echo "$(vps_agent_text 'ERROR: incomplete introspection client response.' 'ERRO: resposta incompleta do cliente de introspecção.')" >&2; exit 1; }
     INTROSPECTION_APP_ID="${APP_VALUES[0]}"
     INTROSPECTION_CLIENT_ID="${APP_VALUES[1]}"
     INTROSPECTION_CLIENT_SECRET="${APP_VALUES[2]}"
@@ -580,7 +661,7 @@ upsert_env VPS_AGENT_REQUIRED_SCOPES "openid $AUDIENCE_SCOPE"
 chmod 600 .env
 
 if [ "$NEEDS_BOOTSTRAP" -eq 1 ]; then
-  echo "Verifying the private introspection client..."
+  echo "$(vps_agent_text 'Verifying the private introspection client...' 'Verificando o cliente privado de introspecção...')"
   curl_zitadel_internal --fail \
     --request POST \
     --url "http://127.0.0.1:8080/oauth/v2/introspect" \
@@ -588,11 +669,11 @@ if [ "$NEEDS_BOOTSTRAP" -eq 1 ]; then
     --header 'Content-Type: application/x-www-form-urlencoded' \
     --data 'token=deliberately-invalid-bootstrap-probe' \
     >/tmp/vps-agent-introspection-probe.json
-  python3 - <<'PY'
-import json
+  VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - <<'PY'
+import json,os
 x=json.load(open("/tmp/vps-agent-introspection-probe.json"))
 assert x.get("active") is False, x
-print("PRIVATE TOKEN INTROSPECTION CLIENT: PASS")
+print("CLIENTE PRIVADO DE INTROSPECÇÃO DE TOKEN: OK" if os.environ.get("VPS_AGENT_LANG")=="pt-BR" else "PRIVATE TOKEN INTROSPECTION CLIENT: PASS")
 PY
 
   # Re-read bootstrap identities while the PAT still works. Remove the human
@@ -638,7 +719,7 @@ PY
       --url "http://127.0.0.1:8080/v2/users/$BOOTSTRAP_HUMAN_ID" \
       --header "Authorization: Bearer $BOOTSTRAP_PAT" \
       >/tmp/vps-agent-delete-bootstrap-human.json
-    echo "Bootstrap human IAM owner removed."
+    echo "$(vps_agent_text 'Bootstrap human IAM owner removed.' 'Proprietário IAM humano de bootstrap removido.')"
   fi
 
   if [ -n "$BOOTSTRAP_MACHINE_ID" ]; then
@@ -647,7 +728,7 @@ PY
       --url "http://127.0.0.1:8080/v2/users/$BOOTSTRAP_MACHINE_ID" \
       --header "Authorization: Bearer $BOOTSTRAP_PAT" \
       >/tmp/vps-agent-delete-bootstrap-machine.json
-    echo "Bootstrap machine IAM owner removed and its PAT revoked."
+    echo "$(vps_agent_text 'Bootstrap machine IAM owner removed and its PAT revoked.' 'Proprietário IAM de máquina do bootstrap removido e seu PAT revogado.')"
   fi
 
   docker run --rm \
@@ -671,7 +752,7 @@ PY
   chmod 600 "$MARKER"
 fi
 
-echo "Confirming OAuth dynamic-client discovery..."
+echo "$(vps_agent_text 'Confirming OAuth dynamic-client discovery...' 'Confirmando descoberta dinâmica de cliente OAuth...')"
 for _ in $(seq 1 30); do
   curl -fsS "$OIDC_URL" >/tmp/vps-agent-oidc.json
   if python3 - <<'PY'
@@ -685,19 +766,19 @@ PY
   fi
   sleep 2
 done
-python3 - <<'PY'
-import json
+VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - <<'PY'
+import json,os
 x=json.load(open("/tmp/vps-agent-oidc.json"))
 endpoint=x.get("registration_endpoint","")
 assert endpoint.startswith("https://"), x
 assert "S256" in x.get("code_challenge_methods_supported",[]), x
-print("DYNAMIC CLIENT REGISTRATION + PKCE: PASS")
+print("REGISTRO DINÂMICO DE CLIENTE + PKCE: OK" if os.environ.get("VPS_AGENT_LANG")=="pt-BR" else "DYNAMIC CLIENT REGISTRATION + PKCE: PASS")
 PY
 
-echo "Switching Gateway and Broker to the integrated operator subject..."
+echo "$(vps_agent_text 'Switching Gateway and Broker to the integrated operator subject...' 'Alterando Gateway e Broker para o subject do operador integrado...')"
 "${compose[@]}" up -d --build --force-recreate broker gateway
 
-echo "Waiting for the public MCP protected resource..."
+echo "$(vps_agent_text 'Waiting for the public MCP protected resource...' 'Aguardando o recurso MCP público protegido...')"
 for _ in $(seq 1 60); do
   code="$(curl -sS --max-time 5 -o /tmp/vps-agent-public-unauth.txt -w '%{http_code}' "https://$DOMAIN/mcp" 2>/dev/null || true)"
   [ "$code" = "401" ] && break
@@ -706,23 +787,20 @@ done
 
 bash scripts/verify-public.sh
 
-cat <<EOF
-
-INTEGRATED AUTH: READY
-
-MCP endpoint:
-  https://$DOMAIN/mcp
-
-OAuth/OIDC issuer:
-  https://$DOMAIN
-
-Operator login:
-  $OPERATOR_EMAIL
-
-The dedicated OAuth operator password was not written to this installer state
-and was never requested by ChatGPT.
-
-Next:
-  bash scripts/connect-chatgpt.sh
-
-EOF
+echo
+echo "$(vps_agent_text 'INTEGRATED AUTH: READY' 'AUTENTICAÇÃO INTEGRADA: PRONTA')"
+echo
+echo "$(vps_agent_text 'MCP endpoint:' 'Endpoint MCP:')"
+echo "  https://$DOMAIN/mcp"
+echo
+echo "OAuth/OIDC issuer:"
+echo "  https://$DOMAIN"
+echo
+echo "$(vps_agent_text 'Portico operator login:' 'Login do operador Portico:')"
+echo "  $(vps_agent_text 'Username' 'Nome de usuário'): $OPERATOR_USERNAME"
+echo "  $(vps_agent_text 'Email' 'E-mail'): $OPERATOR_EMAIL"
+echo
+echo "$(vps_agent_text   'The operator password was not written to installer state and must never be replaced with VPS/SSH credentials.'   'A senha do operador não foi gravada no estado do instalador e nunca deve ser substituída por credenciais VPS/SSH.')"
+echo
+echo "$(vps_agent_text 'Next:' 'Próximo:')"
+echo "  bash scripts/connect-chatgpt.sh"

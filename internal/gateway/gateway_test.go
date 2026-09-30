@@ -126,6 +126,8 @@ func (rootApprovalExecutor) Call(_ context.Context, req wire.Request) (wire.Resp
 			"access": "work",
 			"delegation_ttl_seconds": 3600,
 			"approval_required": true,
+			"ceiling_wide": true,
+			"physical_ceiling": req.Resource,
 			"approval_token": "secret-widget-token",
 		})
 		return wire.Response{ID: req.ID, OK: true, Result: raw}, nil
@@ -187,6 +189,26 @@ func TestRootApprovalWidgetHidesTokenFromStructuredContent(t *testing.T) {
 	if !strings.Contains(resource.Contents[0].Text, "permissions.confirm_root_access") ||
 		!strings.Contains(resource.Contents[0].Text, "Autorizar") {
 		t.Fatal("approval widget is missing its secure confirmation action")
+	}
+	html := resource.Contents[0].Text
+	for _, marker := range []string{
+		"@media (prefers-color-scheme: dark)",
+		"--bg: #ffffff",
+		"--text: #17191d",
+		"--primary: #0b57d0",
+		"ceiling_wide",
+		"Autorizar todo ",
+		"overflow-wrap: anywhere",
+		"button:focus-visible",
+	} {
+		if !strings.Contains(html, marker) {
+			t.Fatalf("approval widget accessibility/ceiling marker missing: %q", marker)
+		}
+	}
+	for _, forbidden := range []string{"currentColor", "color: var(--color-text-primary, inherit)"} {
+		if strings.Contains(html, forbidden) {
+			t.Fatalf("approval widget still depends on unsafe host-theme fallback: %q", forbidden)
+		}
 	}
 }
 

@@ -10,6 +10,10 @@ from __future__ import annotations
 import argparse
 import os
 import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "lib"))
+from i18n import t  # noqa: E402
 import shlex
 import shutil
 import stat
@@ -189,10 +193,10 @@ def show(lists: dict[tuple[str, ...], list[str]]) -> None:
             if item not in roots:
                 roots.append(item)
     if not roots:
-        print("No delegated roots.")
+        print(t("No delegated roots.", "Nenhuma raiz delegada."))
         return
 
-    print("Delegated roots")
+    print(t("Delegated roots", "Raízes delegadas"))
     print("---------------")
     for root in roots:
         flags = []
@@ -227,7 +231,7 @@ def main() -> int:
     env_path = pathlib.Path(args.env)
     policy_path = pathlib.Path(args.policy)
     if not policy_path.is_file():
-        raise SystemExit(f"policy not found: {policy_path}")
+        raise SystemExit(t(f"policy not found: {policy_path}", f"policy não encontrada: {policy_path}"))
 
     text = policy_path.read_text(errors="strict")
     lists = parse_lists(text)
@@ -237,7 +241,7 @@ def main() -> int:
         return 0
 
     if not args.root:
-        raise SystemExit("root is required for add/remove")
+        raise SystemExit(t("root is required for add/remove", "a raiz é obrigatória para add/remove"))
 
     try:
         root = canonical_path(args.root)
@@ -247,19 +251,19 @@ def main() -> int:
     env = env_values(env_path)
     ceiling_raw = env.get("VPS_AGENT_SCOPE_ROOT", "")
     if not ceiling_raw:
-        raise SystemExit("VPS_AGENT_SCOPE_ROOT is not set in the env file")
+        raise SystemExit(t("VPS_AGENT_SCOPE_ROOT is not set in the env file", "VPS_AGENT_SCOPE_ROOT não está definida no arquivo env"))
     try:
         ceiling = canonical_path(ceiling_raw)
     except ValueError as exc:
         raise SystemExit(f"invalid VPS_AGENT_SCOPE_ROOT: {exc}") from exc
 
     if not within(ceiling, root):
-        raise SystemExit(f"delegated root {root} is outside physical ceiling {ceiling}")
+        raise SystemExit(t(f"delegated root {root} is outside physical ceiling {ceiling}", f"a raiz delegada {root} está fora do teto físico {ceiling}"))
     if root == ceiling and not args.allow_ceiling:
-        raise SystemExit(
-            f"refusing to delegate the entire physical ceiling {ceiling}; "
-            "use --allow-ceiling only if that broad authority is intentional"
-        )
+        raise SystemExit(t(
+            f"refusing to delegate the entire physical ceiling {ceiling}; use --allow-ceiling only if that broad authority is intentional",
+            f"recusando delegar todo o teto físico {ceiling}; use --allow-ceiling somente se essa autoridade ampla for intencional",
+        ))
     try:
         reject_symlink_ancestor(root)
     except ValueError as exc:
@@ -284,7 +288,7 @@ def main() -> int:
                 current = parse_lists(updated)
 
     if updated == text:
-        print("Policy already has the requested state.")
+        print(t("Policy already has the requested state.", "A policy já está no estado solicitado."))
         show(parse_lists(updated))
         return 0
 
@@ -295,7 +299,7 @@ def main() -> int:
         backup = backup_dir / f"policy-before-root-change-{stamp}.yaml"
         shutil.copy2(policy_path, backup)
         os.chmod(backup, stat.S_IRUSR | stat.S_IWUSR)
-        print(f"Backup: {backup}")
+        print(t(f"Backup: {backup}", f"Backup: {backup}"))
 
     tmp = policy_path.with_name(policy_path.name + ".tmp")
     tmp.write_text(updated)

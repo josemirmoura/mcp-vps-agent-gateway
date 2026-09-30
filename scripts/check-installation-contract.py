@@ -78,6 +78,8 @@ for path in ROOT.rglob("*"):
         continue
     if rel.startswith((".git/", "state/", "backups/", "diagnostics/", "dist/", "evidence/")):
         continue
+    if "__pycache__/" in rel or rel.endswith((".pyc", ".pyo")):
+        continue
     try:
         text = path.read_text(errors="replace")
     except OSError:
@@ -143,6 +145,81 @@ if "Refine config/policy.yaml" in installer_text or "Edit config/policy.yaml now
     errors.append("scripts/install.sh: normal guided flow still requires manual policy YAML editing")
 if "--scope /opt/vps-agent-sandbox" in quick_text or "install -d" in quick_text and "/opt/vps-agent-sandbox" in quick_text:
     errors.append("docs/quick-start.md: legacy sandbox must not be the normal installation path")
+
+# Clean E2E UX/security invariants (#33-#41).
+authority_text = (ROOT / "scripts/authority-summary.py").read_text(errors="replace")
+preflight_text = (ROOT / "scripts/preflight.py").read_text(errors="replace")
+auth_text = (ROOT / "scripts/setup-integrated-auth.sh").read_text(errors="replace")
+connect_text = (ROOT / "scripts/connect-chatgpt.sh").read_text(errors="replace")
+widget_text = (ROOT / "internal/gateway/root_approval_widget.go").read_text(errors="replace")
+broker_text = (ROOT / "internal/broker/broker.go").read_text(errors="replace")
+
+ux_requirements = {
+    "scripts/authority-summary.py": [
+        "Resumo da autoridade efetiva",
+        "Raízes de leitura do filesystem",
+        "none_label",
+    ],
+    "scripts/preflight.py": [
+        "Verificando requisitos do Portico MCP",
+        "https://docs.docker.com/engine/install/",
+        "https://docs.docker.com/compose/install/linux/",
+        "Portico will provision its bundled Traefik automatically",
+        "Portico irá reutilizá-lo",
+    ],
+    "scripts/install.sh": [
+        "Escolha como o Portico MCP poderá acessar sua VPS",
+        "Você autoriza cada pasta depois",
+        "python3 scripts/preflight.py",
+    ],
+    "scripts/setup-integrated-auth.sh": [
+        "Para conectar o ChatGPT ao Portico MCP",
+        "Domínio público do Portico MCP",
+        "Nome de usuário do login OAuth",
+        "Traefik existente detectado e será reutilizado",
+    ],
+    "scripts/connect-chatgpt.sh": [
+        "A VPS está pronta. Agora falta conectar o Portico MCP ao ChatGPT.",
+        "[Enter] verificar conexão",
+        "--baseline-only",
+        "--after-seq",
+        "Ainda não detectamos a chamada system.info",
+    ],
+    "internal/gateway/root_approval_widget.go": [
+        "@media (prefers-color-scheme: dark)",
+        "ceiling_wide",
+        "Autorizar todo ",
+        "overflow-wrap: anywhere",
+        "button:focus-visible",
+    ],
+    "internal/broker/broker.go": [
+        '"ceiling_wide": root == physical',
+        '"physical_ceiling": physical',
+    ],
+}
+ux_sources = {
+    "scripts/authority-summary.py": authority_text,
+    "scripts/preflight.py": preflight_text,
+    "scripts/install.sh": installer_text,
+    "scripts/setup-integrated-auth.sh": auth_text,
+    "scripts/connect-chatgpt.sh": connect_text,
+    "internal/gateway/root_approval_widget.go": widget_text,
+    "internal/broker/broker.go": broker_text,
+}
+for rel, markers in ux_requirements.items():
+    source = ux_sources[rel]
+    for required in markers:
+        if required not in source:
+            errors.append(f"{rel}: clean-E2E invariant missing: {required}")
+
+if "dynamic delegation of the entire physical ceiling is not allowed" in broker_text:
+    errors.append("internal/broker/broker.go: physical ceiling is still hard-blocked despite explicit human approval")
+if "currentColor" in widget_text or "color: var(--color-text-primary, inherit)" in widget_text:
+    errors.append("internal/gateway/root_approval_widget.go: unsafe host-theme color fallback returned")
+if 'wait-tool \\\n  --subject' in connect_text and '--after-seq "$BASELINE"' not in connect_text:
+    errors.append("scripts/connect-chatgpt.sh: ChatGPT verification lost its fixed audit baseline")
+if "VPS_AGENT_CHATGPT_VERIFY_TIMEOUT:-10m" in connect_text and 'if [ ! -t 0 ]' not in connect_text:
+    errors.append("scripts/connect-chatgpt.sh: hidden interactive verification timeout returned")
 
 required_flow = {
     "docs/quick-start.md": ["scripts/install.sh", "INSTALLATION COMPLETE"],

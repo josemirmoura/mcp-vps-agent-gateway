@@ -29,6 +29,24 @@ jobs:
         run: |
           bash -n scripts/*.sh
           bash -n scripts/lib/*.sh
+      - name: Validate Python helpers and Portico preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/*.py scripts/lib/*.py
+          VPS_AGENT_LANG=pt-BR python3 scripts/preflight.py --json > /tmp/preflight.json
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/preflight.json'))
+          assert x['ok'] is True, x
+          assert x['language'] == 'pt-BR', x
+          PY
+          VPS_AGENT_LANG=pt-BR python3 scripts/preflight.py | tee /tmp/preflight-pt.txt
+          grep -q 'Verificando requisitos do Portico MCP' /tmp/preflight-pt.txt
+          grep -q 'Pré-requisitos: OK' /tmp/preflight-pt.txt
+          VPS_AGENT_LANG=en python3 scripts/preflight.py | tee /tmp/preflight-en.txt
+          grep -q 'Checking Portico MCP prerequisites' /tmp/preflight-en.txt
+          grep -q 'Prerequisites: OK' /tmp/preflight-en.txt
       - name: Validate integrated OAuth scope matching
         shell: bash
         run: |

@@ -2,6 +2,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# shellcheck source=scripts/lib/product.sh
+source scripts/lib/product.sh
+vps_agent_init_language ""
+
 APPLY=0
 ARGS=()
 for arg in "$@"; do
@@ -12,7 +16,23 @@ for arg in "$@"; do
 done
 
 if [ "${#ARGS[@]}" -eq 0 ]; then
-  cat >&2 <<'EOF'
+  if vps_agent_is_pt_br; then
+    cat >&2 <<'EOF'
+uso:
+  bash scripts/delegate-root.sh add /opt/projeto [--access read|work|compose] [--apply]
+  bash scripts/delegate-root.sh remove /opt/projeto [--apply]
+  bash scripts/delegate-root.sh list
+
+Perfis de acesso:
+  read      somente leitura do filesystem
+  work      leitura/escrita + cwd de shell confinado (padrão)
+  compose   work + inspeção/gerência Docker Compose nessa pasta
+
+O caminho deve estar dentro de VPS_AGENT_SCOPE_ROOT. A delegação do próprio
+teto físico requer --allow-ceiling quando feita manualmente pelo terminal.
+EOF
+  else
+    cat >&2 <<'EOF'
 usage:
   bash scripts/delegate-root.sh add /opt/project [--access read|work|compose] [--apply]
   bash scripts/delegate-root.sh remove /opt/project [--apply]
@@ -24,8 +44,9 @@ Access profiles:
   compose   work + Docker Compose inspect/manage for that project directory
 
 The path must be inside VPS_AGENT_SCOPE_ROOT. Delegating the physical ceiling
-itself is refused unless --allow-ceiling is explicitly supplied.
+itself requires --allow-ceiling when done manually from the terminal.
 EOF
+  fi
   exit 2
 fi
 
@@ -37,7 +58,22 @@ case "${ARGS[0]}" in
 esac
 
 if [ "$APPLY" -ne 1 ]; then
-  cat <<'EOF'
+  if vps_agent_is_pt_br; then
+    cat <<'EOF'
+
+A policy foi atualizada, mas o Broker em execução ainda não foi recarregado.
+Revise primeiro:
+  python3 scripts/authority-summary.py
+
+Depois aplique:
+  bash scripts/delegate-root.sh list
+  docker compose up -d --force-recreate broker
+  bash scripts/verify.sh
+
+Ou repita o comando add/remove usando --apply.
+EOF
+  else
+    cat <<'EOF'
 
 Policy file updated but the running Broker has not been reloaded.
 Review first:
@@ -50,6 +86,7 @@ Then apply:
 
 Or rerun the add/remove command with --apply.
 EOF
+  fi
   exit 0
 fi
 
@@ -62,6 +99,6 @@ if [ "${VPS_AGENT_WHOLE_HOST:-0}" = "1" ]; then
   compose+=(-f compose.host.yaml)
 fi
 
-echo "Reloading Broker with the updated policy..."
+echo "$(vps_agent_text 'Reloading Broker with the updated policy...' 'Recarregando o Broker com a policy atualizada...')"
 "${compose[@]}" up -d --force-recreate broker
 bash scripts/verify.sh

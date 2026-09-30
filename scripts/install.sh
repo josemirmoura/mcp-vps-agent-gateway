@@ -9,6 +9,7 @@ PROFILE=""
 SCOPE=""
 DOMAIN=""
 OPERATOR_EMAIL=""
+OPERATOR_USERNAME=""
 RUN_AS=""
 LANG_OVERRIDE=""
 CREATE_SCOPE=0
@@ -36,6 +37,7 @@ Opções:
   --lang LANG               pt-BR | en
   --domain HOSTNAME         Hostname público MCP/OAuth.
   --operator-email EMAIL    E-mail dedicado do operador OAuth.
+  --operator-username NAME  Nome de usuário do login OAuth.
   --local-only              Para após a verificação local.
   --yes                     Aceita a autoridade exibida sem prompt.
   --ack-whole-host          Obrigatório com --yes em whole-host.
@@ -60,6 +62,7 @@ Options:
   --lang LANG               pt-BR | en
   --domain HOSTNAME         Public MCP/OAuth hostname.
   --operator-email EMAIL    Dedicated OAuth operator email.
+  --operator-username NAME  OAuth login username.
   --local-only              Stop after local runtime verification.
   --yes                     Accept the displayed effective authority.
   --ack-whole-host          Required with --yes for whole-host.
@@ -86,27 +89,30 @@ vps_agent_init_language "$LANG_OVERRIDE"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --profile)
-      [ "$#" -ge 2 ] || { echo "ERROR: --profile needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --profile needs a value.' 'ERRO: --profile precisa de um valor.')" >&2; exit 2; }
       PROFILE="$2"; shift 2 ;;
     --scope)
-      [ "$#" -ge 2 ] || { echo "ERROR: --scope needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --scope needs a value.' 'ERRO: --scope precisa de um valor.')" >&2; exit 2; }
       SCOPE="$2"; shift 2 ;;
     --create-scope) CREATE_SCOPE=1; shift ;;
     --run-as)
-      [ "$#" -ge 2 ] || { echo "ERROR: --run-as needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --run-as needs a value.' 'ERRO: --run-as precisa de um valor.')" >&2; exit 2; }
       RUN_AS="$2"; shift 2 ;;
     --lang)
-      [ "$#" -ge 2 ] || { echo "ERROR: --lang needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --lang needs a value.' 'ERRO: --lang precisa de um valor.')" >&2; exit 2; }
       LANG_OVERRIDE="$2"
       VPS_AGENT_LANG_EXPLICIT=1
       vps_agent_init_language "$LANG_OVERRIDE"
       shift 2 ;;
     --domain)
-      [ "$#" -ge 2 ] || { echo "ERROR: --domain needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --domain needs a value.' 'ERRO: --domain precisa de um valor.')" >&2; exit 2; }
       DOMAIN="$2"; shift 2 ;;
     --operator-email)
-      [ "$#" -ge 2 ] || { echo "ERROR: --operator-email needs a value." >&2; exit 2; }
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --operator-email needs a value.' 'ERRO: --operator-email precisa de um valor.')" >&2; exit 2; }
       OPERATOR_EMAIL="$2"; shift 2 ;;
+    --operator-username)
+      [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --operator-username needs a value.' 'ERRO: --operator-username precisa de um valor.')" >&2; exit 2; }
+      OPERATOR_USERNAME="$2"; shift 2 ;;
     --local-only) LOCAL_ONLY=1; shift ;;
     --yes) ASSUME_YES=1; shift ;;
     --ack-whole-host) ACK_WHOLE_HOST=1; shift ;;
@@ -118,22 +124,23 @@ done
 vps_agent_confirm_language
 vps_agent_banner
 
-vps_agent_step "$(vps_agent_text '1/7 Environment' '1/7 Ambiente')"
-[ "$(uname -s)" = "Linux" ] || { echo "$(vps_agent_text 'ERROR: Linux is required.' 'ERRO: Linux é obrigatório.')" >&2; exit 1; }
-for cmd in docker git openssl python3 curl; do
-  command -v "$cmd" >/dev/null 2>&1 || {
-    echo "$(vps_agent_text "ERROR: required command not found: $cmd" "ERRO: comando obrigatório não encontrado: $cmd")" >&2
-    exit 1
-  }
-done
-docker compose version >/dev/null
-if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "$(vps_agent_text     'ERROR: the supported update path requires a Git checkout.'     'ERRO: o fluxo de atualização suportado requer um checkout Git.')" >&2
+vps_agent_step "$(vps_agent_text '1/7 Prerequisites' '1/7 Pré-requisitos')"
+if ! command -v python3 >/dev/null 2>&1; then
+  cat >&2 <<EOF
+$(vps_agent_text   'Python 3 was not found. Portico MCP uses Python 3 for its installation preflight.'   'Python 3 não foi encontrado. O Portico MCP usa Python 3 na verificação de pré-requisitos.')
+
+$(vps_agent_text 'Official installation page:' 'Página oficial de instalação:')
+  https://www.python.org/downloads/
+
+$(vps_agent_text 'Install Python 3, then run this installer again.' 'Instale o Python 3 e execute este instalador novamente.')
+EOF
   exit 1
 fi
-vps_agent_note "Linux: $(uname -sr)"
-vps_agent_note "Docker: $(docker version --format '{{.Server.Version}}' 2>/dev/null || echo unavailable)"
-vps_agent_note "Compose: $(docker compose version --short 2>/dev/null || docker compose version)"
+preflight_args=()
+if [ "$LOCAL_ONLY" -ne 1 ]; then
+  preflight_args+=(--public)
+fi
+python3 scripts/preflight.py "${preflight_args[@]}"
 
 vps_agent_step "$(vps_agent_text '2/7 Scope' '2/7 Escopo')"
 if [ -z "$PROFILE" ]; then
@@ -143,18 +150,38 @@ if [ -z "$PROFILE" ]; then
   fi
   if vps_agent_is_pt_br; then
     cat <<'EOF'
-Escolha o modelo de autoridade física:
-  1) Standard    teto /opt; projetos são autorizados depois (recomendado)
-  2) Project     uma única raiz de projeto
-  3) Whole Host  teto "/" para o filesystem (ainda não é Full)
+Escolha como o Portico MCP poderá acessar sua VPS:
+
+  1) Standard (recomendado)
+     O Portico pode trabalhar dentro de /opt, mas nenhum projeto começa liberado.
+     Você autoriza cada pasta depois, quando o ChatGPT precisar.
+
+  2) Project
+     O Portico fica limitado a uma única pasta desde a instalação.
+     Use quando ele deve trabalhar somente em um projeto específico.
+
+  3) Whole Host
+     O teto físico passa a ser toda a VPS (/).
+     Use apenas quando precisar permitir acesso fora de /opt.
+     Isso ainda não ativa Full nem libera tudo automaticamente.
 EOF
     printf 'Perfil [1]: '
   else
     cat <<'EOF'
-Choose the physical authority model:
-  1) Standard    /opt ceiling; approve project roots later (recommended)
-  2) Project     one project/filesystem root
-  3) Whole Host  filesystem ceiling "/" (still not Full)
+Choose how Portico MCP may access your VPS:
+
+  1) Standard (recommended)
+     Portico may work inside /opt, but no project starts authorized.
+     You approve each folder later when ChatGPT needs it.
+
+  2) Project
+     Portico is limited to one folder from installation time.
+     Use this when it should work only in one specific project.
+
+  3) Whole Host
+     The physical ceiling becomes the whole VPS (/).
+     Use this only when you need access outside /opt.
+     This still does not enable Full or automatically unlock everything.
 EOF
     printf 'Profile [1]: '
   fi
@@ -292,7 +319,7 @@ if [ "$ASSUME_YES" -ne 1 ]; then
   if vps_agent_is_pt_br; then
     [ "$confirm" = "CONTINUAR" ] || { echo "$(vps_agent_text 'Installation stopped.' 'Instalação interrompida.')"; exit 0; }
   else
-    [ "$confirm" = "CONTINUE" ] || { echo "Installation stopped."; exit 0; }
+    [ "$confirm" = "CONTINUE" ] || { echo "$(vps_agent_text 'Installation stopped.' 'Instalação interrompida.')"; exit 0; }
   fi
 fi
 
@@ -320,7 +347,8 @@ vps_agent_step "$(vps_agent_text '6/7 Secure public access' '6/7 Acesso público
 auth_args=()
 [ -n "$DOMAIN" ] && auth_args+=(--domain "$DOMAIN")
 [ -n "$OPERATOR_EMAIL" ] && auth_args+=(--operator-email "$OPERATOR_EMAIL")
-printf 'Running: bash scripts/setup-integrated-auth.sh'
+[ -n "$OPERATOR_USERNAME" ] && auth_args+=(--operator-username "$OPERATOR_USERNAME")
+printf '%s' "$(vps_agent_text 'Running: bash scripts/setup-integrated-auth.sh' 'Executando: bash scripts/setup-integrated-auth.sh')"
 printf ' %q' "${auth_args[@]}"
 printf '\n'
 bash scripts/setup-integrated-auth.sh "${auth_args[@]}"
@@ -328,15 +356,17 @@ bash scripts/setup-integrated-auth.sh "${auth_args[@]}"
 vps_agent_step "$(vps_agent_text '7/7 Connect ChatGPT and verify E2E' '7/7 Conectar ao ChatGPT e verificar E2E')"
 if vps_agent_is_pt_br; then
   cat <<'EOF'
-O próximo script mostra as etapas atuais de conexão no ChatGPT e aguarda uma
-chamada system.info autenticada. A instalação só termina quando o Broker
-observar essa chamada real e a cadeia de auditoria continuar válida.
+O próximo script orienta a conexão com o ChatGPT passo a passo.
+Faça a configuração no seu tempo e volte ao terminal para pressionar Enter.
+A instalação só termina quando o Broker confirmar uma chamada system.info real,
+autenticada e registrada na auditoria.
 EOF
 else
   cat <<'EOF'
-The next script shows the current ChatGPT connection steps and waits for a new
-authenticated system.info call. Installation completes only when the Broker
-observes that real call and the audit chain remains valid.
+The next script guides the ChatGPT connection step by step.
+Take your time, then return to the terminal and press Enter to verify.
+Installation completes only after the Broker confirms a real authenticated
+system.info call in the audit trail.
 EOF
 fi
 bash scripts/connect-chatgpt.sh

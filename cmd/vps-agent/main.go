@@ -71,6 +71,9 @@ func waitTool(args []string) {
 	tool := fs.String("tool", "system.info", "expected MCP tool name")
 	timeout := fs.Duration("timeout", 5*time.Minute, "maximum wait time")
 	poll := fs.Duration("poll", time.Second, "poll interval")
+	afterSeq := fs.Int64("after-seq", -1, "only accept matching audit events after this sequence; default uses current audit head")
+	quiet := fs.Bool("quiet", false, "suppress human progress/result text; use exit status only")
+	baselineOnly := fs.Bool("baseline-only", false, "print the validated current audit sequence and exit")
 	_ = fs.Parse(args)
 	requireToken(*token)
 	if *subject == "" {
@@ -94,8 +97,22 @@ func waitTool(args []string) {
 		fmt.Fprintln(os.Stderr, "audit chain is invalid")
 		os.Exit(1)
 	}
+	if *baselineOnly {
+		fmt.Println(status.Events)
+		return
+	}
+
 	baseline := status.Events
-	fmt.Printf("Waiting for MCP tool %q from subject %q after audit seq %d...\n", *tool, *subject, baseline)
+	if *afterSeq >= 0 {
+		if *afterSeq > status.Events {
+			fmt.Fprintln(os.Stderr, "after-seq is beyond the current audit head")
+			os.Exit(2)
+		}
+		baseline = *afterSeq
+	}
+	if !*quiet {
+		fmt.Printf("Waiting for MCP tool %q from subject %q after audit seq %d...\n", *tool, *subject, baseline)
+	}
 
 	deadline := time.Now().Add(*timeout)
 	for time.Now().Before(deadline) {
@@ -110,9 +127,11 @@ func waitTool(args []string) {
 			if json.Unmarshal(resp.Result, &body) == nil {
 				for _, rec := range body.Events {
 					if rec.Event.Subject == *subject && rec.Event.Tool == *tool && rec.Event.Decision == "allow" {
-						raw, _ := json.MarshalIndent(rec, "", "  ")
-						fmt.Println(string(raw))
-						fmt.Println("CHATGPT/MCP CONNECTION VERIFIED")
+						if !*quiet {
+							raw, _ := json.MarshalIndent(rec, "", "  ")
+							fmt.Println(string(raw))
+							fmt.Println("CHATGPT/MCP CONNECTION VERIFIED")
+						}
 						return
 					}
 				}
@@ -120,7 +139,9 @@ func waitTool(args []string) {
 		}
 		time.Sleep(*poll)
 	}
-	fmt.Fprintln(os.Stderr, "verification timeout; no matching audited tool call arrived")
+	if !*quiet {
+		fmt.Fprintln(os.Stderr, "verification timeout; no matching audited tool call arrived")
+	}
 	os.Exit(1)
 }
 
