@@ -62,7 +62,7 @@ if [ "${VPS_AGENT_AUTH_MODE:-static}" = "static" ]; then
     --tool system.info \
     --args '{}' >/tmp/vps-agent-system-info.json
 else
-  echo "$(vps_agent_text "Local MCP tool call skipped for auth mode ${VPS_AGENT_AUTH_MODE}; public OAuth verification will be used." "Chamada MCP local ignorada no modo ${VPS_AGENT_AUTH_MODE}; será usada a verificação OAuth pública.")"
+  echo "$(vps_agent_msg verify.local_call_skipped "mode=${VPS_AGENT_AUTH_MODE}")"
   printf '{"is_error":false,"mode":"oauth-integrated"}\n' >/tmp/vps-agent-system-info.json
 fi
 cat /tmp/vps-agent-system-info.json
