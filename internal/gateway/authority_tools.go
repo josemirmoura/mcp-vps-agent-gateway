@@ -19,12 +19,6 @@ type sensitiveAccessRevokeInput struct {
 	OperationID string `json:"operation_id,omitempty" jsonschema:"stable retry identity when the client can preserve one"`
 }
 
-type sensitiveAccessConfirmInput struct {
-	RequestID     string `json:"request_id" jsonschema:"pending protected-file approval request identifier"`
-	ApprovalToken string `json:"approval_token" jsonschema:"one-time approval token supplied only to the approval UI"`
-	Decision      string `json:"decision" jsonschema:"approve or deny"`
-}
-
 func registerAuthorityTools(server *mcp.Server, s *Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "permissions.discover_scope",
@@ -43,20 +37,27 @@ func registerAuthorityTools(server *mcp.Server, s *Server) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "permissions.request_sensitive_access",
-		Description: "Request temporary access to one protected secret file such as .env inside an already-authorized root. Normal root delegation never unlocks protected secrets.",
-		Meta: mcp.Meta{
-			"ui": map[string]any{
-				"resourceUri": rootApprovalWidgetURI,
-				"visibility":  []string{"model", "app"},
-			},
-			"openai/outputTemplate":          rootApprovalWidgetURI,
-			"openai/toolInvocation/invoking": "Preparing protected-file request…",
-			"openai/toolInvocation/invoked":  "Protected-file request ready.",
-		},
+		Description: "Request temporary human-approved access to one protected secret file such as .env inside an already-authorized root. Normal root delegation never unlocks protected secrets. On clients with MCP elicitation support, the host renders the native approval UI.",
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint: false, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
 		},
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in sensitiveAccessRequestInput) (*mcp.CallToolResult, map[string]any, error) {
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in sensitiveAccessRequestInput) (*mcp.CallToolResult, any, error) {
+		if state, decision, handled, err := nativeApprovalDecision(req, "sensitive"); handled {
+			if err != nil {
+				return nil, nil, err
+			}
+			var out map[string]any
+			args, _ := json.Marshal(map[string]any{
+				"request_id": state.RequestID,
+				"approval_token": state.ApprovalToken,
+				"decision": decision,
+			})
+			if err := s.call(ctx, "permissions.confirm_sensitive_access", state.RequestID, decision, args, &out, true, state.RequestID+":"+decision); err != nil {
+				return nil, out, err
+			}
+			return nil, out, nil
+		}
+
 		var out map[string]any
 		args, _ := json.Marshal(in)
 		if err := s.call(ctx, "permissions.request_sensitive_access", in.Path, "request", args, &out, true, in.OperationID); err != nil {
@@ -64,30 +65,19 @@ func registerAuthorityTools(server *mcp.Server, s *Server) {
 		}
 		approvalToken, _ := out["approval_token"].(string)
 		delete(out, "approval_token")
-		return &mcp.CallToolResult{Meta: mcp.Meta{
-			"vps-agent/approvalToken": approvalToken,
-		}}, out, nil
+
+		if !supportsNativeElicitation(req) {
+			out["approval_method"] = "operator_fallback"
+			out["message"] = "This MCP client did not advertise native elicitation. The protected-file request remains pending for separate operator approval."
+			return nil, out, nil
+		}
+		approval, err := nativeApprovalResult("sensitive", out, approvalToken)
+		if err != nil {
+			return nil, nil, err
+		}
+		return approval, nil, nil
 	})
 
-	mcp.AddTool(server, &mcp.Tool{
-		Name: "permissions.confirm_sensitive_access",
-		Description: "Approve or deny a pending protected-file grant from the interactive approval card. This app-only tool requires a one-time token hidden from the model.",
-		Meta: mcp.Meta{
-			"ui": map[string]any{"visibility": []string{"app"}},
-			"openai/widgetAccessible": true,
-			"openai/visibility":       "private",
-		},
-		Annotations: &mcp.ToolAnnotations{
-			ReadOnlyHint: false, DestructiveHint: boolPtr(false), IdempotentHint: true, OpenWorldHint: boolPtr(false),
-		},
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in sensitiveAccessConfirmInput) (*mcp.CallToolResult, map[string]any, error) {
-		var out map[string]any
-		args, _ := json.Marshal(in)
-		if err := s.call(ctx, "permissions.confirm_sensitive_access", in.RequestID, in.Decision, args, &out, true, in.RequestID+":"+in.Decision); err != nil {
-			return nil, out, err
-		}
-		return nil, out, nil
-	})
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "permissions.list_sensitive_access",
