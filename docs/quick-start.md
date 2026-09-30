@@ -1,6 +1,6 @@
-# Quick Start
+# Portico MCP Quick Start
 
-The supported installation is terminal-first and uses the repository's transparent Docker Compose and shell scripts.
+Portico MCP is installed from the terminal using the repository's transparent Docker Compose and shell scripts.
 
 ## Requirements
 
@@ -13,11 +13,9 @@ Before running the guided flow:
 - public DNS for the MCP hostname, TCP 80/443 available and valid HTTPS;
 - **ChatGPT Plus or higher**, with Developer Mode and custom MCP app creation actually exposed in ChatGPT Web for that account.
 
-OpenAI controls plan availability and rollout. Its current documentation describes full MCP write/modify support for Business, Enterprise and Edu. Accounts that expose only read/fetch MCP permissions remain limited to those ChatGPT-side capabilities. Recheck the current OpenAI product surface before public setup.
+OpenAI controls plan availability and rollout. Recheck the current ChatGPT product surface before public setup.
 
-## Release candidate
-
-Until the first stable tag is frozen after the final operator acceptance gate:
+## Start here
 
 ~~~bash
 git clone https://github.com/josemirmoura/mcp-vps-agent-gateway.git
@@ -25,7 +23,21 @@ cd mcp-vps-agent-gateway
 bash scripts/install.sh
 ~~~
 
-The guided flow performs:
+The installer detects the terminal locale. Portuguese (Brazil) and English are supported initially. You can override detection explicitly:
+
+~~~bash
+bash scripts/install.sh --lang pt-BR
+# or
+bash scripts/install.sh --lang en
+~~~
+
+The terminal banner identifies the product as **Portico MCP**, shows the version and includes:
+
+~~~text
+Feito por Josemir Moura | github.com/josemirmoura
+~~~
+
+## Guided flow
 
 ~~~text
 Environment
@@ -39,59 +51,64 @@ Environment
  -> INSTALLATION COMPLETE
 ~~~
 
-The default profile is **Project**. It delegates one filesystem root and leaves unrelated administrative capabilities disabled.
+The installer can be safely rerun after an interrupted phase. Existing local operator state is preserved by the lifecycle scripts unless an explicit purge is requested.
 
-The installer can be safely rerun after an interrupted phase. Existing `.env`, policy, identity state and instance identity are preserved by the underlying lifecycle scripts.
+## Recommended authority model: Standard
 
-## Authority profiles
+The default interactive choice is **Standard**.
 
-### Project
+Standard uses:
 
-~~~bash
-bash scripts/install.sh --profile project --scope /opt/my-app
+~~~text
+physical filesystem ceiling: /opt
+static project roots:        none
+project authority:           granted later through explicit approval
 ~~~
 
-### Custom
+The physical ceiling defines where Portico MCP may ever be allowed to operate. It does **not** authorize `/opt` itself.
 
-Choose a physical filesystem ceiling and edit `config/policy.yaml` to restrict individual roots, services, Docker resources and capabilities.
+Equivalent non-interactive command:
 
 ~~~bash
 bash scripts/install.sh --profile custom --scope /opt
 ~~~
 
-### Delegated roots under a broader ceiling
+The CLI value remains `custom` for compatibility, while the interactive product label is **Standard**.
 
-For a multi-project VPS, the physical ceiling can be broader than the logical authority. For example, keep the Broker physically bounded by `/opt` while delegating only selected project directories:
-
-~~~bash
-bash scripts/init.sh --scope /opt
-bash scripts/delegate-root.sh add /opt/project-a --access work --apply
-bash scripts/delegate-root.sh add /opt/project-b --access compose --apply
-bash scripts/delegate-root.sh list
-~~~
-
-`work` grants filesystem read/write plus scoped shell cwd for that directory. `compose` adds Compose inspect/manage for the same directory. `read` grants filesystem read only.
-
-Changing the physical ceiling does not authorize the ceiling itself. Existing logical policy roots are preserved. To revoke a project later:
-
-~~~bash
-bash scripts/delegate-root.sh remove /opt/project-a --apply
-~~~
-
-The helper refuses to delegate the entire physical ceiling unless `--allow-ceiling` is explicitly supplied.
-
-After installation, runtime delegation can use the MCP tools instead of editing `policy.yaml`:
+After ChatGPT is connected, a project is authorized dynamically:
 
 ~~~text
-permissions.request_root_access  -> creates a pending request + in-chat approval card
-user presses Authorize           -> app-only one-time token activates the root
-permissions.list_root_access     -> shows static + dynamic authority
-permissions.revoke_root_access   -> revokes dynamic authority immediately
+permissions.request_root_access
+        |
+        v
+in-chat Authorize / Deny card
+        |
+        v
+Broker activates read / work / compose for that root
 ~~~
 
-Dynamic roots can be permanent or time-limited and take effect without restarting the Broker. On MCP Apps-compatible clients such as ChatGPT, the request renders an inline approval card. The one-time approval token is delivered in tool-result `_meta`, which is available to the app UI but hidden from the model. The app-only confirmation tool requires that token and the same authenticated subject. A model-only call therefore cannot approve its own expansion. Clients without MCP Apps UI can fall back to the separate operator admin approval path.
+The model cannot approve its own permission expansion. The approval token is delivered only to the app UI and the Broker binds the decision to the authenticated subject and pending request.
 
-### Whole Host
+## Project-locked profile
+
+Choose this when Portico MCP should never operate outside one project root.
+
+~~~bash
+bash scripts/install.sh \
+  --profile project \
+  --scope /opt/my-app
+~~~
+
+If the path does not exist, the interactive installer can create it explicitly, or you can use:
+
+~~~bash
+bash scripts/install.sh \
+  --profile project \
+  --scope /opt/my-app \
+  --create-scope
+~~~
+
+## Whole Host
 
 Whole Host changes the Broker's **physical filesystem ceiling** to `/`.
 
@@ -103,16 +120,78 @@ bash scripts/install.sh --profile whole-host
 
 The guided flow requires explicit confirmation before startup.
 
+## Shell execution user
+
+Confined shell jobs run as a real non-root host user. The guided installer detects the invoking non-root user automatically.
+
+To choose another existing non-root user:
+
+~~~bash
+bash scripts/install.sh --run-as deploy
+~~~
+
+Normal scoped shell jobs are never configured to run as root.
+
+## Dynamic project roots
+
+With Standard, no project root is authorized at installation time.
+
+Once connected to ChatGPT, use:
+
+~~~text
+permissions.request_root_access
+permissions.list_root_access
+permissions.revoke_root_access
+~~~
+
+Access profiles:
+
+- `read`: filesystem read;
+- `work`: filesystem read/write plus scoped shell cwd;
+- `compose`: `work` plus Compose operations already enabled by the static action policy.
+
+Dynamic roots can be permanent or time-limited and take effect without restarting the Broker.
+
+Advanced operators can still manage static roots from the terminal with `scripts/delegate-root.sh`, but this is not required by the normal guided installation.
+
 ## Local-only validation
+
+To validate the package without public OAuth or ChatGPT:
 
 ~~~bash
 bash scripts/install.sh \
-  --profile project \
-  --scope /opt/vps-agent-sandbox \
-  --local-only
+  --profile custom \
+  --scope /opt \
+  --local-only \
+  --yes
 ~~~
 
-This intentionally stops before public OAuth and ChatGPT. It must not be described as a completed installation.
+This starts with no static project roots and intentionally stops before public OAuth and ChatGPT. It must not be described as a completed installation.
+
+## Removal
+
+Safe removal preserves local operator configuration and audit state:
+
+~~~bash
+bash scripts/remove.sh safe
+~~~
+
+Full purge removes Portico MCP-owned runtime, volumes, local configuration/state and the default locally built Gateway/Broker images:
+
+~~~bash
+VPS_AGENT_PURGE_CONFIRM=PURGE \
+bash scripts/remove.sh --purge
+~~~
+
+To also delete the Git checkout, use the separate explicit confirmation:
+
+~~~bash
+VPS_AGENT_PURGE_CONFIRM=PURGE \
+VPS_AGENT_REMOVE_SOURCE_CONFIRM=REMOVE_SOURCE \
+bash scripts/remove.sh --purge --remove-source
+~~~
+
+The purge never deletes arbitrary delegated project directories, third-party images, applications, databases or services. The legacy `/opt/vps-agent-sandbox` directory is removed only when it is empty.
 
 ## Stable releases
 
@@ -125,4 +204,4 @@ cd mcp-vps-agent-gateway
 bash scripts/install.sh
 ~~~
 
-The Git checkout is intentional: the existing update mechanism preserves fast-forward verification, state migration checks, backup and automatic rollback.
+The Git checkout is intentional: the update mechanism preserves fast-forward verification, state migration checks, backup and automatic rollback.
