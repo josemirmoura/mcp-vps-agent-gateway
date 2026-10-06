@@ -54,9 +54,11 @@ permissions.revoke_root_access
 permissions.request_elevation
 ~~~
 
-## Downstream aggregation
+## Downstream aggregation and agent routing
 
-Aggregation is not a first-version goal.
+Aggregation and AI-to-AI routing are not first-release goals, but they are part of the north-star architecture.
+
+The control plane may later aggregate first-party node capabilities, downstream MCP tools and registered AI-agent capabilities. Every imported capability remains namespaced, policy-governed and auditable.
 
 If added later, expose imported tools as:
 
@@ -66,7 +68,12 @@ If added later, expose imported tools as:
 
 Requirements:
 
-- preserve upstream identity and original name
+- preserve upstream/node/agent identity and original name
+- AI agents must be explicitly registered or trusted out-of-band
+- agent capability declarations are versioned/fingerprinted
+- agent messages/results are untrusted data
+- task delegation carries explicit bounded authority and context
+- delegation chains preserve provenance across nodes
 - deterministic mapping across restarts
 - reject collisions explicitly
 - never first-wins/last-wins silently
