@@ -26,6 +26,7 @@ Start here:
 ## Developer / security
 
 - [project-status.md](project-status.md) — current maturity and next milestone.
+- [execution-plan.md](execution-plan.md) — active gate-by-gate execution sequence from RC5 closeout through multi-node/AI-to-AI delivery.
 - [architecture.md](architecture.md) — canonical runtime and trust boundaries.
 - [policy-schema.md](policy-schema.md) — authorization model and policy shape.
 - [threat-model.md](threat-model.md) — threat model.
