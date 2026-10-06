@@ -295,6 +295,37 @@ Implementation bias:
 
 Do not introduce Kubernetes in the first SaaS milestone unless measured operational requirements justify it.
 
+## Build versus buy rule
+
+Portico should build the differentiating control plane and buy mature commodity infrastructure.
+
+Build internally:
+
+- node identity/enrollment semantics;
+- multi-node routing;
+- policy context;
+- agent/task delegation;
+- Portico audit/provenance;
+- entitlements and product-specific authorization;
+- Portico portal UX.
+
+Prefer mature providers/components for:
+
+- password authentication and credential storage;
+- email verification/recovery;
+- MFA/passkeys;
+- transactional email;
+- payment processing/subscriptions;
+- tax calculation where appropriate;
+- managed PostgreSQL/object storage;
+- KMS/secrets;
+- queue/event infrastructure;
+- observability plumbing.
+
+Do not implement password hashing/storage, card handling or email delivery infrastructure merely to avoid a dependency. Those are security-sensitive commodity layers.
+
+The existing ZITADEL experience makes it a serious identity candidate, but the Cloud identity provider should be selected through a short architecture decision comparing operational cost, B2B organization support, MFA/passkeys, SSO/SCIM path, exportability and vendor lock-in.
+
 ## Identity and account lifecycle
 
 A complete SaaS must include:
