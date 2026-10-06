@@ -42,7 +42,7 @@ A completed public installation requires:
 - a valid HTTPS certificate;
 - a ChatGPT Web account/workspace whose current product surface actually exposes Developer Mode and custom MCP app registration.
 
-OpenAI controls plan availability, workspace controls and rollout. The project therefore does not treat a subscription label alone as a compatibility guarantee. Current official OpenAI documentation lists full MCP support, including write/modify actions, for Business, Enterprise and Edu; Pro users can connect custom MCPs with read/fetch permissions in developer mode. Any account whose ChatGPT surface exposes narrower capabilities remains limited to those capabilities; Portico cannot elevate ChatGPT-side permissions.
+OpenAI controls plan availability, workspace controls and rollout. The project therefore does not treat a subscription label alone as a compatibility guarantee. Official documentation can lag account-specific rollout behavior, so compatibility is determined by the actual ChatGPT surface exposed to the operator and verified end-to-end. On 2026-10-06, the operator's ChatGPT Plus environment exposed Portico write-capable tools and successfully completed a scoped write/read/delete proof through the real Broker. This is evidence for that environment, not a promise that every Plus account exposes the same surface. Portico cannot elevate permissions that the client itself does not expose.
 
 Current official reference:
 - https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
