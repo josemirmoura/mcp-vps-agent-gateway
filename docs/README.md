@@ -26,7 +26,10 @@ Start here:
 ## Developer / security
 
 - [project-status.md](project-status.md) — current maturity and next milestone.
-- [execution-plan.md](execution-plan.md) — active gate-by-gate execution sequence from RC5 closeout through multi-node/AI-to-AI delivery.
+- [execution-plan.md](execution-plan.md) — active gate-by-gate execution sequence through stable release, multi-node/AI-to-AI and Cloud productization.
+- [commercial-saas-plan.md](commercial-saas-plan.md) — licensing, competitive benchmark, packaging, public/private repository split and full SaaS delivery plan.
+- [licensing-decision.md](licensing-decision.md) — source-available Community licensing options, trade-offs and release-migration gate.
+- [saas-work-breakdown.md](saas-work-breakdown.md) — implementation epics, dependencies and definition of done for the Cloud product.
 - [architecture.md](architecture.md) — canonical runtime and trust boundaries.
 - [policy-schema.md](policy-schema.md) — authorization model and policy shape.
 - [threat-model.md](threat-model.md) — threat model.

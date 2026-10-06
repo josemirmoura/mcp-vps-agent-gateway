@@ -2,7 +2,7 @@
 
 **Status:** active  
 **Started:** 2026-10-06  
-**Immediate objective:** freeze a trustworthy stable `v0.1.0` before implementing the multi-node control plane.  
+**Immediate objective:** close the commercial licensing gate, cut the final licensed release candidate, pass owner acceptance, and freeze a trustworthy stable `v0.1.0` before implementing the multi-node control plane.  
 **North star:** one vendor-neutral Portico control plane connecting multiple policy-authoritative nodes and AI agents, with audited AI-to-AI delegation.
 
 This plan is the execution sequence. It does not replace the architecture, security model or multi-node roadmap.
@@ -30,7 +30,7 @@ Evidence:
 
 ## Phase 1 — RC6 closeout branch
 
-Status: **in progress**
+Status: **complete**
 
 Work:
 
@@ -56,9 +56,9 @@ Success criteria:
 
 ## Phase 1.5 — publish immutable RC6 prerelease
 
-Status: **blocked on Phase 1 merge**
+Status: **complete**
 
-After the closeout PR is green and merged:
+Completed on 2026-10-06:
 
 1. publish the exact merged commit as `v0.1.0-rc.6` through the validated release workflow;
 2. verify the immutable tag and GitHub prerelease;
@@ -67,11 +67,32 @@ After the closeout PR is green and merged:
 
 The operator acceptance must never test a moving branch or a different commit from the release candidate intended for stable promotion.
 
-## Phase 2 — owner clean-install acceptance of RC6
+## Phase 1.7 — commercial licensing and product-boundary gate
 
-Status: **blocked on owner interaction after Phase 1**
+Status: **new blocker before stable v0.1.0**
 
-Use exactly `v0.1.0-rc.6` on a clean supported target chosen for acceptance.
+Commercial strategy now requires a public Community edition that is source-available and free for permitted non-commercial use, plus proprietary Portico Cloud services.
+
+Before stable:
+
+1. obtain legal review of the intended source-available license;
+2. confirm copyright/contributor authority for relicensing future versions;
+3. define permitted non-commercial use and commercial-use boundary;
+4. define trademark policy;
+5. define the public Community repository versus private portico-cloud repository boundary;
+6. update LICENSE, NOTICE, README, site and installer notices consistently;
+7. bump to a new RC after any license change;
+8. run the full automated matrix and publish that exact immutable RC.
+
+RC6 remains the validated technical baseline. If the license changes, RC6 is not the stable-promotion candidate because it was published under Apache-2.0.
+
+See commercial-saas-plan.md and licensing-decision.md.
+
+## Phase 2 — owner clean-install acceptance of final licensed RC
+
+Status: **blocked on Phase 1.7**
+
+Use the exact immutable release-candidate tag produced after the licensing gate. If the only post-RC6 material change is licensing/product packaging, the next candidate is expected to be RC7, but the exact tag is determined by the actual release state.
 
 Required real-world evidence:
 
@@ -97,7 +118,7 @@ This phase intentionally requires a human for browser/OAuth/native confirmation 
 
 Status: **blocked on Phase 2**
 
-After owner acceptance passes:
+After owner acceptance of the final licensed RC passes:
 
 1. freeze the accepted commit;
 2. set `VERSION` to `0.1.0`;
@@ -198,6 +219,33 @@ Status: **planned**
 - control-plane backup/restore;
 - audit recovery and integrity checks.
 
+## Parallel commercial/SaaS productization track
+
+Detailed plan: commercial-saas-plan.md. Implementation backlog: saas-work-breakdown.md.
+
+The SaaS track starts with specification now, but implementation should not distract from the stable Community release gate.
+
+Sequence:
+
+1. SaaS Gate 0 — competitive benchmark, licensing, packaging/pricing, public/private boundary and unit economics;
+2. SaaS Gate 1 — private portico-cloud repository, staging, identity, tenant/workspace model and portal shell;
+3. SaaS Gate 2 — managed node enrollment, registry, routing and centralized audit metadata;
+4. SaaS Gate 3 — full account lifecycle including password recovery, MFA/passkeys, invitations and sessions;
+5. SaaS Gate 4 — Stripe billing, subscriptions, entitlements, invoices, dunning and upgrades/downgrades;
+6. SaaS Gate 5 — Cloud Starter private beta;
+7. SaaS Gate 6 — Cloud Pro;
+8. SaaS Gate 7 — Business Cloud pilots with SSO/SCIM/SIEM/SLA/dedicated options;
+9. SaaS Gate 8 — GA.
+
+Commercial packaging hypothesis:
+
+- Community: $0, self-hosted, source-available, non-commercial;
+- Cloud Starter: initial hypothesis US$ 15 annual-equivalent / US$ 19 monthly;
+- Cloud Pro: initial hypothesis US$ 49 annual-equivalent / US$ 59 monthly;
+- Business Cloud: custom annual contract.
+
+Prices remain validation hypotheses until COGS and willingness-to-pay are measured.
+
 ## Separate maturity tracks
 
 These do not block the first stable Scoped release unless the project explicitly begins claiming them:
@@ -212,6 +260,4 @@ Requires production-tested temporary elevation, revoke-all, network separation, 
 
 ## Current stop point requiring owner
 
-The next unavoidable owner interaction is **Phase 2**, after the RC6 closeout PR is green and merged.
-
-Until then, development should continue without asking the owner to perform manual terminal/browser work.
+The next unavoidable owner intervention is the **Phase 1.7 licensing decision/legal review**. After the final license instrument is approved, automation can update the repository, cut the next RC and rerun CI. The following unavoidable human gate is Phase 2, which requires the real browser/OAuth/native-confirmation acceptance.
