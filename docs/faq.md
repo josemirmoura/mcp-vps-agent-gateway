@@ -69,3 +69,20 @@ main is development. Stable SemVer tags are the normal update channel so product
 ## Can I delete the MCP without deleting my apps?
 
 Yes. Safe remove and purge are designed to remove MCP-owned runtime/configuration artifacts while preserving resources that the MCP administered.
+
+
+## Is Portico only for ChatGPT?
+
+No. ChatGPT Web is the operator's priority interactive client and the current validated public path, but the final product is vendor-neutral. Other compatible web AI clients, local orchestrators and agents are target clients.
+
+## Will AIs be able to communicate through Portico?
+
+Yes, in the planned multi-node architecture. Portico will support authorized AI-to-AI task delegation on the same machine and across different machines, with capability discovery, bounded task authority, provenance and audit.
+
+## Does one AI inherit another AI's permissions?
+
+No. Delegation never implies privilege inheritance. The destination node re-authorizes the delegated task and grants only the capabilities explicitly allowed for that task.
+
+## Is multi-node already implemented?
+
+Not yet. The current validated product path is one Linux host. Multi-node routing, Windows nodes and AI-to-AI communication are roadmap items built on the existing Gateway/Broker security model.
