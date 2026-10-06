@@ -3,25 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Conecte o ChatGPT Web diretamente à sua VPS Linux via MCP, com OAuth auto-hospedado, política definida pelo operador, autorização privilegiada no Broker e auditoria.">
+  <meta name="description" content="O Portico é uma camada open source multi-IA e multi-node de controle e comunicação. O caminho atual conecta com segurança ChatGPT Web e clientes MCP compatíveis ao Linux com policy e auditoria.">
   <link rel="canonical" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/pt-BR/">
   <link rel="alternate" hreflang="en" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/">
   <link rel="alternate" hreflang="pt-BR" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/pt-BR/">
   <link rel="alternate" hreflang="x-default" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/">
-  <meta property="og:title" content="Conecte o ChatGPT Web à sua VPS Linux | Portico MCP">
-  <meta property="og:description" content="Uma ponte MCP auto-hospedada e auditável entre o ChatGPT Web e sua VPS Linux. Você escolhe o perímetro e as capacidades; o Broker aplica a política a cada operação privilegiada.">
+  <meta property="og:title" content="Conecte IAs, agentes e máquinas com segurança | Portico MCP">
+  <meta property="og:description" content="Uma camada segura e auditável entre clientes de IA, agentes e máquinas. Caminho Linux validado hoje; multi-node e comunicação IA a IA no roadmap.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://josemirmoura.github.io/mcp-vps-agent-gateway/pt-BR/">
   <meta property="og:locale" content="pt_BR">
   <meta property="og:locale:alternate" content="en_US">
-  <title>Conecte o ChatGPT Web à sua VPS Linux | Portico MCP</title>
+  <title>Conecte IAs, agentes e máquinas com segurança | Portico MCP</title>
   <link rel="stylesheet" href="../styles.css">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareSourceCode",
     "name": "Portico MCP",
-    "description": "Ponte open source e auto-hospedada que conecta o ChatGPT Web a uma VPS Linux pelo Model Context Protocol (MCP), com OAuth, política definida pelo operador, autorização privilegiada no Broker e auditoria.",
+    "description": "Camada open source de controle e comunicação entre clientes de IA, agentes de IA, computadores e serviços. O caminho atual conecta clientes MCP compatíveis ao Linux com policy e auditoria; a visão final é multi-node e IA a IA.",
     "codeRepository": "https://github.com/josemirmoura/mcp-vps-agent-gateway",
     "programmingLanguage": ["Go", "Shell"],
     "runtimePlatform": "Linux com Docker Engine e Docker Compose v2",
@@ -43,8 +43,8 @@
     </nav>
     <div class="hero-copy">
       <p class="eyebrow">v0.1.0-rc.5 · MCP auto-hospedado · política aplicada · auditável</p>
-      <h1>Conecte o ChatGPT Web diretamente à sua VPS Linux.</h1>
-      <p class="lede">O Portico MCP cria um caminho seguro para o ChatGPT inspecionar e operar sua VPS dentro da autoridade que você definir. O OAuth autentica o cliente. Um Broker local privilegiado reautoriza cada operação no host e registra evidências de auditoria.</p>
+      <h1>Conecte IAs, agentes e máquinas com segurança.</h1>
+      <p class="lede">O Portico MCP é a camada de segurança, roteamento e auditoria entre sistemas de IA e máquinas controladas pelo proprietário. O caminho atual permite ao ChatGPT Web ou outro cliente MCP compatível operar Linux com segurança; a visão final amplia essa base para múltiplos nós e delegação IA a IA.</p>
       <div class="actions">
         <a class="button" href="#quick-start">Começo rápido</a>
         <a class="button secondary" href="#problem-solution">Veja como funciona</a>
@@ -78,7 +78,7 @@
       </div>
 
       <div class="runtime-strip" aria-label="Fluxo de execução">
-        <span>ChatGPT Web</span><b>→</b><span>OAuth</span><b>→</b><span>MCP Gateway</span><b>→</b><span>Policy Broker</span><b>→</b><span>Sua VPS</span>
+        <span>Cliente de IA</span><b>→</b><span>Portico</span><b>→</b><span>Policy Broker</span><b>→</b><span>Nó autorizado</span>
       </div>
 
       <div class="grid two trust-grid">
@@ -118,15 +118,15 @@
 
     <section>
       <p class="eyebrow">Arquitetura</p>
-      <h2>Superfície pública pequena, fronteiras de confiança explícitas.</h2>
+      <h2>Runtime atual de um nó, preparado para evoluir a uma malha multi-node.</h2>
       <div class="architecture">
-        <div class="node"><strong>ChatGPT Web</strong><span>OAuth + MCP por HTTPS</span></div>
+        <div class="node"><strong>Cliente de IA</strong><span>ChatGPT Web primeiro, outros compatíveis</span></div>
         <div class="arrow">→</div>
         <div class="node"><strong>Gateway</strong><span>sem root</span></div>
         <div class="arrow">→</div>
         <div class="node"><strong>Broker</strong><span>fronteira local privilegiada</span></div>
         <div class="arrow">→</div>
-        <div class="node"><strong>VPS</strong><span>Linux · systemd · Docker · arquivos</span></div>
+        <div class="node"><strong>Nó</strong><span>Linux hoje · multi-node no roadmap</span></div>
       </div>
     </section>
 
@@ -162,7 +162,7 @@
           <ul class="feature-list">
             <li>Uma conta/workspace do ChatGPT Web em que o Modo de Desenvolvedor e a criação de app MCP personalizado estejam realmente disponíveis.</li>
             <li>A OpenAI controla disponibilidade por plano/workspace e rollout; o rótulo da assinatura, sozinho, não garante compatibilidade.</li>
-            <li>A documentação oficial atual lista MCP completo com escrita/alteração para Business, Enterprise e Edu; usuários Pro podem conectar MCPs personalizados com leitura/busca no modo de desenvolvedor.</li>
+            <li>A compatibilidade é definida pela superfície realmente exposta à conta e comprovada ponta a ponta. Em 06/10/2026, o ambiente ChatGPT Plus do operador concluiu uma prova real de write/read/delete em modo scoped via Portico.</li>
           </ul>
         </article>
       </div>
