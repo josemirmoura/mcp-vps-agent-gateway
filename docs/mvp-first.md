@@ -12,16 +12,18 @@ Choose deliberately:
 - Adapt if an existing implementation is close enough.
 - Build only when the required combination is missing.
 
-The differentiating target here is:
+The differentiating first-release target is:
 
 ~~~text
-ChatGPT Web
-+ self-controlled VPS
+ChatGPT Web / compatible MCP client
++ self-controlled Linux host
 + server-side policy
 + Scoped autonomy
 + optional temporary elevation
 + Broker under operator control
 ~~~
+
+The north-star product is broader: a vendor-neutral multi-node, multi-AI control and communication layer with AI-to-AI delegation. See `vision.md` and `roadmap-multinode-control-plane.md`.
 
 ## Gate 0A — Prove the ChatGPT product surface
 
@@ -31,14 +33,14 @@ This gate was required before the privileged product path could be considered va
 
 Primary target: ChatGPT Web.
 
-As of 2026-09-26, OpenAI documents full private MCP write/modify in Developer Mode for Business, Enterprise and Edu. Plugin availability varies by plan, surface, region and included app capabilities.
+As of 2026-09-26, public OpenAI documentation described narrower plan availability than the operator later observed in practice. Product availability varies by plan, account, surface, region and rollout.
 
-Do not assume that a private custom write-capable MCP can be attached directly to Plus Web.
+On 2026-10-06, the operator's ChatGPT Plus environment exposed Portico write-capable tools and successfully completed a real scoped write/read/delete proof through the Broker. Treat this as verified evidence for that environment, not as a universal promise for every Plus account.
 
 Choose and validate one supported route:
 
 1. Private development route — a workspace/plan that supports private full MCP write.
-2. Plus Web route — an eligible plugin/app whose remote MCP write capability is available on Plus Web.
+2. Plus Web route — use the actual account surface when custom MCP/app access and required write actions are exposed; verify with an audited end-to-end write proof.
 3. Protocol-only route — MCP Inspector while the distribution route is unresolved.
 
 ### Gate 0A success
