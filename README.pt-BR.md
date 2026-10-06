@@ -1,8 +1,10 @@
 # Portico MCP
 
-**Conecte o ChatGPT Web diretamente à sua VPS Linux via MCP, com a autoridade definida por você e aplicada pelo servidor.**
+**Conecte com segurança clientes de IA, agentes de IA, computadores e serviços, com autoridade definida pelo dono e aplicada nas próprias máquinas.**
 
-O Portico MCP é uma ponte open source e auto-hospedada para permitir que o ChatGPT Web ou outro cliente MCP inspecione e opere uma VPS Linux pelo Model Context Protocol. O OAuth autentica o cliente, um Gateway sem root expõe a superfície MCP e um Broker local privilegiado reautoriza as operações no host conforme a policy definida pelo operador, registrando evidências de auditoria.
+O Portico MCP é uma camada open source de controle e comunicação para sistemas de IA. O caminho atualmente validado permite que o ChatGPT Web ou outro cliente MCP compatível inspecione e opere um host Linux com policy e auditoria aplicadas no servidor. A arquitetura final amplia essa base para um control plane multi-node e multi-IA, no qual chats web, agentes locais e IAs especialistas podem descobrir recursos, operar máquinas autorizadas e se comunicar entre si na mesma máquina ou entre máquinas diferentes.
+
+O ChatGPT Web é o cliente interativo prioritário do operador, mas o Portico é deliberadamente neutro de fornecedor e deve permanecer aberto a outros clientes e agentes de IA compatíveis.
 
 > **Status: candidato em productização pré-release.** Os workflows em Ubuntu 24.04 validam o pacote de ponta a ponta, e o caminho OAuth integrado e auto-hospedado foi verificado por uma chamada real auditada de `system.info` feita pelo ChatGPT Web em 28/09/2026. Ainda faltam a primeira release pública estável, uma promessa formal de compatibilidade e evidência de confiabilidade prolongada em produção.
 
@@ -10,14 +12,23 @@ O Portico MCP é uma ponte open source e auto-hospedada para permitir que o Chat
 
 Sem um caminho confiável de execução, trabalhar com uma VPS usando IA vira um revezamento manual: o ChatGPT sugere um comando, você troca para o terminal, executa, copia os logs de volta, reconstrói o contexto e repete. Dar acesso amplo no estilo SSH reduz parte dessa fricção, mas cria um problema de confiança muito maior.
 
-O Portico MCP fecha esse ciclo mantendo a autorização dentro da VPS. Pela própria conversa, o ChatGPT pode inspecionar arquivos, diagnosticar serviços, analisar logs, trabalhar com Docker e executar outras operações que o dono da VPS habilitar explicitamente.
+O Portico MCP fecha esse ciclo mantendo a autorização nas máquinas controladas pelo proprietário. No caminho atual, o ChatGPT pode inspecionar arquivos, diagnosticar serviços, analisar logs, trabalhar com Docker e executar outras operações explicitamente autorizadas no host Linux.
 
 ~~~text
-ChatGPT Web
+CAMINHO VALIDADO ATUAL
+
+ChatGPT Web / cliente MCP compatível
     -> OAuth
     -> MCP Gateway
     -> Policy Broker
-    -> Sua VPS Linux
+    -> host Linux
+
+DIREÇÃO FINAL DO PRODUTO
+
+chats web de IA / agentes locais / automação
+    <-> Portico Control Plane
+    <-> Linux / Windows / futuros nós
+    <-> IAs locais / RAGs / bancos / serviços / compute
 ~~~
 
 O GitHub hospeda o código-fonte, a documentação, as releases e o canal de atualização. **Depois da instalação, o GitHub não fica no caminho operacional entre o ChatGPT Web e a VPS.**
@@ -75,7 +86,7 @@ Antes de iniciar a instalação guiada, tenha:
 - um domínio/DNS público apontando para a VPS, portas TCP 80/443 disponíveis e HTTPS válido;
 - uma conta/workspace do ChatGPT Web em que o Modo de Desenvolvedor e a criação de app MCP personalizado estejam realmente disponíveis.
 
-A OpenAI controla disponibilidade e permissões por plano, workspace e rollout. A documentação oficial atual lista **suporte MCP completo, incluindo escrita/alteração, para Business, Enterprise e Edu**; usuários Pro podem conectar MCPs personalizados com permissões de leitura/busca no modo de desenvolvedor. O Portico MCP não pode elevar permissões que o próprio ChatGPT não exponha. Antes de depender de um rótulo de plano, confira a interface atual da conta e a documentação oficial da OpenAI.
+A OpenAI controla disponibilidade e permissões por plano, workspace e rollout. O Portico não trata o nome do plano como garantia de capability: vale a superfície efetivamente exposta pela conta e comprovada ponta a ponta. Em 06/10/2026, o ambiente ChatGPT Plus do operador expôs ferramentas de escrita do Portico e concluiu com sucesso uma prova real de write/read/delete em modo `scoped`. Isso comprova aquele ambiente, sem virar promessa para toda conta Plus. O Portico não pode elevar permissões que o cliente de IA não exponha.
 
 Veja [compatibilidade](docs/compatibility.md) para a matriz suportada/testada.
 
@@ -152,11 +163,21 @@ VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge
 ~~~
 
 A remoção segura preserva configuração e auditoria. O purge exige confirmação explícita e remove apenas artefatos do MCP. O update faz backup da configuração/estado, usa Git fast-forward, verifica o runtime novo e restaura código/estado anterior se a verificação falhar.
+## Direção do produto
+
+A visão final é um **Pórtico multi-node e multi-IA**: uma camada estável de segurança, descoberta, roteamento e auditoria através da qual o ChatGPT Web, outros chats web compatíveis, orquestradores locais e agentes especialistas podem operar várias máquinas e delegar tarefas IA ↔ IA na mesma máquina ou entre máquinas.
+
+O plano inclui Linux, Windows, SRV-IA como primeiro nó adicional real, RAG/bancos locais, GPU/compute, descoberta de agentes, delegação durável IA ↔ IA e LLM local opcional como fallback.
+
+Veja [Visão do Pórtico](docs/vision.md) e [Roadmap multi-node](docs/roadmap-multinode-control-plane.md).
+
 ## Documentação
 
 - [Quick Start](docs/quick-start.md)
 - [Contrato de instalação](docs/installation-contract.md)
 - [Modelo do produto](docs/product-model.md)
+- [Visão do Pórtico](docs/vision.md)
+- [Roadmap multi-node e multi-IA](docs/roadmap-multinode-control-plane.md)
 - [Operação](docs/operations.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Compatibilidade](docs/compatibility.md)
