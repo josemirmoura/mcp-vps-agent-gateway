@@ -58,7 +58,7 @@ By default, `scripts/update.sh` selects the newest stable SemVer tag available f
 A release candidate or explicit version can be selected deliberately:
 
 ~~~bash
-VPS_AGENT_UPDATE_REF=v0.1.0-rc.5 bash scripts/update.sh
+VPS_AGENT_UPDATE_REF=v0.1.0-rc.6 bash scripts/update.sh
 ~~~
 
 The updater refuses non-fast-forward targets and retains its backup after success or rollback.
