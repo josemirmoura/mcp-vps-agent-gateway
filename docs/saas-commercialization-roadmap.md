@@ -300,7 +300,27 @@ All database queries involving tenant data must be scoped by organization/worksp
 
 ## 8. Billing and subscription system
 
-Preferred initial billing provider: Stripe Billing.
+Do not lock the billing provider before deciding who carries global tax/compliance responsibility.
+
+### Billing-provider ADR
+
+Evaluate at least:
+
+**Stripe Billing / Payments**
+
+- stronger direct control over customer/payment data and subscription mechanics;
+- current Brazilian card pricing and Billing fees are transparent;
+- good fit when Portico is ready to own tax registrations/filing or use separate tax services.
+
+**Paddle Merchant of Record**
+
+- currently advertises 5% + US$0.50 per checkout transaction;
+- handles payments, subscription billing, global sales-tax/VAT compliance, fraud/chargebacks and buyer billing support as Merchant of Record;
+- attractive for an early global SaaS when operational simplicity is worth the higher percentage fee.
+
+Lemon Squeezy/Stripe Managed Payments may remain a third benchmark, but avoid supporting multiple billing providers in the MVP.
+
+**Decision rule:** choose the provider that minimizes total operational/legal cost for the first 100 paying customers, not merely the lowest payment-processing percentage. Hide the provider behind a narrow internal billing interface so a future migration does not contaminate entitlement logic.
 
 Required flows:
 
