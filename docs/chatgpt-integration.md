@@ -1,6 +1,6 @@
 # ChatGPT integration
 
-Checked: 2026-09-30.
+Checked: 2026-10-06.
 
 ## Target
 
@@ -18,17 +18,17 @@ The installation completion rule is deliberately stricter than "containers are h
 
 ## ChatGPT product prerequisite
 
-The supported product path includes write/modify tools, so release documentation follows OpenAI's current **full MCP** availability rather than assuming that any custom-app surface is sufficient.
+The supported product path includes write/modify tools, so compatibility is decided by the capabilities actually exposed by the target ChatGPT surface and verified end to end.
 
-As checked on 2026-09-28, OpenAI documents full MCP support with write/modify actions on ChatGPT web for **Business and Enterprise/Edu** workspaces. Pro can connect custom MCP apps in developer mode with read/fetch permissions, but that is not equivalent to this product's full write-capable path.
+As checked on 2026-10-06, OpenAI's public help documentation describes full MCP write/modify support for **Business and Enterprise/Edu** workspaces. Separately, the operator's real **ChatGPT Plus** environment exposed Portico write-capable tools and completed a scoped write/read/delete proof through the Broker on 2026-10-06. The repository records that as empirical evidence for that environment, not as a universal Plus compatibility claim.
 
 Before starting public setup:
 
 1. confirm that the current ChatGPT Web account/workspace actually exposes Developer Mode / custom MCP app creation;
 2. on managed workspaces, ensure an admin/owner has enabled Developer Mode / custom apps as required by the workspace;
 3. confirm the account can create a custom app and provide the HTTPS `/mcp` endpoint;
-4. understand the effective MCP permissions: OpenAI currently documents full write/modify MCP support for Business, Enterprise and Edu; Pro custom MCP access is read/fetch-limited;
-5. if OpenAI changes plan availability or UI, recheck the current official documentation before proceeding.
+4. confirm the effective MCP permissions by actually discovering and exercising the required Portico actions; do not infer write capability from the plan name alone;
+5. compare the observed surface with current official OpenAI documentation and record any rollout/account-specific difference as environment evidence rather than a broad compatibility promise.
 
 Official references checked for this release candidate:
 
