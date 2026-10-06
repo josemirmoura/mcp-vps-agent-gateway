@@ -52,7 +52,7 @@ RC6 supersedes RC5 as the exact candidate for the owner's final clean-install op
 
 ### Release candidate
 
-RC5 is the exact candidate for the owner's final clean-install operator acceptance gate. Stable `v0.1.0` remains blocked until that gate passes.
+RC5 was the acceptance candidate until the later runtime-image security refresh required RC6. The RC5 tag remains immutable history.
 
 ## [0.1.0-rc.4] - 2026-09-30
 
