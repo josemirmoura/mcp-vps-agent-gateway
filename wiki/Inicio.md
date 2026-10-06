@@ -2,6 +2,13 @@
 
 > Esta Wiki é uma camada de navegação. A documentação canônica vive em [`docs/`](https://github.com/josemirmoura/mcp-vps-agent-gateway/tree/main/docs) e permanece versionada junto com o código. Se houver qualquer divergência, a documentação do repositório prevalece.
 
+## Visão do produto
+
+O Pórtico tem como direção final ser uma **camada multi-node e multi-IA de controle e comunicação**, neutra de fornecedor. O ChatGPT Web é o cliente prioritário do operador, enquanto outros chats web compatíveis e agentes locais são alvos de primeira classe. O roadmap inclui comunicação e delegação IA ↔ IA na mesma máquina e entre máquinas.
+
+- **Visão:** [Portico vision](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/vision.md)
+- **Roadmap:** [Control plane multi-node](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/roadmap-multinode-control-plane.md)
+
 ## Comece aqui
 
 - **Instalar e conectar:** [Começo rápido](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/quick-start.md) · [Contrato de instalação](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/installation-contract.md) · [Fluxo do instalador](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/installer-flow.md)
