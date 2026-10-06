@@ -21,20 +21,20 @@ Status: **complete**
 
 Evidence:
 
-- `main` is on `v0.1.0-rc.5`;
+- `main` is on `v0.1.0-rc.6`;
 - latest reference implementation CI on 2026-10-06 is green;
 - real ChatGPT Web + integrated OAuth path has prior audited evidence;
 - the operator's ChatGPT Plus environment completed a real scoped write/read/delete proof on 2026-10-06;
 - multi-node/multi-AI vision and roadmap are recorded;
 - current live VPS Portico reports healthy Broker/Gateway state, `scoped` mode and valid audit chain.
 
-## Phase 1 — RC5 closeout branch
+## Phase 1 — RC6 closeout branch
 
 Status: **in progress**
 
 Work:
 
-1. reconcile stale RC3/product-surface documentation with RC5;
+1. reconcile stale RC3/product-surface documentation with RC6;
 2. make ChatGPT compatibility evidence-based rather than plan-name based;
 3. keep official OpenAI documentation and operator-specific observed capability clearly separated;
 4. publish this active execution plan;
@@ -54,11 +54,11 @@ Success criteria:
 - architecture/security checks that apply to the changed files pass;
 - no secret or environment-specific credential is committed.
 
-## Phase 2 — owner clean-install acceptance of RC5
+## Phase 2 — owner clean-install acceptance of RC6
 
 Status: **blocked on owner interaction after Phase 1**
 
-Use exactly `v0.1.0-rc.5` on a clean supported target chosen for acceptance.
+Use exactly `v0.1.0-rc.6` on a clean supported target chosen for acceptance.
 
 Required real-world evidence:
 
@@ -199,6 +199,6 @@ Requires production-tested temporary elevation, revoke-all, network separation, 
 
 ## Current stop point requiring owner
 
-The next unavoidable owner interaction is **Phase 2**, after the RC5 closeout PR is green and merged.
+The next unavoidable owner interaction is **Phase 2**, after the RC6 closeout PR is green and merged.
 
 Until then, development should continue without asking the owner to perform manual terminal/browser work.
