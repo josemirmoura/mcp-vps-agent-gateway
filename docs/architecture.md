@@ -2,7 +2,11 @@
 
 ## Goal
 
-Give an AI client useful operational access to a Linux VPS while keeping the VPS, not the model, in control of authorization and privilege.
+Build a secure control and communication layer that allows AI clients and AI agents to discover, operate and collaborate across owner-authorized computers and services, while keeping each destination machine, not the model, in control of authorization and privilege.
+
+The current v0.1 reference runtime proves this model on one Linux host. The north-star architecture extends the same security invariants to multiple nodes, heterogeneous operating systems and AI-to-AI delegation.
+
+ChatGPT Web is the operator's priority interactive client, but the architecture remains vendor-neutral and compatible with other suitable MCP clients and agents.
 
 > **The LLM is never the security boundary.**
 
@@ -43,6 +47,36 @@ ChatGPT / MCP client
 ~~~
 
 The existing reverse proxy or a supported private tunnel is ingress infrastructure, not a third project service.
+
+## North-star multi-node runtime
+
+The proven single-host runtime is the foundation for the planned multi-node architecture:
+
+~~~text
+web AI clients / local orchestrators / automation
+                    |
+                    v
+           Portico Control Plane
+       identity / discovery / routing
+          audit aggregation / policy context
+                    |
+         +----------+----------+
+         |          |          |
+         v          v          v
+      Node A      Node B      Node C
+      Linux       Windows     Linux
+         |          |          |
+      Broker      Broker      Broker
+         |          |          |
+ files/RAG/AI   apps/AI     DB/GPU/AI
+         \________ AI <-> AI ________/
+~~~
+
+The control plane routes requests and exposes stable node-aware capabilities. It does not become a global root authority. Every destination node re-authorizes the authenticated subject, tool, resource, action and delegation against its own local policy before execution.
+
+AI-to-AI communication is a first-class target capability. An authorized orchestrator or agent may discover another agent, submit bounded work and receive durable results on the same node or another node. Delegation never implies authority inheritance: an agent receives only the explicit capability/context granted for that task.
+
+See [vision.md](vision.md) and [roadmap-multinode-control-plane.md](roadmap-multinode-control-plane.md).
 
 ## Why Go for both processes
 
@@ -293,28 +327,32 @@ Before Full production:
 
 Remote audit infrastructure is not a Gate 0 prerequisite.
 
-## Downstream tool trust
+## Downstream tool and agent trust
 
-If downstream MCP servers are later aggregated:
+If downstream MCP servers or AI agents are aggregated:
 
-- upstreams are allowlisted out-of-band
-- tool names are deterministic and namespaced
-- material schema/description changes are fingerprinted and reviewed
-- tool results are untrusted data
-- results never mutate policy, create leases, register servers or expose secrets
+- upstreams/agents are allowlisted or registered through an explicit trust flow
+- tool and agent names are deterministic and namespaced
+- material schema/capability changes are fingerprinted and reviewed
+- tool and agent results are untrusted data
+- results/messages never mutate policy, create leases, register trust or expose secrets
+- delegated agents receive only explicitly bounded authority
+- delegation chains preserve provenance and remain auditable across nodes
 
-## First-version non-goals
+## First-release scope restraint
 
-The first implementation is not:
+The first implementation deliberately does not attempt to deliver the entire north-star product at once. v0.1 is not yet:
 
-- a universal MCP gateway
-- a multi-tenant control plane
-- a distributed scheduler
-- a generic root-shell service
-- a Kubernetes project
-- a replacement for SSH
-- an attempt to support every MCP client
+- the multi-node control plane;
+- the Windows node implementation;
+- the AI-to-AI discovery/delegation fabric;
+- a multi-tenant SaaS control plane;
+- a distributed scheduler;
+- a generic root-shell service;
+- a Kubernetes project;
+- a replacement for SSH;
+- an attempt to support every possible MCP client.
 
-Its first goal is:
+These are maturity boundaries, not a rejection of the final multi-node/multi-AI product direction. The immediate goal remains:
 
-> Safely prove that the actual target AI client can perform a small, valuable, auditable operation on one VPS.
+> Safely prove and productize a valuable, auditable AI-to-machine control path on one Linux host, then expand the same security model gate by gate.
