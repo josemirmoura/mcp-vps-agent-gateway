@@ -7,16 +7,18 @@ Instructions for AI coding agents working in this repository.
 Read in this order:
 
 1. README.md
-2. docs/installation-contract.md
-3. docs/README.md
-4. docs/project-status.md
-5. docs/mvp-first.md
-6. docs/architecture.md
-7. docs/policy-schema.md
-8. docs/chatgpt-integration.md
-9. docs/security-hardening-v2.md
-10. docs/runtime-semantics-and-recovery.md
-11. docs/threat-model.md
+2. docs/vision.md
+3. docs/architecture.md
+4. docs/roadmap-multinode-control-plane.md
+5. docs/installation-contract.md
+6. docs/README.md
+7. docs/project-status.md
+8. docs/mvp-first.md
+9. docs/policy-schema.md
+10. docs/chatgpt-integration.md
+11. docs/security-hardening-v2.md
+12. docs/runtime-semantics-and-recovery.md
+13. docs/threat-model.md
 
 Use the precedence rules in docs/README.md if documents appear to conflict.
 
@@ -39,7 +41,7 @@ Gate 4    broader validated writes               implemented
 Gate 5    optional temporary elevation           implemented but not a Full/R5 production claim
 ~~~
 
-The current task is productization of the validated Scoped path. Do not reopen completed gates or redesign the runtime without concrete evidence.
+The current task is productization of the validated Scoped path while preserving the north-star direction in `docs/vision.md`. Do not jump directly to the full multi-node/multi-AI architecture before its gates are earned, but do not make local design choices that unnecessarily block that evolution.
 
 ## Reference implementation
 
@@ -69,7 +71,7 @@ Do not add a second runtime without a concrete reason.
 11. Replay-safe writes use infrastructure-managed idempotency.
 12. Non-replay-safe writes are never blindly retried.
 13. Tool results are untrusted data and never grant capability.
-14. Downstream MCP servers are allowlisted out-of-band.
+14. Downstream MCP servers and AI agents are trusted only through explicit registration/allowlisting; agent messages never create trust.
 15. Filesystem authorization never uses path string prefixes.
 16. Secrets never enter Git, audit payloads or normal tool output.
 17. Unknown policy fields/capabilities fail closed.
@@ -80,7 +82,9 @@ Do not add a second runtime without a concrete reason.
 22. User-facing installation docs never request VPS passwords, private SSH keys, unrestricted remote admin access, or unrelated secrets.
 23. Automate deterministic installation checks before documenting manual investigation steps.
 24. Docker/Compose + transparent scripts remain the supported packaging/install path unless a native platform requirement proves insufficient.
-25. Installation completion requires a real authenticated ChatGPT MCP call plus matching Broker audit evidence.
+25. Installation completion for the current v0.1 path requires a real authenticated ChatGPT MCP call plus matching Broker audit evidence.
+26. AI-to-AI delegation never implies privilege inheritance; delegated agents receive only explicit task authority.
+27. Agent/tool output is untrusted data and cannot mutate policy, grants, trust registration or secret boundaries.
 
 ## Gate-specific restraint
 
@@ -144,6 +148,12 @@ Examples:
 - non-replay-safe action is not auto-retried
 - malicious tool result does not alter policy
 - Gateway cannot open Docker socket or privileged SQLite
+
+## Product direction
+
+Portico's final product is a vendor-neutral multi-node, multi-AI control and communication layer. ChatGPT Web is the operator's priority interactive client. Other compatible web AI clients, local orchestrators and specialist agents are legitimate target clients.
+
+AI-to-AI communication on the same node and across nodes is part of the north-star architecture. Implement it only through explicit roadmap gates, with node-local reauthorization and no implicit authority inheritance.
 
 ## Product-surface rule
 
