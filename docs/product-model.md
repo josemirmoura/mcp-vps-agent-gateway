@@ -1,5 +1,9 @@
 # Product model: full toolbox, scoped authority
 
+This document defines the authority model of the **current host-level product**. The north-star product extends the same principle to multiple nodes and AI-to-AI delegation: each destination node remains policy-authoritative, and delegated agents never inherit authority implicitly.
+
+See [vision.md](vision.md) and [roadmap-multinode-control-plane.md](roadmap-multinode-control-plane.md).
+
 ## Core product decision
 
 Ship one complete capability set and control authority through server-side policy.
@@ -19,7 +23,7 @@ The LLM never decides the scope.
 
 ## User-owned scope
 
-The operator decides exactly how much of the VPS is delegated to MCP.
+The operator decides exactly how much of the current host/node is delegated to Portico.
 
 The package may provide policy examples for convenience, but examples never define authority by themselves.
 
@@ -40,7 +44,7 @@ whole filesystem:
 /
 ~~~
 
-The same principle applies independently to systemd units, Docker resources, network destinations, package management, users/groups and other administrative resources.
+The same principle applies independently to systemd units, Docker resources, network destinations, package management, users/groups and other administrative resources. In the multi-node architecture, this scope is evaluated independently by each destination node.
 
 ## Convenience profiles
 
