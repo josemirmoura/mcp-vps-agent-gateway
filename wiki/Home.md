@@ -2,6 +2,13 @@
 
 > This Wiki is a navigation layer. The canonical documentation lives in [`docs/`](https://github.com/josemirmoura/mcp-vps-agent-gateway/tree/main/docs) and remains versioned with the code. If anything here ever conflicts with repository documentation, the repository documentation wins.
 
+## Product direction
+
+Portico's north star is a vendor-neutral **multi-node, multi-AI control and communication layer**. ChatGPT Web is the priority client for the operator, while other compatible web AI clients and local agents remain first-class product targets. The roadmap includes AI-to-AI delegation on the same machine and across machines.
+
+- **Vision:** [Portico vision](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/vision.md)
+- **Roadmap:** [Multi-node control plane](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/roadmap-multinode-control-plane.md)
+
 ## Start here
 
 - **Install and connect:** [Quick Start](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/quick-start.md) · [Installation contract](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/installation-contract.md) · [Installer flow](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/installer-flow.md)
