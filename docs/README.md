@@ -26,7 +26,10 @@ Start here:
 ## Developer / security
 
 - [project-status.md](project-status.md) — current maturity and next milestone.
-- [execution-plan.md](execution-plan.md) — active gate-by-gate execution sequence from RC5 closeout through multi-node/AI-to-AI delivery.
+- [execution-plan.md](execution-plan.md) — active gate-by-gate execution sequence from stable v0.1.0 through multi-node, multi-AI and commercial SaaS delivery.
+- [competitive-commercial-benchmark.md](competitive-commercial-benchmark.md) — adjacent competitor/pricing benchmark and proposed Portico Cloud packaging.
+- [licensing-commercial-boundary.md](licensing-commercial-boundary.md) — planned Community/commercial licensing and public/private repository split.
+- [saas-commercialization-roadmap.md](saas-commercialization-roadmap.md) — complete Portico Cloud SaaS architecture, billing, identity, operations and delivery gates.
 - [architecture.md](architecture.md) — canonical runtime and trust boundaries.
 - [policy-schema.md](policy-schema.md) — authorization model and policy shape.
 - [threat-model.md](threat-model.md) — threat model.
