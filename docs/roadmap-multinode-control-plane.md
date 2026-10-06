@@ -2,17 +2,19 @@
 
 **Status:** planejado  
 **Decisão registrada:** 2026-10-06  
-**Objetivo:** evoluir o Portico de ponte segura entre ChatGPT e uma única máquina Linux para um **control plane multi-node**, no qual o ChatGPT Web pode atuar como cérebro principal do ecossistema computacional do operador.
+**Objetivo:** evoluir o Portico de ponte segura entre um cliente de IA e uma única máquina Linux para uma **camada multi-node e multi-IA de controle e comunicação**, capaz de conectar chats web, agentes locais, máquinas e serviços. No ambiente do operador, o ChatGPT Web/Plus é o cliente cognitivo prioritário, sem criar dependência exclusiva de fornecedor.
 
 ## 1. Decisão arquitetural
 
 A direção planejada é:
 
 ~~~text
-ChatGPT Web / ChatGPT Plus
-        |
-        | MCP
-        v
+ChatGPT Web / ChatGPT Plus / outros chats web de IA
+        |                 agentes locais / automação
+        +--------------------------+
+                                   |
+                                   | MCP / interfaces suportadas
+                                   v
 Portico Control Plane
         |
         +-------------------+-------------------+-------------------+
@@ -28,7 +30,7 @@ Portico Control Plane
  GPU / jobs             serviços           ferramentas        hardware
 ~~~
 
-O ChatGPT é o **orquestrador cognitivo principal**. O Portico permanece como a camada de identidade, autorização, roteamento, auditoria e execução segura. Cada máquina continua dona de seus dados, serviços e políticas locais.
+No ambiente pessoal do operador, o ChatGPT Web é o **orquestrador cognitivo prioritário**. Como produto, o Portico permanece neutro de fornecedor e aceita outros clientes/agentes compatíveis. O Portico é a camada de identidade, autorização, descoberta, roteamento, comunicação, auditoria e execução segura. Cada máquina continua dona de seus dados, serviços e políticas locais.
 
 ## 2. Evidência já obtida
 
@@ -72,7 +74,7 @@ db.query(node_id, database, query)
 gpu.job(node_id, workload)
 ~~~
 
-Novos computadores devem ser registrados no control plane sem exigir recriação do catálogo MCP apresentado ao ChatGPT.
+Novos computadores devem ser registrados no control plane sem exigir recriação do catálogo MCP apresentado ao cliente de IA.
 
 ### 3.2 O Portico continua sendo a fronteira de segurança
 
@@ -128,7 +130,23 @@ Continuam locais:
 
 O ChatGPT entra quando há necessidade de raciocínio, decisão, investigação, planejamento ou execução orientada por linguagem.
 
-### 3.5 LLM local passa a ser opcional
+### 3.5 Comunicação IA ↔ IA é capability de primeira classe
+
+O Portico deve permitir comunicação autorizada:
+
+- entre duas IAs na mesma máquina;
+- entre IAs em máquinas diferentes;
+- entre um chat web e uma IA local especialista;
+- entre um orquestrador local e especialistas distribuídos;
+- entre IAs de fornecedores diferentes quando houver protocolo/adaptador compatível.
+
+A comunicação deve usar identidade, capability discovery, contexto limitado, task/job handles duráveis e auditoria de proveniência.
+
+Uma IA delegada **não herda automaticamente** os poderes da IA que a chamou. Cada delegação recebe apenas as capabilities e o contexto explicitamente concedidos.
+
+Mensagens e resultados de agentes são dados não confiáveis: jamais podem alterar policy, registrar confiança, criar grants ou revelar segredos por conteúdo textual.
+
+### 3.6 LLM local passa a ser opcional
 
 O Portico não deve depender de um LLM local para funcionar.
 
@@ -289,6 +307,16 @@ O catálogo deve privilegiar ferramentas tipadas e estáveis.
 - gpu.job
 - compute.job
 
+### Agents / AI-to-AI
+
+- agent.list
+- agent.info
+- agent.capabilities
+- agent.task.submit
+- agent.task.status
+- agent.task.result
+- agent.task.cancel
+
 As ferramentas só aparecem como disponíveis quando o produto suporta a capability; a política do nó continua decidindo se o operador autorizou seu uso.
 
 ## 6. Roteamento
@@ -408,7 +436,28 @@ Critérios:
 - cancelamento;
 - integração com workloads locais.
 
-### Gate G — endurecimento
+### Gate G — comunicação IA ↔ IA
+
+- registrar e descobrir agentes por node;
+- capability declaration versionada;
+- delegação na mesma máquina;
+- delegação entre máquinas;
+- contexto mínimo necessário;
+- autoridade explicitamente limitada por tarefa;
+- task handles duráveis;
+- proveniência completa da cadeia de delegação;
+- testar ChatGPT -> agente local -> outro agente -> resultado;
+- testar agente local -> agente remoto -> resultado;
+- impedir privilege inheritance entre agentes.
+
+### Gate H — múltiplos clientes de IA
+
+- manter ChatGPT Web como cliente prioritário de validação do operador;
+- validar pelo menos um segundo cliente MCP/IA compatível;
+- garantir catálogo e policies independentes do fornecedor;
+- adapters específicos não podem virar dependência da segurança central.
+
+### Gate I — endurecimento
 
 - rotação/revogação de identidade de nós;
 - testes adversariais multi-node;
@@ -433,13 +482,17 @@ A evolução estará comprovada quando o operador puder, em uma única conversa 
 7. usar recursos de compute;
 8. atravessar Linux e Windows sem trocar de MCP;
 9. manter políticas independentes por máquina;
-10. auditar todas as ações.
+10. auditar todas as ações;
+11. descobrir IAs/agentes disponíveis;
+12. delegar tarefas IA ↔ IA na mesma máquina;
+13. delegar tarefas IA ↔ IA entre máquinas;
+14. usar outro cliente de IA compatível sem redesenhar o Portico.
 
 ## 11. Escopo de produto
 
-Esta evolução transforma o Portico de uma ponte ChatGPT -> VPS em um **control plane seguro para IAs operarem múltiplos computadores e servidores do proprietário**.
+Esta evolução transforma o Portico de uma ponte ChatGPT -> VPS em uma **camada segura para IAs, computadores e serviços se encontrarem, operarem e se comunicarem através de múltiplas máquinas**.
 
-O objetivo de longo prazo é permitir que um mesmo cliente de IA use um conjunto heterogêneo de máquinas como infraestrutura operacional, mantendo:
+O objetivo de longo prazo é permitir que múltiplos clientes e agentes de IA usem um conjunto heterogêneo de máquinas como infraestrutura operacional e deleguem trabalho entre si, mantendo:
 
 - autoridade no lado do proprietário;
 - política server-side;
@@ -449,4 +502,4 @@ O objetivo de longo prazo é permitir que um mesmo cliente de IA use um conjunto
 - isolamento entre nós;
 - independência do modelo de IA.
 
-O Portico deve continuar compatível com outros clientes MCP. ChatGPT é o cliente prioritário do operador, não uma dependência arquitetural exclusiva.
+O Portico deve continuar aberto a outros clientes MCP e agentes compatíveis. ChatGPT Web é o cliente prioritário do operador, não uma dependência arquitetural exclusiva.
