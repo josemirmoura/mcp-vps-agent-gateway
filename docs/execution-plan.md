@@ -86,7 +86,7 @@ Before stable:
 
 RC6 remains the validated technical baseline. If the license changes, RC6 is not the stable-promotion candidate because it was published under Apache-2.0.
 
-See commercial-saas-plan.md.
+See commercial-saas-plan.md and licensing-decision.md.
 
 ## Phase 2 — owner clean-install acceptance of final licensed RC
 
@@ -221,7 +221,7 @@ Status: **planned**
 
 ## Parallel commercial/SaaS productization track
 
-Detailed plan: commercial-saas-plan.md.
+Detailed plan: commercial-saas-plan.md. Implementation backlog: saas-work-breakdown.md.
 
 The SaaS track starts with specification now, but implementation should not distract from the stable Community release gate.
 
