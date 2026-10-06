@@ -6,20 +6,22 @@ The repository keeps documentation in `docs/` as the canonical source. The nativ
 
 Start here:
 
-1. [quick-start.md](quick-start.md) — shortest supported path into the guided terminal flow.
-2. [installation-contract.md](installation-contract.md) — normative boundary between supported installation and development-only procedures.
-3. [installer-flow.md](installer-flow.md) — complete installation phases and manual boundaries.
-4. [product-model.md](product-model.md) — Project, Custom, Whole Host and capability model.
-5. [chatgpt-integration.md](chatgpt-integration.md) — ChatGPT product-surface and completion gate.
-6. [authentication.md](authentication.md) — integrated OAuth/OIDC path.
-7. [operations.md](operations.md) — status, health, logs, audit, update, rollback and removal.
-8. [troubleshooting.md](troubleshooting.md) — common failure paths.
-9. [faq.md](faq.md) — common authority/security questions.
-10. [compatibility.md](compatibility.md) — supported/tested/untested environments.
-11. [privacy.md](privacy.md) — data, logs, secrets and telemetry.
-12. [releases.md](releases.md) — SemVer and stable/RC/development channels.
-13. [support.md](support.md) — support boundaries.
-14. [operator-acceptance.md](operator-acceptance.md) — owner-operated final acceptance gate before the first stable release.
+1. [vision.md](vision.md) — final product direction: multi-node, multi-AI control and communication layer.
+2. [roadmap-multinode-control-plane.md](roadmap-multinode-control-plane.md) — gated path from the current single-host runtime to the north-star architecture.
+3. [quick-start.md](quick-start.md) — shortest supported path into the guided terminal flow.
+4. [installation-contract.md](installation-contract.md) — normative boundary between supported installation and development-only procedures.
+5. [installer-flow.md](installer-flow.md) — complete installation phases and manual boundaries.
+6. [product-model.md](product-model.md) — Project, Custom, Whole Host and capability model.
+7. [chatgpt-integration.md](chatgpt-integration.md) — ChatGPT product-surface and completion gate.
+8. [authentication.md](authentication.md) — integrated OAuth/OIDC path.
+9. [operations.md](operations.md) — status, health, logs, audit, update, rollback and removal.
+10. [troubleshooting.md](troubleshooting.md) — common failure paths.
+11. [faq.md](faq.md) — common authority/security questions.
+12. [compatibility.md](compatibility.md) — supported/tested/untested environments.
+13. [privacy.md](privacy.md) — data, logs, secrets and telemetry.
+14. [releases.md](releases.md) — SemVer and stable/RC/development channels.
+15. [support.md](support.md) — support boundaries.
+16. [operator-acceptance.md](operator-acceptance.md) — owner-operated final acceptance gate before the first stable release.
 
 ## Developer / security
 
@@ -55,7 +57,7 @@ Update historical documents when they can mislead current product status. Never 
 
 ## Architecture in one sentence
 
-Two Go processes: one unprivileged MCP Gateway and one privileged local Broker, connected by a Unix socket; the Broker owns authorization, state and privileged execution.
+Current v0.1: one unprivileged MCP Gateway plus one privileged local Broker on a Linux host. North star: a vendor-neutral Portico control plane connecting multiple policy-authoritative nodes, AI clients and AI agents, including audited AI-to-AI delegation.
 
 ## Current productization strategy in one sentence
 
