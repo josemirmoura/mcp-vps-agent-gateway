@@ -3,9 +3,15 @@
 **Status:** active  
 **Started:** 2026-10-06  
 **Immediate objective:** freeze a trustworthy stable `v0.1.0` before implementing the multi-node control plane.  
-**North star:** one vendor-neutral Portico control plane connecting multiple policy-authoritative nodes and AI agents, with audited AI-to-AI delegation.
+**North star:** one vendor-neutral Portico platform connecting multiple policy-authoritative nodes and AI agents, with audited AI-to-AI delegation, a non-commercial Community edition and a complete commercial Portico Cloud SaaS.
 
 This plan is the execution sequence. It does not replace the architecture, security model or multi-node roadmap.
+
+Commercial planning is detailed in:
+
+- [competitive-commercial-benchmark.md](competitive-commercial-benchmark.md);
+- [licensing-commercial-boundary.md](licensing-commercial-boundary.md);
+- [saas-commercialization-roadmap.md](saas-commercialization-roadmap.md).
 
 ## Operating rule
 
@@ -30,7 +36,7 @@ Evidence:
 
 ## Phase 1 — RC6 closeout branch
 
-Status: **in progress**
+Status: **complete**
 
 Work:
 
@@ -56,7 +62,7 @@ Success criteria:
 
 ## Phase 1.5 — publish immutable RC6 prerelease
 
-Status: **blocked on Phase 1 merge**
+Status: **in progress / automated release workflow**
 
 After the closeout PR is green and merged:
 
@@ -197,6 +203,155 @@ Status: **planned**
 - compromised-node containment;
 - control-plane backup/restore;
 - audit recovery and integrity checks.
+
+## Commercial product track after stable v0.1.0
+
+The commercial SaaS track starts only after the exact stable v0.1.0 gate is passed. It then runs in parallel with the multi-node platform track.
+
+### Commercial Gate S0 — licensing and repository split
+
+- legally review the move from future Apache releases to a source-available non-commercial Community license;
+- preserve historical Apache-2.0 grants/tags;
+- inventory contributor rights before relicensing;
+- establish CLA terms that preserve dual-licensing rights;
+- keep node-side security-critical code public/inspectable;
+- create private `portico-cloud` repository;
+- create private `portico-infra` repository;
+- define optional private enterprise deployment overlays;
+- publish trademark and commercial-license policy.
+
+The preferred candidate for legal review is PolyForm Noncommercial 1.0.0. If commercial use is prohibited, the Community edition must be described as source-available/community source rather than OSI open source.
+
+### Commercial Gate S1 — SaaS skeleton
+
+- production/staging environments;
+- web application;
+- managed user authentication;
+- email verification;
+- password reset/recovery;
+- MFA/passkeys;
+- organization/workspace tenancy;
+- Postgres system of record;
+- CI/CD;
+- observability;
+- transactional email;
+- admin/backoffice skeleton.
+
+### Commercial Gate S2 — cloud node enrollment
+
+- one-time enrollment token;
+- node cryptographic identity;
+- authenticated outbound connection;
+- node registry;
+- heartbeat;
+- rotate/revoke;
+- health and version dashboard;
+- tenant isolation tests.
+
+### Commercial Gate S3 — hosted Portico control plane alpha
+
+- hosted MCP endpoint;
+- workspace-aware routing;
+- local Broker reauthorization on every operation;
+- durable operation/task IDs;
+- cloud audit metadata;
+- node offline/reconnect behavior;
+- no cross-tenant resource access.
+
+This gate converges with Platform Gate B. The first cloud alpha may support Linux only.
+
+### Commercial Gate S4 — billing and entitlements
+
+- Stripe products/prices;
+- Checkout;
+- monthly/annual subscriptions;
+- subscription lifecycle;
+- upgrades/downgrades/proration;
+- Customer Portal;
+- invoices;
+- payment-method updates;
+- failed-payment recovery and grace periods;
+- signed/idempotent webhooks;
+- entitlement engine;
+- usage meters and spend visibility.
+
+Launch pricing hypotheses:
+
+- **Cloud Pro:** US$19/month or US$190/year;
+- **Cloud Team:** US$59/month or US$590/year;
+- **Business:** custom annual contract.
+
+Final prices require cost telemetry and willingness-to-pay validation.
+
+### Commercial Gate S5 — first paid Cloud Pro
+
+Minimum paid scope:
+
+- secure account lifecycle;
+- one workspace;
+- commercial subscription;
+- up to 3 Linux nodes;
+- hosted MCP/control plane;
+- current typed node operations subject to local policy;
+- 30-day cloud audit index;
+- API key management;
+- billing portal;
+- cancellation/export/delete;
+- monitoring/backups/support.
+
+First revenue must not wait for Windows, GPU scheduling, productized RAG or multi-hop AI-to-AI.
+
+### Commercial Gate S6 — Cloud Team
+
+- up to 10 included nodes;
+- 5 users;
+- invites;
+- Owner/Admin/Operator/Auditor/Billing roles;
+- multiple workspaces/projects;
+- shared fleet;
+- shared agents;
+- policy templates;
+- 90-day audit;
+- webhooks;
+- priority support.
+
+### Commercial Gate S7 — Business pilot
+
+- SSO;
+- SCIM;
+- SIEM/audit export;
+- custom retention;
+- custom domains;
+- dedicated relay or single-tenant/VPC deployment;
+- optional on-prem control plane;
+- DPA;
+- SLA;
+- security questionnaire process;
+- onboarding/professional services;
+- commercial order form.
+
+### Commercial Gate S8 — SaaS GA
+
+Require:
+
+- pricing/unit economics validated;
+- subscription failure paths tested;
+- tenant-isolation security review;
+- backup/restore drills;
+- incident response;
+- status page;
+- Terms/Privacy/AUP/commercial license/trademark package;
+- customer export/deletion;
+- support operations;
+- product analytics without customer secrets;
+- reliable Node/cloud compatibility policy;
+- at least one external paying-customer cohort using the self-serve funnel.
+
+### SaaS complete definition
+
+A new customer must be able to discover Portico, register, verify/recover identity, create a workspace, pay, enroll nodes, connect an AI, operate within policy, invite teammates according to plan, inspect audit/usage, manage billing, get support, cancel and export/delete data without manual backend intervention.
+
+The operator must be able to deploy safely, monitor, restore backups, reconcile billing, handle incidents, suspend abuse and support customers without reading node secrets.
 
 ## Separate maturity tracks
 
