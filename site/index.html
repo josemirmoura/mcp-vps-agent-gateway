@@ -3,25 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Connect ChatGPT Web directly to a Linux VPS through MCP with self-hosted OAuth, operator-defined policy, privileged Broker authorization and audit.">
+  <meta name="description" content="Portico is an open-source multi-AI, multi-node control and communication layer. The current validated path securely connects ChatGPT Web and compatible MCP clients to Linux with owner-controlled policy and audit.">
   <link rel="canonical" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/">
   <link rel="alternate" hreflang="en" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/">
   <link rel="alternate" hreflang="pt-BR" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/pt-BR/">
   <link rel="alternate" hreflang="x-default" href="https://josemirmoura.github.io/mcp-vps-agent-gateway/">
-  <meta property="og:title" content="Connect ChatGPT Web to your Linux VPS | Portico MCP">
-  <meta property="og:description" content="A self-hosted, auditable MCP bridge from ChatGPT Web to your Linux VPS. You choose the perimeter and capabilities; the Broker enforces policy on every privileged operation.">
+  <meta property="og:title" content="Connect AIs, agents and machines securely | Portico MCP">
+  <meta property="og:description" content="A secure, auditable control layer for AI clients, agents and machines. Current Linux path today; multi-node and AI-to-AI communication on the roadmap.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://josemirmoura.github.io/mcp-vps-agent-gateway/">
   <meta property="og:locale" content="en_US">
   <meta property="og:locale:alternate" content="pt_BR">
-  <title>Connect ChatGPT Web to your Linux VPS | Portico MCP</title>
+  <title>Connect AIs, agents and machines securely | Portico MCP</title>
   <link rel="stylesheet" href="styles.css">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareSourceCode",
     "name": "Portico MCP",
-    "description": "Open-source, self-hosted bridge that connects ChatGPT Web to a Linux VPS through Model Context Protocol (MCP), with OAuth, operator-defined policy, privileged Broker authorization and audit.",
+    "description": "Open-source control and communication layer for AI clients, AI agents, computers and services. The current validated path connects compatible MCP clients to Linux with operator-defined policy and audit; the north star is multi-node and AI-to-AI.",
     "codeRepository": "https://github.com/josemirmoura/mcp-vps-agent-gateway",
     "programmingLanguage": ["Go", "Shell"],
     "runtimePlatform": "Linux with Docker Engine and Docker Compose v2",
@@ -43,8 +43,8 @@
     </nav>
     <div class="hero-copy">
       <p class="eyebrow">v0.1.0-rc.5 · self-hosted MCP · policy-enforced · auditable</p>
-      <h1>Connect ChatGPT Web directly to your Linux VPS.</h1>
-      <p class="lede">Portico MCP gives ChatGPT a secure path to inspect and operate your VPS inside authority you define. OAuth authenticates the client. A privileged local Broker re-authorizes every host operation and records audit evidence.</p>
+      <h1>Connect AI clients, agents and machines securely.</h1>
+      <p class="lede">Portico MCP is the security, routing and audit layer between AI systems and owner-controlled machines. The current validated path lets ChatGPT Web or another compatible MCP client operate Linux safely; the final product expands this foundation to multiple nodes and AI-to-AI delegation.</p>
       <div class="actions">
         <a class="button" href="#quick-start">Quick Start</a>
         <a class="button secondary" href="#problem-solution">See how it works</a>
@@ -78,7 +78,7 @@
       </div>
 
       <div class="runtime-strip" aria-label="Runtime path">
-        <span>ChatGPT Web</span><b>→</b><span>OAuth</span><b>→</b><span>MCP Gateway</span><b>→</b><span>Policy Broker</span><b>→</b><span>Your VPS</span>
+        <span>AI client</span><b>→</b><span>Portico</span><b>→</b><span>Policy Broker</span><b>→</b><span>Authorized node</span>
       </div>
 
       <div class="grid two trust-grid">
@@ -118,15 +118,15 @@
 
     <section>
       <p class="eyebrow">Architecture</p>
-      <h2>Small public surface, explicit trust boundaries.</h2>
+      <h2>Current single-node runtime, designed to grow into a multi-node fabric.</h2>
       <div class="architecture">
-        <div class="node"><strong>ChatGPT Web</strong><span>OAuth + HTTPS MCP</span></div>
+        <div class="node"><strong>AI client</strong><span>ChatGPT Web first, others compatible</span></div>
         <div class="arrow">→</div>
         <div class="node"><strong>Gateway</strong><span>non-root</span></div>
         <div class="arrow">→</div>
         <div class="node"><strong>Broker</strong><span>local privileged boundary</span></div>
         <div class="arrow">→</div>
-        <div class="node"><strong>VPS</strong><span>Linux · systemd · Docker · files</span></div>
+        <div class="node"><strong>Node</strong><span>Linux today · multi-node roadmap</span></div>
       </div>
     </section>
 
@@ -162,7 +162,7 @@
           <ul class="feature-list">
             <li>A ChatGPT Web account/workspace where Developer Mode and custom MCP app creation are actually available.</li>
             <li>OpenAI controls plan/workspace availability and rollout, so a subscription label alone is not a compatibility guarantee.</li>
-            <li>Current official OpenAI documentation lists full MCP write/modify support for Business, Enterprise and Edu; Pro can connect custom MCPs with read/fetch permissions in developer mode.</li>
+            <li>Compatibility is determined by the actual product surface exposed to the account and verified end-to-end. On 2026-10-06, the operator’s ChatGPT Plus environment completed a real scoped write/read/delete proof through Portico.</li>
           </ul>
         </article>
       </div>
