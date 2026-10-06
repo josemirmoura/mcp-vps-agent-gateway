@@ -1,4 +1,4 @@
-# Productization status — v0.1.0-rc.3
+# Productization status — v0.1.0-rc.6
 
 This document tracks the public-productization checklist against the current release-candidate branch. It is evidence/status, not a replacement for the canonical architecture or security documents.
 
@@ -34,7 +34,10 @@ This document tracks the public-productization checklist against the current rel
 - [x] OAuth/DCR edge rate limiting;
 - [x] documentation link checker;
 - [x] guided installer lifecycle acceptance job;
-- [x] Full/R5 explicitly excluded from production claims.
+- [x] Full/R5 explicitly excluded from production claims;
+- [x] RC5/RC6 native MCP elicitation, discovery-only physical-ceiling inventory and nested protected-secret boundary;
+- [x] operator's ChatGPT Plus environment verified on 2026-10-06 with real scoped write/read/delete through Portico; treated as environment evidence rather than a plan-wide compatibility promise;
+- [x] multi-node/multi-AI north-star and gated roadmap recorded without changing the v0.1 release scope.
 
 ## Validation gates for this branch
 
@@ -47,6 +50,10 @@ This document tracks the public-productization checklist against the current rel
 - [x] ephemeral VPS proof green;
 - [x] simultaneous independent-instance acceptance green;
 - [x] final cross-review after CI evidence.
+
+## Current release blocker
+
+The only blocker for freezing the first stable `v0.1.0` is the owner-operated clean-install acceptance against the exact RC6 tag. Automated CI and disposable-runner acceptance cannot replace that gate because it includes the real target DNS/OAuth/ChatGPT/native-confirmation experience.
 
 ## Deliberately not completed here
 

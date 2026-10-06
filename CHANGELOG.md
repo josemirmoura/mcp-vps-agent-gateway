@@ -11,6 +11,22 @@ The project follows Semantic Versioning. Pre-release versions may change while t
 - final clean-install operator acceptance gate before the first stable release
 - freeze `v0.1.0` after the operator acceptance gate passes
 
+## [0.1.0-rc.6] - 2026-10-06
+
+### Security
+
+- refresh Debian runtime packages during image build so the release candidate includes currently available security fixes;
+- keep the image vulnerability scan as a blocking release gate.
+
+### Documentation
+
+- reconcile release-candidate status and ChatGPT capability evidence;
+- add the active execution plan through the multi-node/multi-AI roadmap.
+
+### Release candidate
+
+RC6 supersedes RC5 as the exact candidate for the owner's final clean-install operator acceptance gate. Stable `v0.1.0` remains blocked until the automated matrix and owner-operated real-environment acceptance pass.
+
 ## [0.1.0-rc.5] - 2026-09-30
 
 ### Added
@@ -36,7 +52,7 @@ The project follows Semantic Versioning. Pre-release versions may change while t
 
 ### Release candidate
 
-RC5 is the exact candidate for the owner's final clean-install operator acceptance gate. Stable `v0.1.0` remains blocked until that gate passes.
+RC5 was the acceptance candidate until the later runtime-image security refresh required RC6. The RC5 tag remains immutable history.
 
 ## [0.1.0-rc.4] - 2026-09-30
 
@@ -121,7 +137,8 @@ The `v0.1.0-rc.1` tag was created, but its release workflow stopped before image
 - Full remains disabled by default and is not claimed as production-ready
 - unrestricted networking remains a separate capability
 
-[Unreleased]: https://github.com/josemirmoura/mcp-vps-agent-gateway/compare/v0.1.0-rc.5...HEAD
+[Unreleased]: https://github.com/josemirmoura/mcp-vps-agent-gateway/compare/v0.1.0-rc.6...HEAD
+[0.1.0-rc.6]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.6
 [0.1.0-rc.5]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.5
 [0.1.0-rc.4]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.4
 [0.1.0-rc.3]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.3
