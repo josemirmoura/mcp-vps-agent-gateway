@@ -149,11 +149,18 @@ VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge
 ~~~
 
 Safe removal preserves configuration and audit state. Purge requires explicit confirmation and removes only MCP-owned artifacts. Updates back up operator configuration/state, use fast-forward Git updates, verify the new runtime, and roll back code/state on verification failure.
+## Planned evolution
+
+The next major architectural direction is a **multi-node Portico control plane**: one stable MCP surface for ChatGPT to discover and operate multiple owner-authorized computers and servers, with local policy enforcement on every node. The plan covers Linux nodes, the SRV-IA as the first additional node, a native Windows node, local RAG/databases, GPU/compute jobs, aggregated audit and optional local-LLM fallback.
+
+See [Multi-node control-plane roadmap](docs/roadmap-multinode-control-plane.md).
+
 ## Documentation
 
 - [Quick Start](docs/quick-start.md)
 - [Installation contract](docs/installation-contract.md)
 - [Product model](docs/product-model.md)
+- [Multi-node control-plane roadmap](docs/roadmap-multinode-control-plane.md)
 - [Operations](docs/operations.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Compatibility](docs/compatibility.md)
