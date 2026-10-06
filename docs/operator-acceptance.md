@@ -13,7 +13,7 @@ Do not run it casually on an important existing MCP installation. Prefer a clean
 - control DNS for the public MCP hostname;
 - have public TCP 80/443 available through the supported edge path;
 - use a ChatGPT Web account/workspace where Developer Mode / custom MCP app creation is actually available;
-- for acceptance of write/modify capabilities, confirm that the current ChatGPT product surface exposes those actions; OpenAI currently documents full MCP write/modify support for Business, Enterprise and Edu, while Pro custom MCP access is read/fetch-limited.
+- for acceptance of write/modify capabilities, confirm that the current ChatGPT product surface actually exposes those actions. OpenAI's public documentation currently describes full MCP write/modify support for Business, Enterprise and Edu, while the operator's ChatGPT Plus environment independently completed a real scoped write/read/delete proof through Portico on 2026-10-06. Treat the observed target environment as acceptance evidence without turning it into a plan-wide guarantee.
 
 Record:
 
