@@ -84,7 +84,7 @@ Before starting the guided installation, have:
 - a public DNS hostname pointing to the VPS, TCP 80/443 available and valid HTTPS;
 - a ChatGPT Web account/workspace where Developer Mode and custom MCP app creation are actually available.
 
-OpenAI controls availability and permissions by plan, workspace and rollout. Current official OpenAI documentation lists **full MCP support, including write/modify actions, for Business, Enterprise and Edu**; Pro can connect custom MCPs with read/fetch permissions in developer mode. Portico MCP cannot elevate permissions that ChatGPT itself does not expose. Always verify the current product UI and official OpenAI documentation before relying on a specific plan label.
+OpenAI controls availability and permissions by plan, workspace and rollout. The project therefore does not treat a subscription label alone as a compatibility guarantee. Current official OpenAI documentation describes full MCP write/modify support for Business, Enterprise and Edu, while the operator's actual ChatGPT Plus environment on 2026-10-06 exposed Portico write-capable tools and completed a real scoped write/read/delete proof through the Broker. That is evidence for the tested environment, not a promise that every Plus account exposes the same surface. Portico MCP cannot elevate permissions that the client itself does not expose. Always verify the current product UI and official OpenAI documentation before relying on a plan label.
 
 See [compatibility](docs/compatibility.md) for the supported/tested matrix.
 
