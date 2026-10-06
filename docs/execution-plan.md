@@ -54,6 +54,19 @@ Success criteria:
 - architecture/security checks that apply to the changed files pass;
 - no secret or environment-specific credential is committed.
 
+## Phase 1.5 — publish immutable RC6 prerelease
+
+Status: **blocked on Phase 1 merge**
+
+After the closeout PR is green and merged:
+
+1. publish the exact merged commit as `v0.1.0-rc.6` through the validated release workflow;
+2. verify the immutable tag and GitHub prerelease;
+3. verify release artifacts, checksums and the release validation result;
+4. use that exact tag for the owner clean-install acceptance.
+
+The operator acceptance must never test a moving branch or a different commit from the release candidate intended for stable promotion.
+
 ## Phase 2 — owner clean-install acceptance of RC6
 
 Status: **blocked on owner interaction after Phase 1**
