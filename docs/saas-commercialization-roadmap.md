@@ -176,6 +176,63 @@ Initial roles:
 
 Separate human identity from node/machine identity.
 
+## 5.1 Identity-provider decision gate
+
+Portico already has working ZITADEL-based OAuth/OIDC for the MCP path. Do not casually add a second identity stack.
+
+Evaluate three routes before S1 implementation:
+
+### Route A — ZITADEL for both portal and MCP authorization
+
+Advantages:
+
+- reuses the protocol already proven by Portico;
+- organizations/multi-tenancy;
+- username/password;
+- passkeys;
+- MFA;
+- external identity providers;
+- enterprise SSO;
+- audit;
+- machine/service identities;
+- avoids synchronizing two independent identity sources.
+
+Trade-off:
+
+- either operate ZITADEL ourselves or accept its cloud pricing/operational dependency.
+
+Current ZITADEL Cloud Pro documentation indicates a US$100 monthly base plus usage-based components; Enterprise adds stronger SLA/support/compliance options.
+
+### Route B — managed SaaS auth such as Clerk/WorkOS plus a separate MCP authorization layer
+
+Advantages:
+
+- extremely fast polished SaaS account UX;
+- strong B2B organization features.
+
+Trade-off:
+
+- creates identity synchronization and two authorization surfaces unless the architecture is carefully unified.
+
+Current benchmarks:
+
+- Clerk Pro starts around US$20/month billed annually and includes B2B organization primitives; higher Business/enterprise features cost more.
+- WorkOS AuthKit currently offers a large free user allowance, while Enterprise SSO/Directory Sync connections are separately charged.
+
+### Route C — self-hosted ZITADEL initially, migrate operational model later
+
+Advantages:
+
+- minimum change from current proven Portico;
+- full control;
+- low vendor cost during engineering.
+
+Trade-off:
+
+- identity becomes production infrastructure we must patch, back up, monitor and secure ourselves.
+
+**Recommended engineering default for the first cloud prototype:** keep ZITADEL as the canonical identity/OAuth model until an explicit ADR proves a replacement materially improves total cost, UX or enterprise sales. Avoid building password storage/authentication code inside Portico.
+
 ## 6. Node identity and enrollment
 
 Each Portico Node needs its own cryptographic identity.
