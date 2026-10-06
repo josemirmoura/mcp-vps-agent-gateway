@@ -1,8 +1,10 @@
 # Portico MCP
 
-**Connect ChatGPT Web directly to your Linux VPS through MCP, with authority you define and the server enforces.**
+**Securely connect AI clients, AI agents, computers and services, with authority defined by the owner and enforced at the machines.**
 
-Portico MCP is an open-source, self-hosted bridge for letting ChatGPT Web or another MCP client inspect and operate a Linux VPS through the Model Context Protocol. OAuth authenticates the client, a non-root Gateway exposes the MCP surface, and a privileged local Broker re-authorizes host operations against operator-defined policy and records audit evidence.
+Portico MCP is an open-source control and communication layer for AI systems. Its current validated product path lets ChatGPT Web or another compatible MCP client inspect and operate a Linux host through server-enforced policy and audit. Its final architecture expands that foundation into a multi-node, multi-AI control plane where web AIs, local agents and specialist AIs can discover resources, operate authorized machines and communicate with one another on the same machine or across machines.
+
+ChatGPT Web is the priority interactive client for the operator, but Portico is intentionally vendor-neutral and should remain usable by other compatible AI clients and agents.
 
 > **Status: pre-release productization candidate.** Clean Ubuntu 24.04 workflows validate the package end to end, and the integrated self-hosted OAuth path has been verified through a real audited ChatGPT Web `system.info` call on 2026-09-28. A stable public release, compatibility promise, and long-running production reliability claim are still pending.
 
@@ -10,14 +12,23 @@ Portico MCP is an open-source, self-hosted bridge for letting ChatGPT Web or ano
 
 Without a trusted execution path, server work with an AI becomes a manual relay: ChatGPT suggests a command, you switch to a terminal, run it, copy logs back, rebuild context and repeat. Broad SSH-style access would remove some friction while creating a much larger trust problem.
 
-Portico MCP closes that loop while keeping authorization on the VPS. From the conversation, ChatGPT can inspect files, diagnose services, analyze logs, work with Docker and perform other operations that the VPS owner explicitly enables.
+Portico MCP closes that loop while keeping authorization on the owner-controlled machines. In the current release path, ChatGPT can inspect files, diagnose services, analyze logs, work with Docker and perform other operations that the Linux host owner explicitly enables.
 
 ~~~text
-ChatGPT Web
+CURRENT VALIDATED PATH
+
+ChatGPT Web / compatible MCP client
     -> OAuth
     -> MCP Gateway
     -> Policy Broker
-    -> Your Linux VPS
+    -> Linux host
+
+FINAL PRODUCT DIRECTION
+
+web AI clients / local agents / automation
+    <-> Portico control plane
+    <-> Linux / Windows / future nodes
+    <-> local AIs / RAGs / databases / services / compute
 ~~~
 
 GitHub hosts the source, documentation, releases and update channel. **GitHub is not a runtime relay between ChatGPT Web and the VPS after installation.**
@@ -149,17 +160,20 @@ VPS_AGENT_PURGE_CONFIRM=PURGE bash scripts/remove.sh --purge
 ~~~
 
 Safe removal preserves configuration and audit state. Purge requires explicit confirmation and removes only MCP-owned artifacts. Updates back up operator configuration/state, use fast-forward Git updates, verify the new runtime, and roll back code/state on verification failure.
-## Planned evolution
+## Product direction
 
-The next major architectural direction is a **multi-node Portico control plane**: one stable MCP surface for ChatGPT to discover and operate multiple owner-authorized computers and servers, with local policy enforcement on every node. The plan covers Linux nodes, the SRV-IA as the first additional node, a native Windows node, local RAG/databases, GPU/compute jobs, aggregated audit and optional local-LLM fallback.
+The north star is a **multi-node, multi-AI Portico control plane**: one stable security and routing layer through which ChatGPT Web, other compatible web AIs, local orchestrators and specialist agents can discover authorized capabilities, operate multiple machines and delegate work AI-to-AI on the same node or across nodes.
 
-See [Multi-node control-plane roadmap](docs/roadmap-multinode-control-plane.md).
+The plan covers Linux and Windows nodes, the SRV-IA as the first additional real node, local RAG/databases, GPU/compute jobs, agent discovery, durable AI-to-AI delegation, aggregated audit and optional local-LLM fallback.
+
+See [Portico vision](docs/vision.md) and [Multi-node control-plane roadmap](docs/roadmap-multinode-control-plane.md).
 
 ## Documentation
 
 - [Quick Start](docs/quick-start.md)
 - [Installation contract](docs/installation-contract.md)
 - [Product model](docs/product-model.md)
+- [Portico vision](docs/vision.md)
 - [Multi-node control-plane roadmap](docs/roadmap-multinode-control-plane.md)
 - [Operations](docs/operations.md)
 - [Troubleshooting](docs/troubleshooting.md)
