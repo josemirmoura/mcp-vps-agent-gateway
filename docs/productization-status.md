@@ -37,7 +37,11 @@ This document tracks the public-productization checklist against the current rel
 - [x] Full/R5 explicitly excluded from production claims;
 - [x] RC5/RC6 native MCP elicitation, discovery-only physical-ceiling inventory and nested protected-secret boundary;
 - [x] operator's ChatGPT Plus environment verified on 2026-10-06 with real scoped write/read/delete through Portico; treated as environment evidence rather than a plan-wide compatibility promise;
-- [x] multi-node/multi-AI north-star and gated roadmap recorded without changing the v0.1 release scope.
+- [x] multi-node/multi-AI north-star and gated roadmap recorded without changing the v0.1 release scope;
+- [x] RC6 immutable prerelease published from the validated main commit;
+- [x] competitive benchmark and commercial SaaS productization plan recorded;
+- [x] Community / Cloud Starter / Cloud Pro / Business Cloud packaging hypothesis defined;
+- [x] public Community versus private Cloud repository boundary designed.
 
 ## Validation gates for this branch
 
@@ -53,12 +57,14 @@ This document tracks the public-productization checklist against the current rel
 
 ## Current release blocker
 
-The only blocker for freezing the first stable `v0.1.0` is the owner-operated clean-install acceptance against the exact RC6 tag. Automated CI and disposable-runner acceptance cannot replace that gate because it includes the real target DNS/OAuth/ChatGPT/native-confirmation experience.
+The stable `v0.1.0` now has two sequential blockers: first, resolve the commercial licensing/product-boundary gate so the stable Community edition is not accidentally released under a license inconsistent with the intended business model; second, run owner-operated clean-install acceptance against the exact immutable post-license RC. RC6 remains the validated technical baseline under Apache-2.0.
 
 ## Deliberately not completed here
 
 - [ ] stable `v0.1.0` tag/release. It must follow the owner's final operator acceptance gate.
-- [ ] final clean-install operator acceptance gate on the owner's target environment.
+- [ ] legal review and final source-available Community license selection;
+- [ ] repository license/product-boundary migration and new immutable RC if the license changes;
+- [ ] final clean-install operator acceptance gate on the owner's target environment using that exact RC;
 - [ ] long-running R4 production reliability evidence.
 - [ ] Full/R5 production maturity.
 - [ ] separate project-managed cryptographic release signing key.
