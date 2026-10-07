@@ -197,7 +197,7 @@ If the call does not arrive or fails authorization, installation remains incompl
 
 ## Development-only procedures
 
-Development and acceptance may use temporary probes, ephemeral runners, project-specific self-hosted runners, ad-hoc curl/openssl diagnostics, development branches, or a human operator who runs commands because the development session has no VPS execution channel.
+Development and acceptance may use temporary probes, ephemeral runners, project-specific self-hosted runners, ad-hoc curl/openssl diagnostics, development branches, or an operator who runs commands because the development session has no VPS execution channel.
 
 Those are **not installation steps**. They belong in PR/issue evidence or development notes and must not be copied into the supported user tutorial.
 
