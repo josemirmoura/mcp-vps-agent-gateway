@@ -29,7 +29,7 @@ func registerAuthorityTools(server *mcp.Server, s *Server) {
 		return nil, out, nil
 	})
 
-	mcp.AddTool(server, annotatedTool("permissions.request_sensitive_access", "Request temporary human-approved access to one protected secret file such as .env inside an already-authorized root. Normal root delegation never unlocks protected secrets. On clients with MCP elicitation support, the host renders the native approval UI."), func(ctx context.Context, req *mcp.CallToolRequest, in sensitiveAccessRequestInput) (*mcp.CallToolResult, any, error) {
+	mcp.AddTool(server, annotatedTool("permissions.request_sensitive_access", "Request temporary operator-approved access to one protected secret file such as .env inside an already-authorized root. Normal root delegation never unlocks protected secrets. On clients with MCP elicitation support, the host renders its native confirmation UI."), func(ctx context.Context, req *mcp.CallToolRequest, in sensitiveAccessRequestInput) (*mcp.CallToolResult, any, error) {
 		if state, decision, handled, err := nativeApprovalDecision(req, "sensitive"); handled {
 			if err != nil {
 				return nil, nil, err
