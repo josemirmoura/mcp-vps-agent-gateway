@@ -60,18 +60,7 @@ For source artifacts, each GitHub Release includes a Sigstore bundle beside the 
 ~~~bash
 cosign verify-blob mcp-vps-agent-source-package.tar.gz \
   --bundle mcp-vps-agent-source-package.tar.gz.sigstore.json \
-  --certificate-identity-regexp '^https://github\.com/josemirmoura/mcp-vps-agent-gateway/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)
-
-By default, `scripts/update.sh` selects the newest stable SemVer tag available from `origin`.
-
-A release candidate or explicit version can be selected deliberately:
-
-~~~bash
-VPS_AGENT_UPDATE_REF=v0.1.0-rc.6 bash scripts/update.sh
-~~~
-
-The updater refuses non-fast-forward targets and retains its backup after success or rollback.
- \
+  --certificate-identity-regexp '^https://github\.com/josemirmoura/mcp-vps-agent-gateway/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)$' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 ~~~
 
@@ -79,18 +68,7 @@ Release images are signed by immutable digest. Example:
 
 ~~~bash
 cosign verify ghcr.io/josemirmoura/mcp-vps-agent-gateway@sha256:<digest> \
-  --certificate-identity-regexp '^https://github\.com/josemirmoura/mcp-vps-agent-gateway/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)
-
-By default, `scripts/update.sh` selects the newest stable SemVer tag available from `origin`.
-
-A release candidate or explicit version can be selected deliberately:
-
-~~~bash
-VPS_AGENT_UPDATE_REF=v0.1.0-rc.6 bash scripts/update.sh
-~~~
-
-The updater refuses non-fast-forward targets and retains its backup after success or rollback.
- \
+  --certificate-identity-regexp '^https://github\.com/josemirmoura/mcp-vps-agent-gateway/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)$' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 ~~~
 
