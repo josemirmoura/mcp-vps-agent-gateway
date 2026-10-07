@@ -63,7 +63,7 @@ RC5 was the acceptance candidate until the later runtime-image security refresh 
 - explicit prerequisite preflight with official dependency guidance
 - didactic DNS, OAuth operator and ChatGPT connection onboarding
 - interactive Enter-to-verify ChatGPT completion loop with a fixed audit baseline
-- explicit human-approved delegation of the configured physical filesystem ceiling
+- explicit operator-approved delegation of the configured physical filesystem ceiling
 - accessible light/dark MCP Apps root-approval card with stronger ceiling-wide warning
 
 ### Security
