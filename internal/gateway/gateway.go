@@ -239,7 +239,7 @@ type adminShellExecInput struct {
 	MemoryBytes    int64  `json:"memory_bytes,omitempty"`
 	TasksMax       int    `json:"tasks_max,omitempty"`
 	OperationID    string `json:"operation_id,omitempty"`
-	GrantID        string `json:"grant_id" jsonschema:"human-approved temporary grant containing shell.admin"`
+	GrantID        string `json:"grant_id" jsonschema:"operator-approved temporary grant containing shell.admin"`
 }
 
 type jobInput struct {
@@ -786,7 +786,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, annotatedTool("permissions.request_root_access", "Request human-approved access to a filesystem root inside the configured physical ceiling. On clients with MCP elicitation support, the client renders the native approval UI and the Broker activates authority only after the human accepts."),
+	mcp.AddTool(server, annotatedTool("permissions.request_root_access", "Request operator-approved access to a filesystem root inside the configured physical ceiling. On clients with MCP elicitation support, the client renders its native confirmation UI and the Broker activates authority only after acceptance."),
 		func(ctx context.Context, req *mcp.CallToolRequest, in rootAccessRequestInput) (*mcp.CallToolResult, any, error) {
 			if state, decision, handled, err := nativeApprovalDecision(req, "root"); handled {
 				if err != nil {
