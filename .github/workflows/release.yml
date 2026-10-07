@@ -57,7 +57,6 @@ jobs:
           bash scripts/version.sh
           bash scripts/validate-compose-model.sh
 
-
   prepare-tag:
     needs: validate
     runs-on: ubuntu-24.04
@@ -123,9 +122,12 @@ jobs:
         run: |
           set -euo pipefail
           ref="$IMAGE@$DIGEST"
+          identity='^https://github\.com/${{ github.repository }}/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)$'
+          issuer='https://token.actions.githubusercontent.com'
           cosign sign --yes "$ref"
           cosign verify "$ref" \
-            --certificate-identity-regexp '^https://github\.com/${{ github.repository }}/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)
+            --certificate-identity-regexp "$identity" \
+            --certificate-oidc-issuer "$issuer"
 
   github-release:
     needs: images
@@ -146,60 +148,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          identity='^https://github\.com/${{ github.repository }}/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          flags=(--verify-tag --generate-notes --title "Portico MCP $RELEASE_TAG")
-          if [[ "$RELEASE_TAG" == *-* ]]; then
-            flags+=(--prerelease)
-          fi
-          gh release create "$RELEASE_TAG" \
-            dist/mcp-vps-agent-source-package.tar.gz \
-            dist/mcp-vps-agent-source-package.tar.gz.sha256 \
-            dist/mcp-vps-agent-source-package.tar.gz.sigstore.json \
-            dist/mcp-vps-agent-source-package.tar.gz.sha256.sigstore.json \
-            dist/RELEASE-INTEGRITY.txt \
-            "${flags[@]}"
- \
-            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
-
-  github-release:
-    needs: images
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - name: Build complete source package
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p dist
-          git archive --format=tar --prefix=mcp-vps-agent/ "$GITHUB_SHA" | gzip -n > dist/mcp-vps-agent-source-package.tar.gz
-          sha256sum dist/mcp-vps-agent-source-package.tar.gz > dist/mcp-vps-agent-source-package.tar.gz.sha256
-          cat > dist/RELEASE-INTEGRITY.txt <<'EOF'
-          Release images carry BuildKit SBOM/provenance attestations in GHCR.
-          The source package is protected by the accompanying SHA-256 checksum.
-          A separate project-managed cryptographic release-signing key is not yet used.
-          The preferred updateable installation remains a tagged Git checkout.
-          EOF
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          flags=(--verify-tag --generate-notes --title "Portico MCP $RELEASE_TAG")
-          if [[ "$RELEASE_TAG" == *-* ]]; then
-            flags+=(--prerelease)
-          fi
-          gh release create "$RELEASE_TAG" \
-            dist/mcp-vps-agent-source-package.tar.gz \
-            dist/mcp-vps-agent-source-package.tar.gz.sha256 \
-            dist/RELEASE-INTEGRITY.txt \
-            "${flags[@]}"
-
+          identity='^https://github\.com/${{ github.repository }}/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)$'
           issuer='https://token.actions.githubusercontent.com'
 
           for artifact in \
@@ -217,7 +166,7 @@ jobs:
           cat > dist/RELEASE-INTEGRITY.txt <<'EOF'
           Release images are keyless-signed with Sigstore/cosign and carry BuildKit SBOM/provenance attestations in GHCR.
           Source artifacts have SHA-256 integrity material plus Sigstore bundles produced by the GitHub Actions release workflow.
-          Verification binds signatures to the Portico release workflow identity and GitHub Actions OIDC issuer.
+          Verification binds signatures to the Portico release workflow identity and the GitHub Actions OIDC issuer.
           The preferred updateable installation remains a tagged Git checkout.
           EOF
       - name: Create GitHub Release
@@ -232,42 +181,7 @@ jobs:
           gh release create "$RELEASE_TAG" \
             dist/mcp-vps-agent-source-package.tar.gz \
             dist/mcp-vps-agent-source-package.tar.gz.sha256 \
-            dist/RELEASE-INTEGRITY.txt \
-            "${flags[@]}"
- \
-            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
-
-  github-release:
-    needs: images
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - name: Build complete source package
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p dist
-          git archive --format=tar --prefix=mcp-vps-agent/ "$GITHUB_SHA" | gzip -n > dist/mcp-vps-agent-source-package.tar.gz
-          sha256sum dist/mcp-vps-agent-source-package.tar.gz > dist/mcp-vps-agent-source-package.tar.gz.sha256
-          cat > dist/RELEASE-INTEGRITY.txt <<'EOF'
-          Release images carry BuildKit SBOM/provenance attestations in GHCR.
-          The source package is protected by the accompanying SHA-256 checksum.
-          A separate project-managed cryptographic release-signing key is not yet used.
-          The preferred updateable installation remains a tagged Git checkout.
-          EOF
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          flags=(--verify-tag --generate-notes --title "Portico MCP $RELEASE_TAG")
-          if [[ "$RELEASE_TAG" == *-* ]]; then
-            flags+=(--prerelease)
-          fi
-          gh release create "$RELEASE_TAG" \
-            dist/mcp-vps-agent-source-package.tar.gz \
-            dist/mcp-vps-agent-source-package.tar.gz.sha256 \
+            dist/mcp-vps-agent-source-package.tar.gz.sigstore.json \
+            dist/mcp-vps-agent-source-package.tar.gz.sha256.sigstore.json \
             dist/RELEASE-INTEGRITY.txt \
             "${flags[@]}"
