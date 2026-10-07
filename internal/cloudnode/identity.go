@@ -132,8 +132,7 @@ func SaveState(path string, state NodeState) error {
 	if err != nil {
 		return err
 	}
-	data = append(data, '
-')
+	data = append(data, byte(10))
 
 	temp, err := os.CreateTemp(dir, ".identity-*")
 	if err != nil {
