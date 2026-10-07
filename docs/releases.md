@@ -60,7 +60,7 @@ For source artifacts, each GitHub Release includes a Sigstore bundle beside the 
 ~~~bash
 cosign verify-blob mcp-vps-agent-source-package.tar.gz \
   --bundle mcp-vps-agent-source-package.tar.gz.sigstore.json \
-  --certificate-identity-regexp '^https://github\.com/josemirmoura/mcp-vps-agent-gateway/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)
+  --certificate-identity-regexp '^https://github\.com/josemirmoura/mcp-vps-agent-gateway/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)## Update behavior
 
 By default, `scripts/update.sh` selects the newest stable SemVer tag available from `origin`.
 
@@ -79,7 +79,7 @@ Release images are signed by immutable digest. Example:
 
 ~~~bash
 cosign verify ghcr.io/josemirmoura/mcp-vps-agent-gateway@sha256:<digest> \
-  --certificate-identity-regexp '^https://github\.com/josemirmoura/mcp-vps-agent-gateway/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)
+  --certificate-identity-regexp '^https://github\.com/josemirmoura/mcp-vps-agent-gateway/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)## Update behavior
 
 By default, `scripts/update.sh` selects the newest stable SemVer tag available from `origin`.
 
