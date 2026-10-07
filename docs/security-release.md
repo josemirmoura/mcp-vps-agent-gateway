@@ -79,7 +79,9 @@ This matrix records concrete pre-release controls. A checked item means the cont
 - [x] source release artifact has SHA-256 checksum.
 - [x] GHCR release images build for amd64/arm64.
 - [x] release images request BuildKit SBOM/provenance attestations.
-- [ ] separate project-managed cryptographic signing key is not implemented for the first RC; no signing claim is made.
+- [x] the release workflow keyless-signs future release images and source artifacts with Sigstore/cosign using GitHub Actions OIDC, and immediately verifies the resulting signatures/bundles.
+- [x] signing identity is bound to this repository's release workflow plus the GitHub Actions OIDC issuer; no long-lived private signing key is stored as a repository secret.
+- [ ] already-published RC artifacts pre-dating this workflow remain unsigned; the next candidate must exercise the signing path before stable promotion.
 
 ## Maturity boundaries
 
