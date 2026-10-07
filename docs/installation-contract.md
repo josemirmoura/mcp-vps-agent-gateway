@@ -31,7 +31,7 @@ The supported tutorial must **never instruct the user to give ChatGPT or a proje
 
 Secrets that are strictly required by the service are entered locally on the VPS or through the corresponding native service UI/API. For example, the dedicated OAuth operator password is entered locally by the setup script and is not supplied to ChatGPT.
 
-Development sessions may temporarily require a human operator to run commands and return sanitized diagnostics because the development agent lacks a direct execution channel. That is a limitation of the development environment, **not** a product requirement and must not be copied into user-facing installation instructions.
+Development sessions may temporarily require an operator to run commands and return sanitized diagnostics because the development agent lacks a direct execution channel. That is a limitation of the development environment, **not** a product requirement and must not be copied into user-facing installation instructions.
 
 ## Automation responsibility
 

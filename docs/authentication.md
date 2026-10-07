@@ -45,7 +45,7 @@ The script generates the identity-stack secrets, reuses an existing Traefik when
 
 The operator password is read without terminal echo. It is never written to `.env` or the state marker.
 
-The temporary bootstrap human IAM owner is deleted after the dedicated operator is created. The bootstrap machine PAT is then removed from the bootstrap volume. The internal login-client PAT remains in the private Docker volume because ZITADEL Login requires it.
+The temporary bootstrap IAM owner is deleted after the dedicated operator is created. The bootstrap machine PAT is then removed from the bootstrap volume. The internal login-client PAT remains in the private Docker volume because ZITADEL Login requires it.
 
 ## MCP protected-resource metadata
 
@@ -109,7 +109,7 @@ The operator still has to authenticate before ChatGPT receives a usable access t
 
 ## Subject binding
 
-The setup script creates a dedicated regular human user for the VPS operator and writes that user's chosen stable ID to:
+The setup script creates a dedicated regular operator user for the VPS operator and writes that user's chosen stable ID to:
 
 ~~~dotenv
 VPS_AGENT_SUBJECT=<operator-user-id>

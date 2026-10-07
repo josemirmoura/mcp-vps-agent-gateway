@@ -29,7 +29,7 @@ Active dynamic root delegations are Broker-owned state. They do not edit `policy
 
 Generic MCP tool annotations and host confirmation policy remain UX signals rather than the Broker security boundary.
 
-For clients that advertise standard MCP elicitation, root and protected-file delegation use the client's native human-confirmation surface. The Gateway returns a multi-round-trip elicitation request with opaque request state; the model receives neither a self-approval tool nor a usable approval token. After accept/decline/cancel, the Broker independently binds the decision to the pending request, authenticated subject, requested resource, access profile and approval expiry. Clients without elicitation leave the request pending for the separate operator fallback.
+For clients that advertise standard MCP elicitation, root and protected-file delegation use the client's native confirmation surface. The Gateway returns a multi-round-trip elicitation request with opaque request state; the model receives neither a self-approval tool nor a usable approval token. After accept/decline/cancel, the Broker independently binds the decision to the pending request, authenticated subject, requested resource, access profile and approval expiry. Clients without elicitation leave the request pending for the separate operator fallback.
 
 ### Administrative elevation
 
@@ -39,7 +39,7 @@ If elevation is enabled later:
 
 - MCP can request elevation
 - MCP cannot approve elevation
-- human approval uses a separate authenticated web flow or equivalent trusted surface
+- operator approval uses a separate authenticated web flow or equivalent trusted surface
 - use step-up auth and preferably MFA/passkey
 - bind approval to a one-time nonce/request
 - apply rate limits, cooldowns and duplicate coalescing
@@ -85,7 +85,7 @@ The LLM is not responsible for inventing a stable idempotency key.
 
 Only the Broker opens the privileged SQLite database.
 
-Gateway and human approval routes use narrow Broker APIs.
+Gateway and operator approval routes use narrow Broker APIs.
 
 Transactions are short. External commands never run inside open database transactions.
 

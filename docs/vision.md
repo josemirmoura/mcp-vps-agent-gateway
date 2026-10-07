@@ -6,7 +6,7 @@ The public Portico Community runtime connects a compatible web AI/MCP client to 
 
 The security principle is stable:
 
-**The AI is never the security boundary. Humans define authority; the destination machine enforces it; audit records it.**
+**The AI is never the security boundary. Operators define authority; the destination machine enforces it; audit records it.**
 
 ## Interoperability direction
 

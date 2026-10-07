@@ -58,7 +58,7 @@ The gate passes only when:
 - hostnames and audit chain heads remain distinct;
 - each instance finishes with the expected local state.
 
-This is the server-side collision test and can run without human involvement.
+This is the server-side collision test and can run without operator involvement.
 
 ## ChatGPT product-surface behavior
 

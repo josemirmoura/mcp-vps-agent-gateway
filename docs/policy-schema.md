@@ -118,7 +118,7 @@ network.unrestricted is never implicitly added.
 - unknown enum values: reject
 - invalid path roots: reject
 - write roots without explicit permission: reject
-- wildcard administrative capabilities require Full feature enabled plus a valid human-approved grant
+- wildcard administrative capabilities require Full feature enabled plus a valid operator-approved grant
 - unrestricted network requires separate explicit approval
 - TTL above server maximum: reject
 - static policy activation requires an authoritative Broker reload/activation path

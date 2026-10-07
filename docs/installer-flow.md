@@ -4,7 +4,7 @@
 
 Installation is declarative and terminal-first.
 
-The operator controls two human/AI-readable local files plus one physical scope variable:
+The operator controls two operator/AI-readable local files plus one physical scope variable:
 
 ~~~text
 .env                    # includes VPS_AGENT_SCOPE_ROOT
@@ -81,7 +81,7 @@ permissions.request_root_access
         -> active subject-bound delegation
 ~~~
 
-`read` grants filesystem read. `work` grants filesystem read/write plus scoped shell cwd. `compose` adds Compose authority only for Compose actions already enabled by the static action policy. On clients that advertise MCP elicitation, Portico asks the client to render the human confirmation natively; no custom approval iframe is part of the normal ChatGPT path. Clients without elicitation leave the request pending for the separate operator fallback.
+`read` grants filesystem read. `work` grants filesystem read/write plus scoped shell cwd. `compose` adds Compose authority only for Compose actions already enabled by the static action policy. On clients that advertise MCP elicitation, Portico asks the client to render the confirmation natively; no custom approval iframe is part of the normal ChatGPT path. Clients without elicitation leave the request pending for the separate operator fallback.
 
 Protected secret-bearing paths form a second boundary inside authorized projects. Their temporary exception uses the same native MCP elicitation flow when the client supports it. By default `.env` and `.env.*` remain locked while `.env.example`, `.env.sample` and `.env.template` remain ordinary readable templates. Reading or modifying a protected path requires a separate temporary `permissions.request_sensitive_access` approval. The grant is exact-path, subject-bound, auditable, expiring and independently revocable. Scoped shell jobs mask protected paths, including hardlink aliases discovered inside the delegated roots, unless a temporary protected-file `work` grant explicitly exposes that exact path.
 
@@ -197,7 +197,7 @@ If the call does not arrive or fails authorization, installation remains incompl
 
 ## Development-only procedures
 
-Development and acceptance may use temporary probes, ephemeral runners, project-specific self-hosted runners, ad-hoc curl/openssl diagnostics, development branches, or a human operator who runs commands because the development session has no VPS execution channel.
+Development and acceptance may use temporary probes, ephemeral runners, project-specific self-hosted runners, ad-hoc curl/openssl diagnostics, development branches, or an operator who runs commands because the development session has no VPS execution channel.
 
 Those are **not installation steps**. They belong in PR/issue evidence or development notes and must not be copied into the supported user tutorial.
 

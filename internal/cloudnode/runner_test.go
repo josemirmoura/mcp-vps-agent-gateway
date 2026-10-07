@@ -60,7 +60,7 @@ func TestRunnerUsesLocalBrokerSubjectAndTaskInvocationID(t *testing.T) {
 				ID:                taskID,
 				WorkspaceID:       identity.WorkspaceID,
 				DestinationNodeID: identity.NodeID,
-				RequestedBy:       "human-user-from-cloud",
+				RequestedBy:       "cloud-user-from-origin",
 				Operation:         "file.read",
 				Resource:          "/opt/project/README.md",
 				Action:            "read",
@@ -109,7 +109,7 @@ func TestRunnerUsesLocalBrokerSubjectAndTaskInvocationID(t *testing.T) {
 		if request.Subject != "operator-local" {
 			t.Fatalf("Broker subject=%q", request.Subject)
 		}
-		if request.Subject == "human-user-from-cloud" {
+		if request.Subject == "cloud-user-from-origin" {
 			t.Fatal("Cloud requester was incorrectly trusted as local Broker authority")
 		}
 		if request.InvocationID != taskID || request.ID != taskID {

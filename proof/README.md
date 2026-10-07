@@ -1,6 +1,6 @@
 # Ephemeral VPS proof harness
 
-This directory turns a human test request into reproducible evidence on a fresh GitHub-hosted Ubuntu runner.
+This directory turns a operator test request into reproducible evidence on a fresh GitHub-hosted Ubuntu runner.
 
 ## Flow
 

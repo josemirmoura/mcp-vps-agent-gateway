@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Portico MCP host prerequisite preflight.
 
-Human output follows the resolved Portico locale. --json is stable and is not
+Operator output follows the resolved Portico locale. --json is stable and is not
 localized so CI/automation can consume it.
 """
 

@@ -634,7 +634,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			})
 	}
 
-	mcp.AddTool(server, annotatedTool("shell.exec_admin", "Start a temporary human-approved administrative shell job. Full mode and a valid shell.admin grant are required."),
+	mcp.AddTool(server, annotatedTool("shell.exec_admin", "Start a temporary operator-approved administrative shell job. Full mode and a valid shell.admin grant are required."),
 		func(ctx context.Context, _ *mcp.CallToolRequest, in adminShellExecInput) (*mcp.CallToolResult, map[string]any, error) {
 			var out map[string]any
 			args, _ := json.Marshal(map[string]any{

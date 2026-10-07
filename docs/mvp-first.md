@@ -174,7 +174,7 @@ A generic shell is not a prerequisite for useful operation.
 Only if Scoped is demonstrably insufficient:
 
 - elevation requests
-- out-of-band human approval
+- out-of-band operator approval
 - temporary capability leases
 - revoke-all
 - remote audit anchoring

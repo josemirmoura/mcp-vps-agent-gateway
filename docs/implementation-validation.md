@@ -164,7 +164,7 @@ ChatGPT Web
 
 The completion flow observed the authenticated `system.info` event for the expected subject and reached the same `CHATGPT WEB CONNECTION VERIFIED` / `INSTALLATION COMPLETE` criterion enforced by `scripts/connect-chatgpt.sh`. Environment-specific hostname, subject and credential values are intentionally not committed as public evidence.
 
-This closes the product-surface Gate 0A for the supported integrated-auth path. The RC5 authority closeout includes discovery-only physical-ceiling inventory, nested protected-secret enforcement, native MCP elicitation for human authority approval, explicit public-tool safety annotations, abuse limits and expanded filesystem race tests. RC6 carries that model forward and refreshes runtime packages required by the blocking image-security gate. The final owner clean-install RC6 acceptance remains required before stable v0.1.0; this evidence does not establish long-running production reliability or Full/R5 maturity.
+This closes the product-surface Gate 0A for the supported integrated-auth path. The RC5 authority closeout includes discovery-only physical-ceiling inventory, nested protected-secret enforcement, native MCP elicitation for operator authority approval, explicit public-tool safety annotations, abuse limits and expanded filesystem race tests. RC6 carries that model forward and refreshes runtime packages required by the blocking image-security gate. The final owner clean-install RC6 acceptance remains required before stable v0.1.0; this evidence does not establish long-running production reliability or Full/R5 maturity.
 
 ## What this proves
 
@@ -218,4 +218,4 @@ The workflow uploads:
 - before/after systemd state
 - file content/hash when applicable
 
-This is the mechanism used for human-requested acceptance demonstrations.
+This is the mechanism used for operator-requested acceptance demonstrations.

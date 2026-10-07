@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small shared locale helper for human-facing Portico CLI output.
+"""Small shared locale helper for operator-facing Portico CLI output.
 
 Machine-readable JSON and protocol payloads must not use this module.
 """

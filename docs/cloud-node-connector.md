@@ -29,7 +29,7 @@ local Broker
 host operation
 ```
 
-The human Cloud requester is provenance, not automatic local authority.
+The Cloud requester is provenance, not automatic local authority.
 
 The connector uses `PORTICO_CLOUD_BROKER_SUBJECT` as the local Broker principal. By default the Compose overlay maps it to `VPS_AGENT_SUBJECT`.
 

@@ -203,7 +203,7 @@ func (b *Broker) guardSensitiveRequest(ctx context.Context, req wire.Request) *w
 			continue
 		}
 		resp := deny(req.ID, "sensitive_path_locked",
-			"protected secret path requires a separate explicit human approval")
+			"protected secret path requires a separate explicit operator approval")
 		return &resp
 	}
 	return nil

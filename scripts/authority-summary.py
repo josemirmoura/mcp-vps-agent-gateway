@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Human-readable Portico authority summary.
+"""Operator-readable Portico authority summary.
 
 This is presentation only. The Broker's policy parser remains authoritative.
 Machine-readable policy/protocol values are not localized.
@@ -92,7 +92,7 @@ def values(lists, *path):
     return lists.get(tuple(path), [])
 
 
-def human_bool(raw: str) -> str:
+def display_bool(raw: str) -> str:
     low = raw.strip().lower()
     if low == "true":
         return yes_no(True)
@@ -101,7 +101,7 @@ def human_bool(raw: str) -> str:
     return raw
 
 
-def human_network(raw: str) -> str:
+def display_network(raw: str) -> str:
     if not is_pt_br():
         return raw
     return {
@@ -139,9 +139,9 @@ def main() -> int:
     whole = env.get("VPS_AGENT_WHOLE_HOST", "0") == "1"
     physical = env.get("VPS_AGENT_SCOPE_ROOT", t("(not set)", "(não definido)"))
     mode = scalar(scalars, "mode")
-    full = human_bool(scalar(scalars, "features", "full_mode_enabled"))
-    network = human_network(scalar(scalars, "network", "mode"))
-    shell_enabled = human_bool(scalar(scalars, "shell", "enabled"))
+    full = display_bool(scalar(scalars, "features", "full_mode_enabled"))
+    network = display_network(scalar(scalars, "network", "mode"))
+    shell_enabled = display_bool(scalar(scalars, "shell", "enabled"))
 
     print(t("Effective authority summary", "Resumo da autoridade efetiva"))
     print("---------------------------")
