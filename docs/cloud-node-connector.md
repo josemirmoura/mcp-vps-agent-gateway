@@ -120,7 +120,7 @@ Production Cloud URLs require HTTPS. Plain HTTP is accepted only for loopback de
 For first enrollment only, the binary also accepts:
 
 - `--token-stdin`;
-- `PORTICO_CLOUD_ENROLLMENT_TOKEN_FILE`;
+- `PORTICO_CLOUD_ENROLLMENT_TOKEN_FILE`, interpreted as a filename under `/run/secrets`;
 - `PORTICO_CLOUD_ENROLLMENT_TOKEN` as a less-preferred convenience path.
 
 ## Current boundary
