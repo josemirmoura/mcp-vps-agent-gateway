@@ -77,7 +77,7 @@ On discovery/reload:
 2. compare with the last approved fingerprint
 3. classify the change
 4. automatically accept only explicitly safe classes of change
-5. require human/admin review for permission-expanding or semantically material changes
+5. require operator/admin review for permission-expanding or semantically material changes
 
 Examples requiring review:
 
