@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -16,6 +18,10 @@ import (
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
+	enrollOnly := flag.Bool("enroll-only", false, "enroll the node, persist identity, and exit")
+	tokenStdin := flag.Bool("token-stdin", false, "read the one-time enrollment token from stdin")
+	flag.Parse()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -39,7 +45,7 @@ func main() {
 		nodeName = "portico-node"
 	}
 
-	enrollmentToken, err := readEnrollmentToken()
+	enrollmentToken, err := readEnrollmentToken(*tokenStdin)
 	if err != nil {
 		fatal("failed to read enrollment token", err)
 	}
@@ -50,6 +56,14 @@ func main() {
 	}
 	_ = os.Unsetenv("PORTICO_CLOUD_ENROLLMENT_TOKEN")
 	enrollmentToken = ""
+
+	if *enrollOnly {
+		slog.Info("portico_cloud_node_enrolled",
+			"node_id", identity.NodeID,
+			"workspace_id", identity.WorkspaceID,
+		)
+		return
+	}
 
 	brokerSubject := strings.TrimSpace(os.Getenv("PORTICO_CLOUD_BROKER_SUBJECT"))
 	if brokerSubject == "" {
@@ -86,7 +100,22 @@ func main() {
 	slog.Info("portico_cloud_node_stop", "node_id", identity.NodeID)
 }
 
-func readEnrollmentToken() (string, error) {
+func readEnrollmentToken(fromStdin bool) (string, error) {
+	if fromStdin {
+		data, err := io.ReadAll(io.LimitReader(os.Stdin, 4097))
+		if err != nil {
+			return "", err
+		}
+		if len(data) > 4096 {
+			return "", errors.New("enrollment token from stdin is too large")
+		}
+		token := strings.TrimSpace(string(data))
+		if token == "" {
+			return "", errors.New("enrollment token from stdin is empty")
+		}
+		return token, nil
+	}
+
 	if path := strings.TrimSpace(os.Getenv("PORTICO_CLOUD_ENROLLMENT_TOKEN_FILE")); path != "" {
 		data, err := os.ReadFile(path) // #nosec G304 -- operator-selected secret file is an explicit connector input.
 		if err != nil {
