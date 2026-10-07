@@ -75,7 +75,7 @@ cd mcp-vps-agent-gateway
 bash scripts/install.sh
 ```
 
-O fluxo guiado cobre pré-requisitos, escopo de autoridade, containers, verificação local, HTTPS/OAuth, conexão com o cliente de IA e uma chamada MCP real auditada.
+O fluxo guiado cobre pré-requisitos, escopo de autoridade, containers, verificação local, HTTPS/OAuth, conexão com o cliente de IA e uma chamada MCP real auditada. Ele só imprime `INSTALAÇÃO CONCLUÍDA` / `INSTALLATION COMPLETE` depois que o gate ponta a ponta passa.
 
 Veja:
 
