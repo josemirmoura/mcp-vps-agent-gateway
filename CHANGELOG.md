@@ -33,7 +33,7 @@ RC6 supersedes RC5 as the exact candidate for the owner's final clean-install op
 
 - discovery-only listing of immediate directories beneath the configured physical ceiling without granting project-content access
 - separate temporary, exact-path protected-file grants for secrets such as `.env`
-- native MCP elicitation for root and protected-file human approval, replacing the custom inline approval iframe on capable clients
+- native MCP elicitation for root and protected-file operator approval, replacing the custom inline approval iframe on capable clients
 - centralized MCP tool safety annotations covering read-only, destructive, idempotent and open-world semantics
 - GitHub-native manual release promotion through Actions after validation
 
@@ -48,7 +48,7 @@ RC6 supersedes RC5 as the exact candidate for the owner's final clean-install op
 
 - Standard explicitly treats the chosen path, default `/opt`, as a maximum physical ceiling rather than implicit read authority
 - ChatGPT can discover project directory names under the ceiling and request the exact project needed
-- human authorization is rendered by the MCP client through native elicitation when supported
+- operator authorization is rendered by the MCP client through native elicitation when supported
 
 ### Release candidate
 
