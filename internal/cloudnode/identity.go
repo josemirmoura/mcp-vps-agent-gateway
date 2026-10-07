@@ -124,7 +124,7 @@ func SaveState(path string, state NodeState) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	if err := os.Chmod(dir, 0o700); err != nil {
+	if err := os.Chmod(dir, 0o700); err != nil { // #nosec G302 -- 0700 is the intended owner-only directory mode.
 		return err
 	}
 
@@ -160,10 +160,14 @@ func SaveState(path string, state NodeState) error {
 		return err
 	}
 
-	parent, err := os.Open(dir)
+	root, err := os.OpenRoot(dir)
 	if err == nil {
-		_ = parent.Sync()
-		_ = parent.Close()
+		parent, openErr := root.Open(".")
+		if openErr == nil {
+			_ = parent.Sync()
+			_ = parent.Close()
+		}
+		_ = root.Close()
 	}
 	return nil
 }
