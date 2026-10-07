@@ -1,76 +1,39 @@
-# Productization status — v0.1.0-rc.6
+# Community productization status
 
-This document tracks the public-productization checklist against the current release-candidate branch. It is evidence/status, not a replacement for the canonical architecture or security documents.
+Current baseline: v0.1.0-rc.6 technical line
 
-## Completed in the productization branch
+## Completed
 
-- [x] current implementation/status reconciled with the real ChatGPT Web E2E evidence;
-- [x] README EN/PT-BR rewritten around the product entry point;
-- [x] repository sanitization guard extended beyond supported docs;
-- [x] canonical product name, tagline and visible version;
-- [x] SemVer VERSION + CHANGELOG;
-- [x] guided transparent terminal installation;
-- [x] Project / Custom / Whole Host authority UX;
-- [x] effective authority summary before runtime startup;
-- [x] Whole Host kept separate from Full;
-- [x] unrestricted network kept separate from Full;
-- [x] integrated OAuth/OIDC retained and documented;
-- [x] audit and operational observability documented separately;
-- [x] status/health/log/audit/diagnostic-bundle operator workflows;
-- [x] diagnostic bundle redaction retained;
+- [x] public README EN/PT-BR;
+- [x] guided terminal installation;
+- [x] explicit authority UX;
+- [x] integrated OAuth/OIDC path;
+- [x] status/health/log/audit/diagnostic workflows;
 - [x] stable-by-default update channel;
-- [x] explicit update-availability check via `scripts/version.sh --check`;
-- [x] backup, migration validation and automatic rollback preserved;
-- [x] safe remove and purge behavior preserved;
-- [x] landing page productized;
-- [x] privacy and telemetry documentation;
-- [x] compatibility/support matrix;
-- [x] issue templates and PR template;
-- [x] release tag ↔ VERSION validation;
+- [x] backup, migration validation and rollback behavior;
+- [x] safe remove/purge lifecycle;
+- [x] privacy and compatibility documentation;
 - [x] release checksum;
-- [x] container SBOM/provenance requested by release workflow;
-- [x] invalid/inactive/expired/wrong-issuer/wrong-audience OAuth regression coverage;
-- [x] revoked/inactive OAuth token rejection made explicit at the introspection boundary;
-- [x] OAuth/DCR edge rate limiting;
-- [x] documentation link checker;
-- [x] guided installer lifecycle acceptance job;
-- [x] Full/R5 explicitly excluded from production claims;
-- [x] RC5/RC6 native MCP elicitation, discovery-only physical-ceiling inventory and nested protected-secret boundary;
-- [x] operator's ChatGPT Plus environment verified on 2026-10-06 with real scoped write/read/delete through Portico; treated as environment evidence rather than a plan-wide compatibility promise;
-- [x] multi-node/multi-AI north-star and gated roadmap recorded without changing the v0.1 release scope;
-- [x] RC6 immutable prerelease published from the validated main commit;
-- [x] competitive benchmark and commercial SaaS productization plan recorded;
-- [x] Community / Cloud Starter / Cloud Pro / Business Cloud packaging hypothesis defined;
-- [x] public Community versus private Cloud repository boundary designed.
+- [x] container SBOM/provenance requests;
+- [x] security/regression coverage;
+- [x] clean-runner acceptance paths;
+- [x] native MCP elicitation and protected-secret boundary;
+- [x] real scoped write/read/delete proof in the operator's ChatGPT Plus environment on 2026-10-06;
+- [x] RC6 immutable prerelease published.
 
-## Validation gates for this branch
+## Current stable blockers
 
-- [x] pull request opened;
-- [x] reference implementation CI green;
-- [x] integrated-auth component acceptance green;
-- [x] Docker package acceptance green;
-- [x] lifecycle acceptance including guided install green;
-- [x] full ephemeral Scoped acceptance green;
-- [x] ephemeral VPS proof green;
-- [x] simultaneous independent-instance acceptance green;
-- [x] final cross-review after CI evidence.
+- [ ] final future-Community license decision and legal review;
+- [ ] new RC if license/public notices change;
+- [ ] owner clean-install acceptance against the exact final RC;
+- [ ] stable v0.1.0 release.
 
-## Current release blocker
+## Later maturity work
 
-The stable `v0.1.0` now has two sequential blockers: first, resolve the commercial licensing/product-boundary gate so the stable Community edition is not accidentally released under a license inconsistent with the intended business model; second, run owner-operated clean-install acceptance against the exact immutable post-license RC. RC6 remains the validated technical baseline under Apache-2.0.
+- [ ] long-running production reliability evidence;
+- [ ] Full/elevated production maturity;
+- [ ] project-managed cryptographic release signing.
 
-## Deliberately not completed here
+## Public boundary
 
-- [ ] stable `v0.1.0` tag/release. It must follow the owner's final operator acceptance gate.
-- [ ] legal review and final source-available Community license selection;
-- [ ] repository license/product-boundary migration and new immutable RC if the license changes;
-- [ ] final clean-install operator acceptance gate on the owner's target environment using that exact RC;
-- [ ] long-running R4 production reliability evidence.
-- [ ] Full/R5 production maturity.
-- [ ] separate project-managed cryptographic release signing key.
-
-## GitHub storefront metadata
-
-README, Pages, release policy, badges/links and repository content are handled in this branch.
-
-Repository-level description/topics/homepage are GitHub metadata rather than repository files. They should be reviewed in the final storefront pass; the current connected GitHub tool surface does not expose a repository-metadata mutation action, so this item must not be marked complete by automation without evidence.
+This status file tracks only the public Community/runtime product. Confidential commercial/SaaS planning is maintained outside this repository.
