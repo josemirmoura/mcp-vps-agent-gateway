@@ -36,7 +36,7 @@ Deliberate security requirements include:
 - local-only privileged Broker over Unix socket;
 - deny-by-default Broker authorization;
 - exact subject/resource/action re-authorization;
-- human-approved temporary elevation when enabled;
+- operator-approved temporary elevation when enabled;
 - filesystem traversal and symlink-escape resistance;
 - physical-ceiling discovery that exposes directory names only, never project contents;
 - protected secret paths remain locked inside delegated roots unless separately and temporarily approved;
