@@ -1,0 +1,34 @@
+services:
+  cloud-node:
+    build:
+      context: .
+      target: cloud-node
+    image: ${PORTICO_CLOUD_NODE_IMAGE:-portico-cloud-node:local}
+    restart: unless-stopped
+    depends_on:
+      broker:
+        condition: service_healthy
+    user: "65532:65532"
+    environment:
+      PORTICO_CLOUD_URL: ${PORTICO_CLOUD_URL:?set PORTICO_CLOUD_URL}
+      PORTICO_CLOUD_NODE_NAME: ${PORTICO_CLOUD_NODE_NAME:-}
+      PORTICO_CLOUD_STATE: /var/lib/portico-cloud-node/state.json
+      PORTICO_CLOUD_BROKER_SOCKET: /run/vps-agent/broker.sock
+      PORTICO_CLOUD_BROKER_SUBJECT: ${PORTICO_CLOUD_BROKER_SUBJECT:-${VPS_AGENT_SUBJECT:-operator}}
+      PORTICO_CLOUD_HEARTBEAT_INTERVAL: ${PORTICO_CLOUD_HEARTBEAT_INTERVAL:-30s}
+      PORTICO_CLOUD_POLL_INTERVAL: ${PORTICO_CLOUD_POLL_INTERVAL:-2s}
+      PORTICO_CLOUD_RENEW_INTERVAL: ${PORTICO_CLOUD_RENEW_INTERVAL:-10s}
+      PORTICO_CLOUD_BROKER_TIMEOUT: ${PORTICO_CLOUD_BROKER_TIMEOUT:-15m}
+    volumes:
+      - broker-run:/run/vps-agent
+      - cloud-node-state:/var/lib/portico-cloud-node
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  cloud-node-state:
