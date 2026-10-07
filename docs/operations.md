@@ -25,7 +25,7 @@ Use this first when asking: **is the system healthy?**
 bash scripts/diagnose.sh health
 ~~~
 
-Returns the Broker health snapshot without the broader human-facing status output.
+Returns the Broker health snapshot without the broader operator-facing status output.
 
 ## Logs
 
