@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -116,8 +117,16 @@ func readEnrollmentToken(fromStdin bool) (string, error) {
 		return token, nil
 	}
 
-	if path := strings.TrimSpace(os.Getenv("PORTICO_CLOUD_ENROLLMENT_TOKEN_FILE")); path != "" {
-		data, err := os.ReadFile(path) // #nosec G304 -- operator-selected secret file is an explicit connector input.
+	if name := strings.TrimSpace(os.Getenv("PORTICO_CLOUD_ENROLLMENT_TOKEN_FILE")); name != "" {
+		if filepath.IsAbs(name) || filepath.Base(name) != name || name == "." || name == ".." {
+			return "", errors.New("enrollment token file must be a filename under /run/secrets")
+		}
+		root, err := os.OpenRoot("/run/secrets")
+		if err != nil {
+			return "", err
+		}
+		defer root.Close()
+		data, err := root.ReadFile(name)
 		if err != nil {
 			return "", err
 		}
