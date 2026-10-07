@@ -204,7 +204,7 @@ func TestDynamicRootRequestCannotEscapePhysicalCeiling(t *testing.T) {
 	}
 }
 
-func TestDynamicPhysicalCeilingRequiresAndAcceptsHumanApproval(t *testing.T) {
+func TestDynamicPhysicalCeilingRequiresAndAcceptsOperatorApproval(t *testing.T) {
 	ctx := context.Background()
 	physical := t.TempDir()
 	target := filepath.Join(physical, "ceiling-approved.txt")
