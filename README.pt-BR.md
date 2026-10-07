@@ -116,6 +116,12 @@ Este repositório pode evoluir o runtime Community e contratos públicos de inte
 
 Compromissos do roadmap público são limitados ao que já foi lançado, ao que é necessário para interoperabilidade ou ao que foi explicitamente aprovado para anúncio público. Veja [Roadmap público](docs/roadmap-multinode-control-plane.md).
 
+## Conector opcional do Portico Cloud
+
+O runtime público inclui um conector Cloud opcional. Ele cadastra o nó Linux com identidade Ed25519 local, recebe tarefas gerenciadas por um canal HTTPS de saída, renova leases de operações longas e entrega cada operação ao mesmo Broker local.
+
+Veja [Conector de nó do Portico Cloud](docs/cloud-node-connector.pt-BR.md).
+
 ## Documentação
 
 - [Mapa da documentação](docs/README.md)
