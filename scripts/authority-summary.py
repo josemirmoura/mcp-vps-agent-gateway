@@ -101,7 +101,7 @@ def display_bool(raw: str) -> str:
     return raw
 
 
-def human_network(raw: str) -> str:
+def display_network(raw: str) -> str:
     if not is_pt_br():
         return raw
     return {
@@ -140,7 +140,7 @@ def main() -> int:
     physical = env.get("VPS_AGENT_SCOPE_ROOT", t("(not set)", "(não definido)"))
     mode = scalar(scalars, "mode")
     full = display_bool(scalar(scalars, "features", "full_mode_enabled"))
-    network = human_network(scalar(scalars, "network", "mode"))
+    network = display_network(scalar(scalars, "network", "mode"))
     shell_enabled = display_bool(scalar(scalars, "shell", "enabled"))
 
     print(t("Effective authority summary", "Resumo da autoridade efetiva"))
