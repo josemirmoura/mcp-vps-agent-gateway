@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Canonical product identity for human-facing terminal scripts.
+# Canonical product identity for operator-facing terminal scripts.
 # Do not source this file from machine-readable APIs or JSON-producing commands.
 
 VPS_AGENT_PRODUCT_NAME="Portico MCP"
