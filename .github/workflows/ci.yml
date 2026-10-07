@@ -91,7 +91,7 @@ jobs:
         run: |
           mkdir -p dist/linux-amd64 dist/linux-arm64
           for arch in amd64 arm64; do
-            for cmd in vps-agent-gateway vps-agent-broker vps-agent vps-agent-mcp-call; do
+            for cmd in vps-agent-gateway vps-agent-broker vps-agent vps-agent-mcp-call portico-cloud-node; do
               CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags='-s -w' -o "dist/linux-$arch/$cmd" "./cmd/$cmd"
             done
           done
@@ -105,6 +105,14 @@ jobs:
           name: vps-agent-linux-binaries
           path: dist/
           if-no-files-found: error
+
+  cloud-node-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build Cloud node connector image
+        run: docker build --target cloud-node -t portico-cloud-node:ci .
 
   docker-smoke:
     runs-on: ubuntu-24.04
