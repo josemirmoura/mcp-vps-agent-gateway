@@ -1,5 +1,5 @@
 {
-  "id": "human-proof-example",
+  "id": "operator-proof-example",
   "subject": "proof-operator",
   "type": "directory_html_and_file",
   "directory": "/opt/vps-agent-proof-site",
