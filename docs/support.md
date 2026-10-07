@@ -1,35 +1,35 @@
-# Support policy
+# Community support policy
 
-Portico MCP is an open-source project.
+This repository contains the public Portico Community runtime.
 
 ## Supported release line
 
-During the initial productization period:
+During initial productization:
 
-- the newest stable `0.x` release is the supported public line;
+- the newest stable 0.x release will be the supported public line;
 - the current release candidate is supported for acceptance/testing;
-- `main` is development and is not a stable support channel.
+- main is development and is not a stable support channel.
 
 Security fixes may require upgrading to the newest patch release.
 
 ## Getting help
 
-Use a GitHub issue for reproducible bugs, installation failures and documentation problems that do not contain secrets.
+Use a GitHub issue for reproducible Community/runtime bugs, installation failures and public documentation problems that do not contain secrets.
 
-Before opening an issue, collect a sanitized diagnostic bundle when practical:
+When practical:
 
-~~~bash
+```bash
 bash scripts/diagnose.sh bundle
-~~~
+```
 
-Never attach `.env`, raw credentials, private SSH keys or unredacted secret material.
+Never attach .env files, raw credentials, private SSH keys or unredacted secret material.
 
 ## Security issues
 
-Do not publish exploit details in an ordinary issue. Follow `SECURITY.md`.
+Do not publish exploit details in an ordinary issue. Follow SECURITY.md.
 
 ## Service level
 
-There is no guaranteed response-time or uptime SLA for the open-source project.
+The public Community repository has no guaranteed response-time or uptime SLA.
 
-Support commitments for a future commercial distribution, if any, must be documented separately and must not be inferred from this repository.
+Any commercial support commitments belong to the corresponding commercial service terms and are not implied by this repository.
