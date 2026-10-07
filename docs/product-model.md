@@ -245,7 +245,7 @@ The operator or assisting AI edits the declarative policy to choose:
 10. Approval/elevation behavior.
 11. Authentication and public/private MCP exposure.
 
-`config/policy.yaml` is the authoritative, human/AI-readable configuration. `docker compose config -q` and runtime validation reject invalid package configuration before use.
+`config/policy.yaml` is the authoritative, operator/AI-readable configuration. `docker compose config -q` and runtime validation reject invalid package configuration before use.
 
 The policy remains editable later without reinstalling the binaries.
 
@@ -307,7 +307,7 @@ Authentication:
 <configured method>
 
 Effective scope:
-<human-readable policy summary>
+<operator-readable policy summary>
 
 Next:
 Connect this MCP to ChatGPT Web
