@@ -75,7 +75,7 @@ cd mcp-vps-agent-gateway
 bash scripts/install.sh
 ```
 
-The guided flow covers prerequisites, authority scope, containers, local verification, HTTPS/OAuth, AI-client connection and a real audited MCP call.
+The guided flow covers prerequisites, authority scope, containers, local verification, HTTPS/OAuth, AI-client connection and a real audited MCP call. It prints `INSTALLATION COMPLETE` only after the end-to-end completion gate succeeds.
 
 See:
 
