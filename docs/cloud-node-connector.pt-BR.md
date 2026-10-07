@@ -116,7 +116,7 @@ Em produção, a URL do Cloud exige HTTPS. HTTP simples é aceito somente em loo
 Somente no primeiro enrollment também são aceitos:
 
 - `--token-stdin`;
-- `PORTICO_CLOUD_ENROLLMENT_TOKEN_FILE`;
+- `PORTICO_CLOUD_ENROLLMENT_TOKEN_FILE`, interpreted as a filename under `/run/secrets`;
 - `PORTICO_CLOUD_ENROLLMENT_TOKEN`, como alternativa menos recomendada.
 
 ## Limite atual
