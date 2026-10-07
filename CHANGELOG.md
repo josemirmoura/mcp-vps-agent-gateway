@@ -11,6 +11,24 @@ The project follows Semantic Versioning. Pre-release versions may change while t
 - final clean-install operator acceptance gate before the first stable release
 - freeze `v0.1.0` after the operator acceptance gate passes
 
+## [0.1.0-rc.7] - 2026-10-07
+
+### UX
+
+- compact native MCP elicitation prompts so path/profile/duration remain visible on narrow ChatGPT surfaces;
+- add regression coverage that bounds confirmation prompt size and line count;
+- standardize Portico-owned approval terminology around operator/user language.
+
+### Security and release engineering
+
+- preserve Broker-authoritative approval semantics while removing verbose confirmation prose;
+- carry forward keyless Sigstore/cosign signing and verification for release images and source artifacts;
+- make RC7 the first candidate intended to exercise the signed release workflow end to end.
+
+### Release candidate
+
+RC7 supersedes RC6 as the current acceptance candidate. Stable `v0.1.0` remains blocked by the final Community license/legal gate and owner-operated exact-candidate acceptance.
+
 ## [0.1.0-rc.6] - 2026-10-06
 
 ### Security
@@ -137,7 +155,8 @@ The `v0.1.0-rc.1` tag was created, but its release workflow stopped before image
 - Full remains disabled by default and is not claimed as production-ready
 - unrestricted networking remains a separate capability
 
-[Unreleased]: https://github.com/josemirmoura/mcp-vps-agent-gateway/compare/v0.1.0-rc.6...HEAD
+[Unreleased]: https://github.com/josemirmoura/mcp-vps-agent-gateway/compare/v0.1.0-rc.7...HEAD
+[0.1.0-rc.7]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.7
 [0.1.0-rc.6]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.6
 [0.1.0-rc.5]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.5
 [0.1.0-rc.4]: https://github.com/josemirmoura/mcp-vps-agent-gateway/releases/tag/v0.1.0-rc.4
