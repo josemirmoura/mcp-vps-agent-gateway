@@ -79,7 +79,9 @@ This matrix records concrete pre-release controls. A checked item means the cont
 - [x] source release artifact has SHA-256 checksum.
 - [x] GHCR release images build for amd64/arm64.
 - [x] release images request BuildKit SBOM/provenance attestations.
-- [ ] separate project-managed cryptographic signing key is not implemented for the first RC; no signing claim is made.
+- [x] release workflow is configured for keyless GitHub/Sigstore signed provenance attestations for GHCR image digests and the source package.
+- [x] no long-lived project private signing key is stored; signing identity is derived from short-lived GitHub OIDC credentials.
+- [ ] live release evidence for the new signed-attestation workflow is still required on the next release candidate before this control is claimed as release-proven.
 
 ## Maturity boundaries
 
