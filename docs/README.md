@@ -59,3 +59,5 @@ Current Community promise:
 **one compatible web AI chat <-> one Linux computer**
 
 Broader commercial/SaaS planning is maintained outside this public repository.
+
+- [Portico Cloud node connector](cloud-node-connector.md) — optional outbound managed-Cloud enrollment, signed task transport, and local Broker handoff.
