@@ -100,7 +100,7 @@ Then validate the nested secret boundary:
 - create a disposable `.env.example` and confirm it remains readable;
 - create a disposable `.env` and confirm normal file read/hash and confined shell access are denied despite the parent project being authorized;
 - request temporary protected-file access to that exact `.env`;
-- confirm the MCP client renders native human approval and clearly identifies the protected file, access profile and expiration;
+- confirm the MCP client renders native confirmation and clearly identifies the protected file, access profile and expiration;
 - approve the temporary exception, perform only the intended test, then revoke it;
 - confirm the `.env` becomes inaccessible again immediately;
 - confirm no secret content appears in audit/log output.
