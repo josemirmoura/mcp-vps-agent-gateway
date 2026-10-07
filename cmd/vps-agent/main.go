@@ -72,7 +72,7 @@ func waitTool(args []string) {
 	timeout := fs.Duration("timeout", 5*time.Minute, "maximum wait time")
 	poll := fs.Duration("poll", time.Second, "poll interval")
 	afterSeq := fs.Int64("after-seq", -1, "only accept matching audit events after this sequence; default uses current audit head")
-	quiet := fs.Bool("quiet", false, "suppress human progress/result text; use exit status only")
+	quiet := fs.Bool("quiet", false, "suppress interactive progress/result text; use exit status only")
 	baselineOnly := fs.Bool("baseline-only", false, "print the validated current audit sequence and exit")
 	_ = fs.Parse(args)
 	requireToken(*token)
