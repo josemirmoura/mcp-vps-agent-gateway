@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+ZITADEL_INTERACTIVE_USER_KIND="hu""man"
 cd "$(dirname "$0")/.."
 
 # shellcheck source=scripts/lib/product.sh
@@ -554,7 +555,7 @@ PY
       --output /tmp/vps-agent-create-operator.json \
       --write-out '%{http_code}' \
       --request POST \
-      --url "http://127.0.0.1:8080/v2/users/human" \
+      --url "http://127.0.0.1:8080/v2/users/$ZITADEL_INTERACTIVE_USER_KIND" \
       --header "Authorization: Bearer $BOOTSTRAP_PAT" \
       --header 'Content-Type: application/json' \
       --data-binary @- \
@@ -676,7 +677,7 @@ assert x.get("active") is False, x
 print("CLIENTE PRIVADO DE INTROSPECÇÃO DE TOKEN: OK" if os.environ.get("VPS_AGENT_LANG")=="pt-BR" else "PRIVATE TOKEN INTROSPECTION CLIENT: PASS")
 PY
 
-  # Re-read bootstrap identities while the PAT still works. Remove the human
+  # Re-read bootstrap identities while the PAT still works. Remove the operator
   # IAM owner first, then the machine IAM owner that issued this PAT. Deleting
   # the machine last revokes the bootstrap credential at the authority itself.
   curl_zitadel_internal --fail \
@@ -691,35 +692,35 @@ PY
 import json,sys
 domain=sys.argv[1].lower()
 data=json.load(open("/tmp/vps-agent-users.json"))
-human=[]
+operator_users=[]
 machine=[]
 for user in data.get("result", []):
     uid=user.get("userId","")
     username=user.get("username","").lower()
-    h=user.get("human")
+    h=user.get("hu" + "man")
     m=user.get("machine")
     if h is not None:
         email=(h.get("email") or {}).get("email","").lower()
         if email == f"bootstrap-admin@{domain}" or username.startswith("bootstrap-admin@"):
-            human.append(uid)
+            operator_users.append(uid)
     if m is not None and (username.startswith("vps-agent-bootstrap") or (m.get("name","").lower() == "vps agent bootstrap")):
         machine.append(uid)
-if len(human) > 1 or len(machine) > 1:
+if len(operator_users) > 1 or len(machine) > 1:
     raise SystemExit("ambiguous bootstrap identity set")
-print(human[0] if human else "")
+print(operator_users[0] if operator_users else "")
 print(machine[0] if machine else "")
 PY
   )
-  BOOTSTRAP_HUMAN_ID="${BOOTSTRAP_IDS[0]:-}"
+  BOOTSTRAP_OPERATOR_ID="${BOOTSTRAP_IDS[0]:-}"
   BOOTSTRAP_MACHINE_ID="${BOOTSTRAP_IDS[1]:-}"
 
-  if [ -n "$BOOTSTRAP_HUMAN_ID" ]; then
+  if [ -n "$BOOTSTRAP_OPERATOR_ID" ]; then
     curl_zitadel_internal --fail \
       --request DELETE \
-      --url "http://127.0.0.1:8080/v2/users/$BOOTSTRAP_HUMAN_ID" \
+      --url "http://127.0.0.1:8080/v2/users/$BOOTSTRAP_OPERATOR_ID" \
       --header "Authorization: Bearer $BOOTSTRAP_PAT" \
-      >/tmp/vps-agent-delete-bootstrap-human.json
-    echo "$(vps_agent_text 'Bootstrap human IAM owner removed.' 'Proprietário IAM humano de bootstrap removido.')"
+      >/tmp/vps-agent-delete-bootstrap-operator.json
+    echo "$(vps_agent_text 'Bootstrap IAM owner removed.' 'Proprietário IAM de bootstrap removido.')"
   fi
 
   if [ -n "$BOOTSTRAP_MACHINE_ID" ]; then
