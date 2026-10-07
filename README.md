@@ -118,6 +118,12 @@ This repository may evolve the Community runtime and public interoperability con
 
 Public roadmap commitments are intentionally limited to features that are released, required for interoperability, or explicitly approved for public announcement. See [Public roadmap](docs/roadmap-multinode-control-plane.md).
 
+## Optional Portico Cloud connector
+
+The public node runtime now includes an optional outbound Cloud connector. It enrolls a Linux node with a local Ed25519 identity, leases signed managed tasks, renews long-running leases and submits every operation to the same local Broker policy boundary.
+
+See [Portico Cloud node connector](docs/cloud-node-connector.md).
+
 ## Documentation
 
 - [Documentation map](docs/README.md)
