@@ -113,43 +113,41 @@ func approvalMessage(kind string, values map[string]any) string {
 	pt := strings.EqualFold(strings.TrimSpace(os.Getenv("VPS_AGENT_LANG")), "pt-BR")
 	access := stringValue(values["access"])
 	duration := durationValue(values["delegation_ttl_seconds"], pt)
-	ceiling := stringValue(values["physical_ceiling"])
 
 	if kind == "sensitive" {
 		target := stringValue(values["path"])
 		if pt {
 			return fmt.Sprintf(
-				"Autorizar acesso temporário a um arquivo protegido do Portico MCP?\n\nArquivo: %s\nAcesso: %s\nDuração: %s\nTeto físico: %s\n\nArquivos protegidos, como .env, continuam bloqueados mesmo quando a pasta do projeto está autorizada. Esta exceção vale somente para o arquivo acima e expira automaticamente. Aceite apenas se você realmente quiser liberar esse segredo para a tarefa atual.",
-				target, accessLabel(access, true), duration, ceiling,
+				"Autorizar arquivo protegido?\nArquivo: %s\nPerfil: %s\nDuração: %s\nSomente este arquivo será liberado.",
+				target, accessLabel(access, true), duration,
 			)
 		}
 		return fmt.Sprintf(
-			"Authorize temporary access to a protected Portico MCP file?\n\nFile: %s\nAccess: %s\nDuration: %s\nPhysical ceiling: %s\n\nProtected files such as .env stay locked even when the project folder is authorized. This exception applies only to the file above and expires automatically. Accept only if you intentionally want to expose this secret for the current task.",
-			target, accessLabel(access, false), duration, ceiling,
+			"Authorize protected file?\nFile: %s\nProfile: %s\nDuration: %s\nOnly this file will be unlocked.",
+			target, accessLabel(access, false), duration,
 		)
 	}
 
 	target := stringValue(values["root"])
 	ceilingWide, _ := values["ceiling_wide"].(bool)
+	ceiling := stringValue(values["physical_ceiling"])
 	if pt {
 		message := fmt.Sprintf(
-			"Autorizar acesso do Portico MCP?\n\nPasta: %s\nAcesso: %s\nDuração: %s\nTeto físico: %s\n\nO teto físico é o limite máximo da IA; ele não concede acesso por si só. Esta autorização libera somente o perfil acima dentro da pasta solicitada. Arquivos protegidos, como .env, continuam bloqueados.",
-			target, accessLabel(access, true), duration, ceiling,
+			"Autorizar Pórtico?\nPasta: %s\nPerfil: %s\nDuração: %s",
+			target, accessLabel(access, true), duration,
 		)
 		if ceilingWide {
-			message += "\n\nATENÇÃO: você está autorizando o próprio teto físico. O perfil solicitado passará a valer para todas as pastas atuais e futuras abaixo desse teto enquanto a autorização estiver ativa."
+			message += fmt.Sprintf("\nATENÇÃO: inclui todas as pastas atuais e futuras sob %s.", ceiling)
 		}
-		message += "\n\nVocê poderá revogar esta autorização depois."
 		return message
 	}
 	message := fmt.Sprintf(
-		"Authorize Portico MCP access?\n\nFolder: %s\nAccess: %s\nDuration: %s\nPhysical ceiling: %s\n\nThe physical ceiling is the AI's maximum boundary; it grants no access by itself. This authorization enables only the profile above inside the requested folder. Protected files such as .env remain locked.",
-		target, accessLabel(access, false), duration, ceiling,
+		"Authorize Portico?\nFolder: %s\nProfile: %s\nDuration: %s",
+		target, accessLabel(access, false), duration,
 	)
 	if ceilingWide {
-		message += "\n\nWARNING: you are authorizing the physical ceiling itself. The requested profile will apply to every current and future folder below that ceiling while the authorization remains active."
+		message += fmt.Sprintf("\nWARNING: includes every current and future folder under %s.", ceiling)
 	}
-	message += "\n\nYou can revoke this authorization later."
 	return message
 }
 
@@ -157,19 +155,19 @@ func accessLabel(access string, pt bool) string {
 	switch access {
 	case "read":
 		if pt {
-			return "Somente leitura"
+			return "Leitura"
 		}
-		return "Read only"
+		return "Read"
 	case "work":
 		if pt {
-			return "Trabalho (ler, criar, editar, excluir e usar shell confinado)"
+			return "Trabalho (leitura/escrita + shell confinado)"
 		}
-		return "Work (read, create, edit, delete, and use confined shell)"
+		return "Work (read/write + confined shell)"
 	case "compose":
 		if pt {
-			return "Trabalho + Compose já permitido pela política"
+			return "Trabalho + Compose"
 		}
-		return "Work + Compose actions already allowed by policy"
+		return "Work + Compose"
 	default:
 		return access
 	}
