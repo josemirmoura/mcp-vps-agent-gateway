@@ -25,7 +25,7 @@ Broker local
 operação no host
 ```
 
-O usuário humano que originou a tarefa no Cloud é informação de proveniência. Ele não recebe autoridade local automaticamente.
+O usuário que originou a tarefa no Cloud é informação de proveniência. Ele não recebe autoridade local automaticamente.
 
 O conector usa `PORTICO_CLOUD_BROKER_SUBJECT` como principal perante o Broker. No overlay Docker Compose, o padrão acompanha `VPS_AGENT_SUBJECT`.
 
