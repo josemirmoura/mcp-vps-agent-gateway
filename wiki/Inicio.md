@@ -1,49 +1,39 @@
-# Wiki do Portico MCP
+# Wiki do Portico MCP Community
 
-> Esta Wiki é uma camada de navegação. A documentação canônica vive em [`docs/`](https://github.com/josemirmoura/mcp-vps-agent-gateway/tree/main/docs) e permanece versionada junto com o código. Se houver qualquer divergência, a documentação do repositório prevalece.
+> Esta Wiki é uma camada de navegação do repositório público Community/runtime. A documentação pública versionada vive em [docs/](https://github.com/josemirmoura/mcp-vps-agent-gateway/tree/main/docs).
 
-## Visão do produto
+## Produto Community
 
-O Pórtico tem como direção final ser uma **camada multi-node e multi-IA de controle e comunicação**, neutra de fornecedor. O ChatGPT Web é o cliente prioritário do operador, enquanto outros chats web compatíveis e agentes locais são alvos de primeira classe. O roadmap inclui comunicação e delegação IA ↔ IA na mesma máquina e entre máquinas.
+O Portico Community conecta **um chat web de IA compatível a um computador Linux** com policy e auditoria aplicadas no servidor.
 
-- **Visão:** [Portico vision](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/vision.md)
-- **Roadmap:** [Control plane multi-node](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/roadmap-multinode-control-plane.md)
+- [Começo rápido](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/quick-start.md)
+- [Contrato de instalação](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/installation-contract.md)
+- [Modelo do produto](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/product-model.md)
+- [Arquitetura](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/architecture.md)
+- [Roadmap público](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/roadmap-multinode-control-plane.md)
 
-## Comece aqui
+## Operação e troubleshooting
 
-- **Instalar e conectar:** [Começo rápido](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/quick-start.md) · [Contrato de instalação](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/installation-contract.md) · [Fluxo do instalador](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/installer-flow.md)
-- **Conectar o ChatGPT Web:** [Integração com ChatGPT](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/chatgpt-integration.md) · [Autenticação](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/authentication.md)
-- **Escolher a autoridade:** [Modelo do produto](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/product-model.md) · [Esquema de política](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/policy-schema.md)
-- **Operar o serviço:** [Operações](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/operations.md) · [Solução de problemas](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/troubleshooting.md) · [FAQ](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/faq.md)
+- [Integração com ChatGPT](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/chatgpt-integration.md)
+- [Autenticação](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/authentication.md)
+- [Operações](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/operations.md)
+- [Solução de problemas](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/troubleshooting.md)
+- [FAQ](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/faq.md)
 
-## Entenda o sistema
+## Segurança e evidências
 
-- [Arquitetura e fronteiras de confiança](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/architecture.md)
 - [Modelo de ameaças](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/threat-model.md)
 - [Hardening de segurança](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/security-hardening-v2.md)
-- [Semântica de runtime e recuperação](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/runtime-semantics-and-recovery.md)
-- [Confiança em ferramentas e proteção contra confused deputy](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/tool-trust-and-confused-deputy.md)
+- [Matriz de segurança para release](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/security-release.md)
+- [Validação da implementação](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/implementation-validation.md)
 
-## Compatibilidade, privacidade e releases
+## Compatibilidade, privacidade e release
 
 - [Compatibilidade](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/compatibility.md)
 - [Privacidade](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/privacy.md)
-- [Releases e canais de versão](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/releases.md)
-- [Limites de suporte](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/support.md)
-- [Aceitação final pelo operador](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/operator-acceptance.md)
-
-## Desenvolvimento e evidências de segurança
-
-- [Estado atual do projeto](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/project-status.md)
-- [Validação da implementação](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/implementation-validation.md)
-- [Matriz de segurança para release](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/security-release.md)
-- [Transporte e agregação](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/transport-and-aggregation.md)
-- [Runbook histórico de implementação](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/implementation-runbook.md)
-
-## Destinos úteis
-
-- [Website do projeto](https://josemirmoura.github.io/mcp-vps-agent-gateway/)
-- [Repositório](https://github.com/josemirmoura/mcp-vps-agent-gateway)
-- [Toda a documentação canônica](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/README.md)
 - [Releases](https://github.com/josemirmoura/mcp-vps-agent-gateway/releases)
+- [Suporte](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/support.md)
+
+- [Repositório](https://github.com/josemirmoura/mcp-vps-agent-gateway)
+- [Mapa da documentação pública](https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/README.md)
 - [English](Home)

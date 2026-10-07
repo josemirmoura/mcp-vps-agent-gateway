@@ -95,6 +95,10 @@ Prefer:
 
 ## Current next milestone
 
-The implementation has clean-room evidence through the broad Scoped toolbox and Docker packaging, plus a completed real ChatGPT Web OAuth end-to-end gate on 2026-09-28.
+The implementation has clean-runner evidence through the broad Scoped toolbox and Docker packaging, plus real ChatGPT Web/OAuth evidence and a real scoped write/read/delete proof in the operator environment.
 
-The current milestone is **owner clean-install acceptance of `v0.1.0-rc.6`** after the RC6 automated matrix is green. RC6 carries forward the RC5 authority model, including native MCP elicitation, discovery-only physical-ceiling inventory, nested protected-secret enforcement and explicit MCP safety annotations, and refreshes runtime packages required by the blocking image-security gate. The remaining blocker for freezing stable `v0.1.0` is the owner-operated clean installation against the exact RC6 tag, including real ChatGPT OAuth, audited `system.info`, native approval UX, discovery without content leakage, representative scoped operations, `.env` denial/temporary exception/revocation, root revocation and lifecycle checks. Long-running reliability remains a later production-maturity requirement. See [operator-acceptance.md](operator-acceptance.md), [execution-plan.md](execution-plan.md) and [implementation-validation.md](implementation-validation.md).
+The immediate blocker before stable `v0.1.0` is the **future Community license gate**. RC6 is the validated technical baseline and was published under Apache-2.0. If the license/public notices change, the project must cut a new immutable RC, rerun the automated matrix and perform owner clean-install acceptance against that exact candidate.
+
+Owner acceptance remains the final technical gate before stable promotion and includes real OAuth/client connection, audit, native approval UX, scoped operations, protected-secret denial/temporary exception/revocation and lifecycle checks.
+
+Long-running reliability remains a later production-maturity requirement. See [operator-acceptance.md](operator-acceptance.md), [execution-plan.md](execution-plan.md) and [implementation-validation.md](implementation-validation.md).
