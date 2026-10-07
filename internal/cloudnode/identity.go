@@ -46,53 +46,77 @@ func ValidateIdentity(identity Identity) error {
 	return err
 }
 
-func LoadIdentity(path string) (Identity, error) {
+func ValidateState(state NodeState) error {
+	if _, err := state.Identity.Private(); err != nil {
+		return err
+	}
+
+	if state.Identity.NodeID == "" {
+		if state.Enrollment == nil ||
+			state.Enrollment.Token == "" ||
+			state.Enrollment.NodeName == "" ||
+			state.Enrollment.Platform == "" {
+			return errors.New("pending enrollment state is incomplete")
+		}
+		if state.Identity.WorkspaceID != "" || state.Identity.Fingerprint != "" {
+			return errors.New("pending enrollment contains partial server identity")
+		}
+		return nil
+	}
+
+	if state.Enrollment != nil {
+		return errors.New("enrolled identity must not retain the bootstrap token")
+	}
+	return ValidateIdentity(state.Identity)
+}
+
+func LoadState(path string) (NodeState, error) {
 	if path == "" {
-		return Identity{}, errors.New("identity path is required")
+		return NodeState{}, errors.New("identity path is required")
 	}
 
 	info, err := os.Lstat(path)
 	if err != nil {
-		return Identity{}, err
+		return NodeState{}, err
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
-		return Identity{}, errors.New("identity path must not be a symlink")
+		return NodeState{}, errors.New("identity path must not be a symlink")
 	}
 	if info.Mode().Perm()&0o077 != 0 {
-		return Identity{}, errors.New("identity file permissions are too broad")
+		return NodeState{}, errors.New("identity file permissions are too broad")
 	}
 
 	dir := filepath.Dir(path)
 	base := filepath.Base(path)
 	root, err := os.OpenRoot(dir)
 	if err != nil {
-		return Identity{}, err
+		return NodeState{}, err
 	}
 	defer root.Close()
 
 	data, err := root.ReadFile(base)
 	if err != nil {
-		return Identity{}, err
+		return NodeState{}, err
 	}
-	if len(data) > 16<<10 {
-		return Identity{}, errors.New("identity file is unexpectedly large")
+	if len(data) > 32<<10 {
+		return NodeState{}, errors.New("identity file is unexpectedly large")
 	}
 
-	var identity Identity
-	if err := json.Unmarshal(data, &identity); err != nil {
-		return Identity{}, err
+	var state NodeState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return NodeState{}, err
 	}
-	if err := ValidateIdentity(identity); err != nil {
-		return Identity{}, err
+	if err := ValidateState(state); err != nil {
+		return NodeState{}, err
 	}
-	return identity, nil
+	return state, nil
 }
 
-func SaveIdentity(path string, identity Identity) error {
+func SaveState(path string, state NodeState) error {
 	if path == "" {
 		return errors.New("identity path is required")
 	}
-	if err := ValidateIdentity(identity); err != nil {
+	if err := ValidateState(state); err != nil {
 		return err
 	}
 
@@ -104,7 +128,7 @@ func SaveIdentity(path string, identity Identity) error {
 		return err
 	}
 
-	data, err := json.MarshalIndent(identity, "", "  ")
+	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return err
 	}
