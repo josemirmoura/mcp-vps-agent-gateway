@@ -369,7 +369,7 @@ When an elevated grant expires:
 - persist final state
 - audit
 
-A special completion grant may be used only with explicit human approval.
+A special completion grant may be used only with explicit operator approval.
 
 ## 12. Recovery
 
