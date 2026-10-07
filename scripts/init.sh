@@ -127,7 +127,7 @@ fi
 mkdir -p state
 chmod 700 state
 
-# Persist the resolved human-facing locale so commands executed later keep the
+# Persist the resolved operator-facing locale so commands executed later keep the
 # same language even when the terminal/SSH locale differs.
 python3 - ".env" "$VPS_AGENT_LANG" <<'PY'
 import pathlib
