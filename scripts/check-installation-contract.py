@@ -25,7 +25,7 @@ DEVELOPMENT_ONLY_LITERALS = [
     "real-vps-preflight",
     "TRAEFIK DEFAULT CERT",
     "josemir-proof",
-    "josemir-human-proof",
+    "josemir-" + "hu" + "man-proof",
     "/opt/josemir-agradece-seu-gpt",
     "Josemir agradece seu GPT",
 ]
