@@ -200,7 +200,11 @@ ux_requirements = {
         "decline",
         "cancel",
         "ATENÇÃO",
-        ".env",
+        "Autorizar Pórtico?",
+        "Autorizar arquivo protegido?",
+        "Perfil:",
+        "Duração:",
+        "Somente este arquivo será liberado.",
     ],
     "internal/gateway/gateway.go": [
         '"permissions.request_root_access"',
@@ -247,7 +251,7 @@ for rel, markers in ux_requirements.items():
             errors.append(f"{rel}: clean-E2E invariant missing: {required}")
 
 if "dynamic delegation of the entire physical ceiling is not allowed" in broker_text:
-    errors.append("internal/broker/broker.go: physical ceiling is still hard-blocked despite explicit human approval")
+    errors.append("internal/broker/broker.go: physical ceiling is still hard-blocked despite explicit operator approval")
 if "rootApprovalWidgetURI" in gateway_text or "openai/outputTemplate" in gateway_text or "openai/outputTemplate" in authority_tools_text:
     errors.append("internal/gateway: custom MCP Apps approval UI metadata returned instead of native elicitation")
 if 'annotatedTool("permissions.confirm_root_access"' in gateway_text or 'annotatedTool("permissions.confirm_sensitive_access"' in authority_tools_text:

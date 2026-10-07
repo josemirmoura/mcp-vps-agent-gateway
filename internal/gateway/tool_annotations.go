@@ -93,7 +93,7 @@ func toolSafetyFor(name string) (toolSafety, bool) {
 
 	// Authority requests and revocations alter Portico authority, not user data.
 	// The Broker remains authoritative and approval requests still require a
-	// separate human decision where applicable.
+	// separate operator decision where applicable.
 	case "permissions.request_root_access",
 		"permissions.revoke_root_access",
 		"permissions.request_sensitive_access",
