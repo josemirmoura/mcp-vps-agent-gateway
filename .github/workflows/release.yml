@@ -94,6 +94,8 @@ jobs:
             image: mcp-vps-agent-gateway
           - target: broker
             image: mcp-vps-agent-broker
+          - target: cloud-node
+            image: portico-cloud-node
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-qemu-action@v3
