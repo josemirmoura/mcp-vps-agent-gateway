@@ -60,7 +60,23 @@ For source artifacts, each GitHub Release includes a Sigstore bundle beside the 
 ~~~bash
 cosign verify-blob mcp-vps-agent-source-package.tar.gz \
   --bundle mcp-vps-agent-source-package.tar.gz.sigstore.json \
-  --certificate-identity-regexp '^https://github\.com/josemirmoura/mcp-vps-agent-gateway/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)## Update behavior
+  --certificate-identity-regexp '^https://github\.com/josemirmoura/mcp-vps-agent-gateway/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)$' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+~~~
+
+Release images are signed by immutable digest. Example:
+
+~~~bash
+cosign verify ghcr.io/josemirmoura/mcp-vps-agent-gateway@sha256:<digest> \
+  --certificate-identity-regexp '^https://github\.com/josemirmoura/mcp-vps-agent-gateway/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)$' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+~~~
+
+This signing model avoids a long-lived project private key in GitHub Secrets. Trust is anchored in Sigstore plus the repository/workflow identity.
+
+Already-published release candidates created before this control remain historical unsigned artifacts. Do not infer a signature retroactively from documentation.
+
+## Update behavior
 
 By default, `scripts/update.sh` selects the newest stable SemVer tag available from `origin`.
 
