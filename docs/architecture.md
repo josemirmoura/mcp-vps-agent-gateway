@@ -148,7 +148,7 @@ A user may authorize:
 
 For multi-project deployments, the physical ceiling and logical roots are deliberately separate. The ceiling is the maximum boundary, not a read grant. The Standard profile may expose only the immediate directory names below that ceiling through a discovery-only Broker operation so the client can request the correct project without opening it. The static policy supplies the baseline roots. Additional roots can be represented as Broker-owned dynamic delegations bound to the authenticated subject, an access profile (`read`, `work`, or `compose`) and an optional expiry. Creating a pending request is not authorization. On clients that advertise MCP elicitation, the Gateway returns a multi-round-trip elicitation request and the MCP client renders its own native confirmation surface. The opaque approval state is returned only through the protocol round trip and the Broker independently validates the pending request, authenticated subject and one-time approval token before activating the delegation. The confirmation tools are not published in the model-visible tool catalog. Clients without elicitation fail closed into the separate operator fallback. Revocation takes effect from Broker state without a container restart.
 
-Secret-bearing files form a nested boundary inside an authorized root. Protected paths such as `.env` require a second exact-path, temporary, human-approved grant. Common template files remain ordinary project content. The Broker enforces this rule for generic filesystem operations, and the shell sandbox masks protected paths so a root delegation cannot be used as an alternate plaintext-secret retrieval path.
+Secret-bearing files form a nested boundary inside an authorized root. Protected paths such as `.env` require a second exact-path, temporary, operator-approved grant. Common template files remain ordinary project content. The Broker enforces this rule for generic filesystem operations, and the shell sandbox masks protected paths so a root delegation cannot be used as an alternate plaintext-secret retrieval path.
 
 Filesystem scope is only one dimension. systemd units, Docker resources, shell roots, network destinations and administrative actions are independently scoped.
 
@@ -170,7 +170,7 @@ Full is disabled by default.
 
 ## Approval is a flow, not necessarily a daemon
 
-Routine work should use Scoped and require no human interruption.
+Routine work should use Scoped and require no operator interruption.
 
 If temporary elevation is later enabled, the agent may create a request, but approval occurs outside the MCP action channel.
 
