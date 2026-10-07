@@ -26,7 +26,7 @@ ChatGPT / MCP client
 | MCP + auth + schemas        |
 | canonical tool names        |
 | response shaping            |
-| optional human web UI       |
+| optional operator web UI       |
 +-------------+---------------+
               |
               | Unix Domain Socket
@@ -146,7 +146,7 @@ A user may authorize:
 - several selected roots/resources
 - the whole host
 
-For multi-project deployments, the physical ceiling and logical roots are deliberately separate. The ceiling is the maximum boundary, not a read grant. The Standard profile may expose only the immediate directory names below that ceiling through a discovery-only Broker operation so the client can request the correct project without opening it. The static policy supplies the baseline roots. Additional roots can be represented as Broker-owned dynamic delegations bound to the authenticated subject, an access profile (`read`, `work`, or `compose`) and an optional expiry. Creating a pending request is not authorization. On clients that advertise MCP elicitation, the Gateway returns a multi-round-trip elicitation request and the MCP client renders its own native human-confirmation surface. The opaque approval state is returned only through the protocol round trip and the Broker independently validates the pending request, authenticated subject and one-time approval token before activating the delegation. The confirmation tools are not published in the model-visible tool catalog. Clients without elicitation fail closed into the separate operator fallback. Revocation takes effect from Broker state without a container restart.
+For multi-project deployments, the physical ceiling and logical roots are deliberately separate. The ceiling is the maximum boundary, not a read grant. The Standard profile may expose only the immediate directory names below that ceiling through a discovery-only Broker operation so the client can request the correct project without opening it. The static policy supplies the baseline roots. Additional roots can be represented as Broker-owned dynamic delegations bound to the authenticated subject, an access profile (`read`, `work`, or `compose`) and an optional expiry. Creating a pending request is not authorization. On clients that advertise MCP elicitation, the Gateway returns a multi-round-trip elicitation request and the MCP client renders its own native confirmation surface. The opaque approval state is returned only through the protocol round trip and the Broker independently validates the pending request, authenticated subject and one-time approval token before activating the delegation. The confirmation tools are not published in the model-visible tool catalog. Clients without elicitation fail closed into the separate operator fallback. Revocation takes effect from Broker state without a container restart.
 
 Secret-bearing files form a nested boundary inside an authorized root. Protected paths such as `.env` require a second exact-path, temporary, human-approved grant. Common template files remain ordinary project content. The Broker enforces this rule for generic filesystem operations, and the shell sandbox masks protected paths so a root delegation cannot be used as an alternate plaintext-secret retrieval path.
 
