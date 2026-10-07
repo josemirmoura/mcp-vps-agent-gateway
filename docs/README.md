@@ -61,3 +61,4 @@ Current Community promise:
 Broader commercial/SaaS planning is maintained outside this public repository.
 
 - [Portico Cloud node connector](cloud-node-connector.md) — optional outbound managed-Cloud enrollment, signed task transport, and local Broker handoff.
+- [Conector de nó do Portico Cloud (PT-BR)](cloud-node-connector.pt-BR.md) — enrollment, transporte assinado e entrega ao Broker local.
