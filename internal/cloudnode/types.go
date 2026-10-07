@@ -15,6 +15,18 @@ type Identity struct {
 	Fingerprint string `json:"fingerprint"`
 }
 
+
+type PendingEnrollment struct {
+	Token    string `json:"token"`
+	NodeName string `json:"node_name"`
+	Platform string `json:"platform"`
+}
+
+type NodeState struct {
+	Identity   Identity           `json:"identity"`
+	Enrollment *PendingEnrollment `json:"enrollment,omitempty"`
+}
+
 type EnrollmentRequest struct {
 	Token             string `json:"token"`
 	Name              string `json:"name"`
