@@ -3,7 +3,7 @@ mode: full
 enabled: false
 
 # Full is a convenience preset. The capability grant stores exactly what
-# the human approved. Unrestricted network is NOT implied.
+# the operator approved. Unrestricted network is NOT implied.
 capabilities:
   - shell.admin
   - filesystem.read:any
