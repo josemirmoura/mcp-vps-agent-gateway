@@ -341,7 +341,7 @@ features:
 Add:
 
 - elevation request
-- human out-of-band approval
+- operator out-of-band approval
 - one-time nonce
 - temporary explicit capabilities
 - expiry
@@ -349,7 +349,7 @@ Add:
 - separate network elevation
 - enhanced audit
 
-A human approval UI may be hosted by Gateway, but Broker validates the signed human identity/assertion and nonce independently.
+An operator approval UI may be hosted by Gateway, but Broker validates the signed operator identity/assertion and nonce independently.
 
 Only after this is tested consider shell.exec_admin.
 
