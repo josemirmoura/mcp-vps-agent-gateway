@@ -210,11 +210,15 @@ func TestRootAccessUsesNativeMCPApproval(t *testing.T) {
 	if strings.Contains(string(raw), "secret-root-token") || strings.Contains(string(raw), "approval_token") {
 		t.Fatalf("approval token leaked to final model-visible output: %s", raw)
 	}
-	if !strings.Contains(prompt, "Autorizar acesso do Portico MCP?") ||
+	if !strings.Contains(prompt, "Autorizar Pórtico?") ||
 		!strings.Contains(prompt, "ATENÇÃO") ||
 		!strings.Contains(prompt, "/opt") ||
-		!strings.Contains(prompt, ".env") {
-		t.Fatalf("native approval prompt is missing human-facing authority context: %q", prompt)
+		!strings.Contains(prompt, "Perfil:") ||
+		!strings.Contains(prompt, "Duração:") {
+		t.Fatalf("native approval prompt is missing operator-facing authority context: %q", prompt)
+	}
+	if len(prompt) > 220 {
+		t.Fatalf("native approval prompt is too long for compact mobile rendering: %d bytes: %q", len(prompt), prompt)
 	}
 }
 
@@ -280,6 +284,58 @@ func TestSensitiveAccessUsesNativeMCPApproval(t *testing.T) {
 	}
 	if strings.Contains(string(raw), "secret-sensitive-token") || !strings.Contains(prompt, ".env") {
 		t.Fatalf("protected-file native approval leaked token or lost context: result=%s prompt=%q", raw, prompt)
+	}
+}
+
+func TestApprovalPromptsStayCompactForMobile(t *testing.T) {
+	t.Setenv("VPS_AGENT_LANG", "pt-BR")
+
+	cases := []struct {
+		name   string
+		kind   string
+		values map[string]any
+		want   []string
+	}{
+		{
+			name: "root",
+			kind: "root",
+			values: map[string]any{
+				"root":                   "/opt/project-a",
+				"access":                 "work",
+				"delegation_ttl_seconds": 3600,
+				"physical_ceiling":       "/opt",
+				"ceiling_wide":           false,
+			},
+			want: []string{"Autorizar Pórtico?", "/opt/project-a", "Perfil:", "Duração:"},
+		},
+		{
+			name: "protected-file",
+			kind: "sensitive",
+			values: map[string]any{
+				"path":                   "/opt/project-a/.env",
+				"access":                 "read",
+				"delegation_ttl_seconds": 600,
+				"physical_ceiling":       "/opt",
+			},
+			want: []string{"Autorizar arquivo protegido?", "/opt/project-a/.env", "Perfil:", "Duração:"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			prompt := approvalMessage(tc.kind, tc.values)
+			if len(prompt) > 220 {
+				t.Fatalf("approval prompt is too long for compact mobile rendering: %d bytes: %q", len(prompt), prompt)
+			}
+			if strings.Count(prompt, "\n") > 5 {
+				t.Fatalf("approval prompt has too many lines for compact mobile rendering: %q", prompt)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(prompt, want) {
+					t.Fatalf("approval prompt missing %q: %q", want, prompt)
+				}
+			}
+		})
 	}
 }
 
