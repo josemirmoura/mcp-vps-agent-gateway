@@ -30,7 +30,7 @@ Do not record passwords, tokens, private keys or .env contents.
 Clone the exact RC tag and enter the guided flow.
 
 ~~~bash
-git clone --branch v0.1.0-rc.6 https://github.com/josemirmoura/mcp-vps-agent-gateway.git
+git clone --branch v0.1.0-rc.7 https://github.com/josemirmoura/mcp-vps-agent-gateway.git
 cd mcp-vps-agent-gateway
 bash scripts/install.sh
 ~~~
