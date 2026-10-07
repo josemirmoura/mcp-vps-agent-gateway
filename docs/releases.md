@@ -49,6 +49,30 @@ The tag workflow builds:
 
 Security CI separately produces vulnerability reports and CycloneDX SBOM evidence during acceptance.
 
+The release workflow also creates **keyless signed provenance attestations** using GitHub OIDC and short-lived Sigstore certificates:
+
+- each published GHCR Gateway/Broker image is attested by immutable image digest and the attestation is pushed alongside the OCI image;
+- the source package receives a signed GitHub provenance attestation;
+- the portable Sigstore bundle for the source package is attached to the GitHub Release;
+- no long-lived project private signing key is stored.
+
+After a release is published, verify the source package with a current GitHub CLI:
+
+~~~bash
+gh attestation verify mcp-vps-agent-source-package.tar.gz --owner josemirmoura
+~~~
+
+For a release image, use its immutable digest rather than only a mutable tag:
+
+~~~bash
+gh attestation verify \
+  oci://ghcr.io/josemirmoura/mcp-vps-agent-gateway@sha256:<digest> \
+  --owner josemirmoura \
+  --bundle-from-oci
+~~~
+
+The first release that exercises this new workflow must itself pass verification before the project marks the signing/attestation gate complete.
+
 The normal updateable installation remains a tagged Git checkout because `scripts/update.sh` intentionally uses Git fast-forward semantics, migration validation, backup and rollback.
 
 ## Update behavior
