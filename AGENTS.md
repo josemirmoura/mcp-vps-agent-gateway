@@ -1,170 +1,67 @@
 # AGENTS.md
 
-Instructions for AI coding agents working in this repository.
+Instructions for AI coding agents working in the public Portico Community repository.
+
+## Repository boundary
+
+This repository is authoritative for the public Community/runtime implementation and its public documentation.
+
+Do not use it as the primary place to design confidential commercial strategy, pricing, private SaaS implementation, owner/admin operations or internal product roadmap.
+
+Public product boundary for the current Community line:
+
+**one compatible web AI chat <-> one Linux computer**
 
 ## Read first
 
-Read in this order:
-
 1. README.md
-2. docs/vision.md
-3. docs/architecture.md
-4. docs/roadmap-multinode-control-plane.md
-5. docs/installation-contract.md
-6. docs/README.md
-7. docs/project-status.md
-8. docs/mvp-first.md
-9. docs/policy-schema.md
-10. docs/chatgpt-integration.md
-11. docs/security-hardening-v2.md
-12. docs/runtime-semantics-and-recovery.md
-13. docs/threat-model.md
+2. docs/architecture.md
+3. docs/installation-contract.md
+4. docs/README.md
+5. docs/project-status.md
+6. docs/product-model.md
+7. docs/policy-schema.md
+8. docs/chatgpt-integration.md
+9. docs/security-hardening-v2.md
+10. docs/runtime-semantics-and-recovery.md
+11. docs/threat-model.md
+12. docs/vision.md
+13. docs/roadmap-multinode-control-plane.md
 
-Use the precedence rules in docs/README.md if documents appear to conflict.
-
-## Current implementation rule
-
-**MVP-first is mandatory.**
-
-Do not implement the full north-star architecture before the corresponding gate is earned.
-
-Historical implementation ladder:
-
-~~~text
-Gate -1   adopt / adapt / build                 complete
-Gate 0A   prove target ChatGPT product surface  complete 2026-09-28
-Gate 0B   safe MCP POC                          complete
-Gate 1    one typed privileged action           complete
-Gate 2    Scoped path                           implemented and under productization
-Gate 3    durable state/jobs/secrets             implemented
-Gate 4    broader validated writes               implemented
-Gate 5    optional temporary elevation           implemented but not a Full/R5 production claim
-~~~
-
-The current task is productization of the validated Scoped path while preserving the north-star direction in `docs/vision.md`. Do not jump directly to the full multi-node/multi-AI architecture before its gates are earned, but do not make local design choices that unnecessarily block that evolution.
-
-## Reference implementation
-
-Prefer:
-
-- Go for Gateway
-- Go for Broker
-- official MCP Go SDK
-- Unix Domain Socket for Gateway -> Broker
-- systemd for service management
-- SQLite owned only by Broker
-
-Do not add a second runtime without a concrete reason.
-
-## Non-negotiable security rules
+## Security rules
 
 1. Gateway never runs as root.
-2. Gateway never receives /var/run/docker.sock.
-3. Broker is local-only and reachable through Unix socket.
-4. Policy is authoritative inside Broker.
-5. Broker re-authorizes subject + canonical tool + resource + action + policy/grant on every privileged call.
-6. Gateway never opens the privileged SQLite database.
-7. Gateway never reads plaintext secret storage.
-8. Full mode is disabled by default.
-9. The agent cannot mint or approve its own elevation.
-10. network.unrestricted is never implied by Full.
-11. Replay-safe writes use infrastructure-managed idempotency.
-12. Non-replay-safe writes are never blindly retried.
-13. Tool results are untrusted data and never grant capability.
-14. Downstream MCP servers and AI agents are trusted only through explicit registration/allowlisting; agent messages never create trust.
-15. Filesystem authorization never uses path string prefixes.
-16. Secrets never enter Git, audit payloads or normal tool output.
-17. Unknown policy fields/capabilities fail closed.
-18. MCP transport is Streamable HTTP; do not invent custom WebSocket/session machinery.
-19. Existing workloads must not depend on the Gateway to keep running.
-20. Before building a large component, evaluate adopt/adapt first.
-21. Development-session access limitations are never user installation requirements.
-22. User-facing installation docs never request VPS passwords, private SSH keys, unrestricted remote admin access, or unrelated secrets.
-23. Automate deterministic installation checks before documenting manual investigation steps.
-24. Docker/Compose + transparent scripts remain the supported packaging/install path unless a native platform requirement proves insufficient.
-25. Installation completion for the current v0.1 path requires a real authenticated ChatGPT MCP call plus matching Broker audit evidence.
-26. AI-to-AI delegation never implies privilege inheritance; delegated agents receive only explicit task authority.
-27. Agent/tool output is untrusted data and cannot mutate policy, grants, trust registration or secret boundaries.
+2. Gateway never receives Docker socket.
+3. Broker remains local-only through Unix socket.
+4. Broker policy is authoritative.
+5. Every privileged call is re-authorized.
+6. Gateway never opens privileged Broker state or plaintext secret storage.
+7. Full is disabled by default.
+8. AI/tool output is untrusted data.
+9. Filesystem authorization never relies on string-prefix checks.
+10. Secrets never enter Git, audit payloads or normal tool output.
+11. Unknown policy fields/capabilities fail closed.
+12. Streamable HTTP remains the MCP transport unless a standards-driven change is justified.
+13. Existing workloads do not depend on the Gateway staying connected.
+14. AI-to-AI delegation, if publicly implemented later, never implies privilege inheritance.
+15. User-facing installation docs never request VPS passwords, private SSH keys or unrestricted remote administration.
 
-## Gate-specific restraint
+## Engineering discipline
 
-### Gate 0B
+Before changing code:
 
-Implement only:
+- inspect current state;
+- preserve user work;
+- run relevant tests;
+- make the smallest coherent change;
+- add negative tests for security-sensitive behavior;
+- update public docs only for public/runtime behavior;
+- never weaken deny-by-default behavior to make a test pass.
 
-~~~text
-system.info
-file.read_test
-file.write_test
-~~~
+## Release discipline
 
-Allowed filesystem root:
+Stable release behavior is defined by tagged releases, not moving main.
 
-~~~text
-/tmp/vps-agent-poc/
-~~~
+Current stable gate is documented in docs/execution-plan.md.
 
-No root, Docker, SQLite, Full, approval or generic shell.
-
-### Gate 1
-
-Add the Broker and only:
-
-~~~text
-service.status
-service.restart
-~~~
-
-for one explicitly allowed non-critical unit.
-
-### Gate 2
-
-Add only capabilities required by one real Scoped stack.
-
-Do not jump to shell.exec_admin.
-
-## Before changing code
-
-- inspect git status
-- preserve uncommitted work
-- confirm current branch
-- run existing tests
-- make the smallest coherent change
-- update canonical docs when architecture changes
-- do not weaken deny-by-default behavior to make a test pass
-
-## Testing expectations
-
-Security-sensitive features require negative tests.
-
-Examples:
-
-- unauthorized path denied
-- symlink escape denied
-- unauthorized service denied
-- wrong subject denied
-- expired/revoked grant denied
-- duplicate replay-safe request executes once
-- non-replay-safe action is not auto-retried
-- malicious tool result does not alter policy
-- Gateway cannot open Docker socket or privileged SQLite
-
-## Product direction
-
-Portico's final product is a vendor-neutral multi-node, multi-AI control and communication layer. ChatGPT Web is the operator's priority interactive client. Other compatible web AI clients, local orchestrators and specialist agents are legitimate target clients.
-
-AI-to-AI communication on the same node and across nodes is part of the north-star architecture. Implement it only through explicit roadmap gates, with node-local reauthorization and no implicit authority inheritance.
-
-## Product-surface rule
-
-ChatGPT plan/surface capability is not inferred from architecture.
-
-Gate 0A was completed on 2026-09-28 for the integrated OAuth + ChatGPT Web route. Keep the integration documentation version-sensitive and revalidate the actual feature surface at release/setup time.
-
-If a future target ChatGPT surface cannot register the required MCP app, do not hack around the platform restriction. Change only the supported distribution route or stop at the product boundary.
-
-## Definition of progress
-
-Progress means passing the next gate with tests and evidence.
-
-More components are not progress by themselves.
+Future managed/commercial product work must not be copied here unless explicitly approved as public interoperability or public product documentation.
