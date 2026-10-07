@@ -22,7 +22,7 @@ They are intended for final acceptance and may receive fixes before the correspo
 
 ## First public release
 
-The current acceptance candidate identifies itself as `0.1.0-rc.6`. RC6 carries forward the RC5 authority model and adds refreshed Debian runtime packages after the blocking image-security scan detected newly available fixes. Earlier RC tags are retained as immutable history.
+The current acceptance candidate identifies itself as `0.1.0-rc.7`. RC7 carries forward the validated RC6 runtime line, adds compact native approval UX for narrow/mobile ChatGPT surfaces, standardizes operator/user terminology, and is the first candidate intended to exercise the keyless Sigstore release-signing path end to end. Earlier RC tags are retained as immutable history.
 
 The stable `v0.1.0` tag is created only after the owner's final clean-install operator acceptance gate succeeds.
 
@@ -33,10 +33,10 @@ The preferred owner path is **GitHub Actions → release → Run workflow** on `
 Enter the exact SemVer tag required by `VERSION`, for example:
 
 ~~~text
-v0.1.0-rc.6
+v0.1.0-rc.7
 ~~~
 
-The workflow validates source, tests and the installation contract first. Only after validation does a manual run create the exact tag, build/publish the multi-architecture images and create the GitHub Release. Existing external tag pushes remain supported and enter the same validated pipeline. Pre-release SemVer tags such as `-rc.6` are published as GitHub pre-releases.
+The workflow validates source, tests and the installation contract first. Only after validation does a manual run create the exact tag, build/publish the multi-architecture images and create the GitHub Release. Existing external tag pushes remain supported and enter the same validated pipeline. Pre-release SemVer tags such as `-rc.7` are published as GitHub pre-releases.
 
 ## Release artifacts
 
@@ -83,7 +83,7 @@ By default, `scripts/update.sh` selects the newest stable SemVer tag available f
 A release candidate or explicit version can be selected deliberately:
 
 ~~~bash
-VPS_AGENT_UPDATE_REF=v0.1.0-rc.6 bash scripts/update.sh
+VPS_AGENT_UPDATE_REF=v0.1.0-rc.7 bash scripts/update.sh
 ~~~
 
 The updater refuses non-fast-forward targets and retains its backup after success or rollback.

@@ -1,6 +1,6 @@
 # Community productization status
 
-Current baseline: v0.1.0-rc.6 technical line
+Current baseline: v0.1.0-rc.7 release-candidate line
 
 ## Completed
 
@@ -19,7 +19,8 @@ Current baseline: v0.1.0-rc.6 technical line
 - [x] clean-runner acceptance paths;
 - [x] native MCP elicitation and protected-secret boundary;
 - [x] real scoped write/read/delete proof in the operator's ChatGPT Plus environment on 2026-10-06;
-- [x] RC6 immutable prerelease published.
+- [x] RC6 immutable prerelease published;
+- [x] RC7 source candidate prepared for signed release validation.
 
 ## Current stable blockers
 
