@@ -12,8 +12,7 @@ on:
         type: string
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 env:
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
@@ -60,6 +59,8 @@ jobs:
   prepare-tag:
     needs: validate
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -87,6 +88,12 @@ jobs:
   images:
     needs: prepare-tag
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     strategy:
       matrix:
         include:
@@ -104,6 +111,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
+        id: build
         with:
           context: .
           target: ${{ matrix.target }}
@@ -112,10 +120,22 @@ jobs:
           sbom: true
           provenance: mode=max
           tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ env.RELEASE_TAG }}
+      - name: Create signed image provenance attestation
+        uses: actions/attest@v4
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false
 
   github-release:
     needs: images
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -128,11 +148,23 @@ jobs:
           git archive --format=tar --prefix=mcp-vps-agent/ "$GITHUB_SHA" | gzip -n > dist/mcp-vps-agent-source-package.tar.gz
           sha256sum dist/mcp-vps-agent-source-package.tar.gz > dist/mcp-vps-agent-source-package.tar.gz.sha256
           cat > dist/RELEASE-INTEGRITY.txt <<'EOF'
-          Release images carry BuildKit SBOM/provenance attestations in GHCR.
-          The source package is protected by the accompanying SHA-256 checksum.
-          A separate project-managed cryptographic release-signing key is not yet used.
+          Release images carry BuildKit SBOM/provenance plus a GitHub artifact attestation
+          signed with a short-lived Sigstore certificate issued from GitHub OIDC identity.
+          The source package carries a SHA-256 checksum and a signed GitHub provenance
+          attestation. No long-lived project private signing key is stored by the project.
+          Verify attestations with the GitHub CLI as documented in docs/releases.md.
           The preferred updateable installation remains a tagged Git checkout.
           EOF
+      - name: Create signed source-package provenance attestation
+        id: attest-source
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/mcp-vps-agent-source-package.tar.gz
+      - name: Add portable Sigstore bundle to release files
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "${{ steps.attest-source.outputs.bundle-path }}" dist/mcp-vps-agent-source-package.sigstore.json
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -145,5 +177,6 @@ jobs:
           gh release create "$RELEASE_TAG" \
             dist/mcp-vps-agent-source-package.tar.gz \
             dist/mcp-vps-agent-source-package.tar.gz.sha256 \
+            dist/mcp-vps-agent-source-package.sigstore.json \
             dist/RELEASE-INTEGRITY.txt \
             "${flags[@]}"
