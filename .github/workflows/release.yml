@@ -14,6 +14,7 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
 
 env:
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
@@ -104,6 +105,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
+        id: build
         with:
           context: .
           target: ${{ matrix.target }}
@@ -112,6 +114,128 @@ jobs:
           sbom: true
           provenance: mode=max
           tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ env.RELEASE_TAG }}
+      - uses: sigstore/cosign-installer@v4.1.2
+      - name: Keyless-sign and verify release image
+        shell: bash
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          ref="$IMAGE@$DIGEST"
+          cosign sign --yes "$ref"
+          cosign verify "$ref" \
+            --certificate-identity-regexp '^https://github\.com/${{ github.repository }}/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)
+
+  github-release:
+    needs: images
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Build complete source package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          git archive --format=tar --prefix=mcp-vps-agent/ "$GITHUB_SHA" | gzip -n > dist/mcp-vps-agent-source-package.tar.gz
+          sha256sum dist/mcp-vps-agent-source-package.tar.gz > dist/mcp-vps-agent-source-package.tar.gz.sha256
+      - uses: sigstore/cosign-installer@v4.1.2
+      - name: Keyless-sign and verify source artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          identity='^https://github\.com/${{ github.repository }}/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          flags=(--verify-tag --generate-notes --title "Portico MCP $RELEASE_TAG")
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" \
+            dist/mcp-vps-agent-source-package.tar.gz \
+            dist/mcp-vps-agent-source-package.tar.gz.sha256 \
+            dist/mcp-vps-agent-source-package.tar.gz.sigstore.json \
+            dist/mcp-vps-agent-source-package.tar.gz.sha256.sigstore.json \
+            dist/RELEASE-INTEGRITY.txt \
+            "${flags[@]}"
+ \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+
+  github-release:
+    needs: images
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Build complete source package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          git archive --format=tar --prefix=mcp-vps-agent/ "$GITHUB_SHA" | gzip -n > dist/mcp-vps-agent-source-package.tar.gz
+          sha256sum dist/mcp-vps-agent-source-package.tar.gz > dist/mcp-vps-agent-source-package.tar.gz.sha256
+          cat > dist/RELEASE-INTEGRITY.txt <<'EOF'
+          Release images carry BuildKit SBOM/provenance attestations in GHCR.
+          The source package is protected by the accompanying SHA-256 checksum.
+          A separate project-managed cryptographic release-signing key is not yet used.
+          The preferred updateable installation remains a tagged Git checkout.
+          EOF
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          flags=(--verify-tag --generate-notes --title "Portico MCP $RELEASE_TAG")
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" \
+            dist/mcp-vps-agent-source-package.tar.gz \
+            dist/mcp-vps-agent-source-package.tar.gz.sha256 \
+            dist/RELEASE-INTEGRITY.txt \
+            "${flags[@]}"
+
+          issuer='https://token.actions.githubusercontent.com'
+
+          for artifact in \
+            dist/mcp-vps-agent-source-package.tar.gz \
+            dist/mcp-vps-agent-source-package.tar.gz.sha256
+          do
+            bundle="$artifact.sigstore.json"
+            cosign sign-blob "$artifact" --bundle "$bundle" --yes
+            cosign verify-blob "$artifact" \
+              --bundle "$bundle" \
+              --certificate-identity-regexp "$identity" \
+              --certificate-oidc-issuer "$issuer"
+          done
+
+          cat > dist/RELEASE-INTEGRITY.txt <<'EOF'
+          Release images are keyless-signed with Sigstore/cosign and carry BuildKit SBOM/provenance attestations in GHCR.
+          Source artifacts have SHA-256 integrity material plus Sigstore bundles produced by the GitHub Actions release workflow.
+          Verification binds signatures to the Portico release workflow identity and GitHub Actions OIDC issuer.
+          The preferred updateable installation remains a tagged Git checkout.
+          EOF
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          flags=(--verify-tag --generate-notes --title "Portico MCP $RELEASE_TAG")
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" \
+            dist/mcp-vps-agent-source-package.tar.gz \
+            dist/mcp-vps-agent-source-package.tar.gz.sha256 \
+            dist/RELEASE-INTEGRITY.txt \
+            "${flags[@]}"
+ \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 
   github-release:
     needs: images
