@@ -173,6 +173,13 @@ func (r Runner) processTask(ctx context.Context, task Task) error {
 			completion.Error = boundedError("failed to encode Broker response: " + err.Error())
 		} else {
 			completion.Result = raw
+			if !result.response.OK {
+				// A denied local Broker request must not become a successful Cloud
+				// task merely because its signed completion transport succeeded.
+				// Keep the error text stable and non-secret; detailed local
+				// authorization evidence belongs to the Broker audit chain.
+				completion.Error = "local Broker denied operation"
+			}
 		}
 	}
 
