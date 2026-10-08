@@ -38,6 +38,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Build pinned official MCP conformance suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --quiet --filter=blob:none https://github.com/modelcontextprotocol/conformance.git "$RUNNER_TEMP/mcp-conformance"
+          git -C "$RUNNER_TEMP/mcp-conformance" checkout --quiet --detach c37eec888e1c6ff140af79987a40008548b7cc5f
+          cd "$RUNNER_TEMP/mcp-conformance"
+          npm ci --no-audit --no-fund
+          npm run build
       - name: Build disposable unprivileged gateway
         shell: bash
         run: |
@@ -74,7 +83,8 @@ jobs:
           }
 
           # Protocol-only loopback smoke, not the full OAuth conformance set.
-          timeout 240s npx --yes @modelcontextprotocol/conformance@0.1.11 \
+          # Pinned upstream commit contains the published 2026-07-28 requirement sets.
+          timeout 240s node "$RUNNER_TEMP/mcp-conformance/dist/index.js" \
             server \
             --url http://127.0.0.1:18991/mcp \
             --scenario server-stateless \
