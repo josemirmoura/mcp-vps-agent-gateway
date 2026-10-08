@@ -143,12 +143,11 @@ func (r Runner) processTask(ctx context.Context, task Task) error {
 	renewFatal := make(chan error, 1)
 	go r.renewLoop(renewCtx, task, renewFatal)
 
-	// The local Broker call must not outlive its Cloud delivery window.
-	// Cancellation is best effort for work already started by the Broker.
+	// A task expiry is a fixed deadline. Delivery leases are renewable:
+	// renewLoop must cancel the Broker on an unrenewed lease deadline rather
+	// than permanently capping execution at the *initial* lease expiry.
+	// Cancellation remains best effort after host-side work has started.
 	brokerDeadline := time.Now().Add(r.BrokerTimeout)
-	if task.LeaseExpiresAt != nil && task.LeaseExpiresAt.Before(brokerDeadline) {
-		brokerDeadline = *task.LeaseExpiresAt
-	}
 	if task.ExpiresAt != nil && task.ExpiresAt.Before(brokerDeadline) {
 		brokerDeadline = *task.ExpiresAt
 	}
@@ -231,20 +230,63 @@ func (r Runner) renewLoop(ctx context.Context, task Task, fatal chan<- error) {
 	ticker := time.NewTicker(r.RenewInterval)
 	defer ticker.Stop()
 
+	reportFatal := func(err error) {
+		select {
+		case fatal <- err:
+		default:
+		}
+	}
+
+	// Preserve the current known lease deadline locally even if Cloud is
+	// unreachable. A successful signed renewal replaces this deadline.
+	var leaseTimer *time.Timer
+	var leaseDeadline <-chan time.Time
+	defer func() {
+		if leaseTimer != nil {
+			leaseTimer.Stop()
+		}
+	}()
+	setDeadline := func(expiresAt time.Time) bool {
+		remaining := time.Until(expiresAt)
+		if remaining <= 0 {
+			reportFatal(errors.New("Cloud lease expired during Broker execution"))
+			return false
+		}
+		if leaseTimer == nil {
+			leaseTimer = time.NewTimer(remaining)
+			leaseDeadline = leaseTimer.C
+			return true
+		}
+		if !leaseTimer.Stop() {
+			select {
+			case <-leaseTimer.C:
+			default:
+			}
+		}
+		leaseTimer.Reset(remaining)
+		return true
+	}
+	if task.LeaseExpiresAt != nil && !setDeadline(*task.LeaseExpiresAt) {
+		return
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-leaseDeadline:
+			reportFatal(errors.New("Cloud lease expired without renewal"))
+			return
 		case <-ticker.C:
-			_, err := r.Client.RenewTaskLease(ctx, r.Identity, task.ID, task.LeaseID)
+			expiresAt, err := r.Client.RenewTaskLease(ctx, r.Identity, task.ID, task.LeaseID)
 			if err == nil {
+				if !setDeadline(expiresAt) {
+					return
+				}
 				continue
 			}
 			if IsStatus(err, http.StatusUnauthorized) || IsStatus(err, http.StatusConflict) {
-				select {
-				case fatal <- err:
-				default:
-				}
+				reportFatal(err)
 				return
 			}
 			if ctx.Err() == nil {
@@ -256,7 +298,6 @@ func (r Runner) renewLoop(ctx context.Context, task Task, fatal chan<- error) {
 		}
 	}
 }
-
 func (r Runner) completeWithRetry(
 	ctx context.Context,
 	taskID string,
