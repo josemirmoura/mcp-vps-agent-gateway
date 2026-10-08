@@ -124,13 +124,14 @@ func validatedApprovalMessage(kind string, values map[string]any) (string, error
 	if kind == "sensitive" {
 		targetKey = "path"
 	}
+	ceilingWide, _ := values["ceiling_wide"].(bool)
 	for _, key := range []string{targetKey, "access", "physical_ceiling"} {
 		value := stringValue(values[key])
 		if value == "—" || strings.TrimSpace(value) == "" {
 			if key == "physical_ceiling" && kind == "sensitive" {
 				continue
 			}
-			if key == "physical_ceiling" && values["ceiling_wide"] != true {
+			if key == "physical_ceiling" && !ceilingWide {
 				continue
 			}
 			return "", fmt.Errorf("cannot display missing approval field %s", key)
