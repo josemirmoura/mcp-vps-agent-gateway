@@ -214,7 +214,6 @@ func (r Runner) processTask(ctx context.Context, task Task) error {
 	return nil
 }
 
-
 // validateTaskDeliveryWindow checks Cloud delivery deadlines before any
 // node-local action. A timed-out lease may be requeued by Cloud; the node must
 // not act on it or use the stale lease to report a completion.
