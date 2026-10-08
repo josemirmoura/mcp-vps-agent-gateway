@@ -1,0 +1,15 @@
+name: operator-approval-fallback
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-security-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Python operator fallback tests
+        run: python3 -m unittest discover -s tests/scripts -p 'test_operator_approvals.py' -v
+      - name: Syntax-check trusted CLI
+        run: python3 -m py_compile scripts/operator-approvals.py
