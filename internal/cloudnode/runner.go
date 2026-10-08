@@ -115,6 +115,11 @@ func (r Runner) processTask(ctx context.Context, task Task) error {
 	if task.DestinationNodeID != r.Identity.NodeID {
 		return errors.New("leased task targets a different node")
 	}
+	if err := validateTaskDeliveryWindow(task, time.Now().UTC()); err != nil {
+		// The Cloud lease is no longer valid. Do not dispatch to the Broker
+		// or attempt completion with an expired lease ID.
+		return err
+	}
 	if len(task.Input) == 0 {
 		task.Input = json.RawMessage("{}")
 	}
@@ -138,7 +143,16 @@ func (r Runner) processTask(ctx context.Context, task Task) error {
 	renewFatal := make(chan error, 1)
 	go r.renewLoop(renewCtx, task, renewFatal)
 
-	brokerCtx, cancelBroker := context.WithTimeout(ctx, r.BrokerTimeout)
+	// The local Broker call must not outlive its Cloud delivery window.
+	// Cancellation is best effort for work already started by the Broker.
+	brokerDeadline := time.Now().Add(r.BrokerTimeout)
+	if task.LeaseExpiresAt != nil && task.LeaseExpiresAt.Before(brokerDeadline) {
+		brokerDeadline = *task.LeaseExpiresAt
+	}
+	if task.ExpiresAt != nil && task.ExpiresAt.Before(brokerDeadline) {
+		brokerDeadline = *task.ExpiresAt
+	}
+	brokerCtx, cancelBroker := context.WithDeadline(ctx, brokerDeadline)
 	defer cancelBroker()
 
 	type brokerResult struct {
@@ -147,6 +161,10 @@ func (r Runner) processTask(ctx context.Context, task Task) error {
 	}
 	brokerDone := make(chan brokerResult, 1)
 	go func() {
+		if err := brokerCtx.Err(); err != nil {
+			brokerDone <- brokerResult{err: err}
+			return
+		}
 		response, err := r.Broker.Call(brokerCtx, brokerRequest)
 		brokerDone <- brokerResult{response: response, err: err}
 	}()
@@ -193,6 +211,20 @@ func (r Runner) processTask(ctx context.Context, task Task) error {
 		"operation", task.Operation,
 		"broker_ok", result.err == nil && result.response.OK,
 	)
+	return nil
+}
+
+
+// validateTaskDeliveryWindow checks Cloud delivery deadlines before any
+// node-local action. A timed-out lease may be requeued by Cloud; the node must
+// not act on it or use the stale lease to report a completion.
+func validateTaskDeliveryWindow(task Task, now time.Time) error {
+	if task.LeaseExpiresAt != nil && !now.Before(*task.LeaseExpiresAt) {
+		return errors.New("Cloud task lease expired before Broker dispatch")
+	}
+	if task.ExpiresAt != nil && !now.Before(*task.ExpiresAt) {
+		return errors.New("Cloud task expired before Broker dispatch")
+	}
 	return nil
 }
 
