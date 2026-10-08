@@ -76,8 +76,16 @@ if "--write-out" in args:
 
 MOCK_DOCKER = r"""#!/usr/bin/env python3
 import json
+import os
+import stat
 import sys
 args = sys.argv[1:]
+base = os.environ["VPS_AGENT_VERIFY_DIR"]
+assert stat.S_IMODE(os.stat(base).st_mode) == 0o700, "verifier directory must be private"
+trace = os.environ.get("MOCK_TRACE")
+if trace:
+    with open(trace, "a", encoding="utf-8") as fh:
+        fh.write(base + "\n")
 if args[:2] == ["compose", "config"]:
     pass
 elif args[:3] == ["compose", "ps", "-a"]:
