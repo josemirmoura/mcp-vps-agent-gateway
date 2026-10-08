@@ -37,7 +37,14 @@ func MarkQuarantine(statePath string) error {
 	}
 	path := QuarantineMarkerPath(statePath)
 	dir := filepath.Dir(path)
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	// Confine all writes to the trusted state directory; O_EXCL prevents
+	// following a pre-existing marker symlink.
+	file, err := root.OpenFile(filepath.Base(path), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if errors.Is(err, os.ErrExist) {
 		return nil // Already quarantined, including a pre-existing marker.
 	}
@@ -55,7 +62,7 @@ func MarkQuarantine(statePath string) error {
 	if err := file.Close(); err != nil {
 		return err
 	}
-	parent, err := os.Open(dir)
+	parent, err := root.Open(".")
 	if err != nil {
 		return err
 	}
