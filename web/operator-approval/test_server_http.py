@@ -58,17 +58,18 @@ class HttpContract(unittest.TestCase):
         with patch.dict(os.environ,{"PORTICO_OPERATOR_PUBLIC_ORIGIN":"https://operator.example.test",
             "PORTICO_OPERATOR_PHYSICAL_CEILING":"/opt"}),patch.object(app.OperatorIPC,"list_requests",return_value=[item]):
             with patch.object(app,"verify_password",return_value=True):
-                self.client.open(self.req("/api/operator/login","POST",{"password":"valid"}))
-            result=json.load(self.client.open(self.req(f"/api/operator/approvals/{ID}")))
+                login=self.client.open(self.req("/api/operator/login","POST",{"password":"valid"}))
+                cookie=login.headers["Set-Cookie"].split(";",1)[0]
+            result=json.load(self.client.open(self.req(f"/api/operator/approvals/{ID}",headers={"Cookie":cookie})))
             self.assertEqual(result["resource"],"/opt/project")
             self.assertFalse(result["ceiling_wide"])
             self.assertTrue(result["csrf_token"])
             with self.assertRaises(HTTPError) as e:
-                self.client.open(self.req(f"/api/operator/approvals/{ID}/decision","POST",{"decision":"approve"}))
+                self.client.open(self.req(f"/api/operator/approvals/{ID}/decision","POST",{"decision":"approve"},{"Cookie":cookie}))
             self.assertEqual(e.exception.code,403)
             with patch.object(app.OperatorIPC,"call",return_value={"status":"approved"}) as call:
                 response=json.load(self.client.open(self.req(f"/api/operator/approvals/{ID}/decision",
-                         "POST",{"decision":"approve"},{"X-CSRF-Token":result["csrf_token"]})))
+                         "POST",{"decision":"approve"},{"X-CSRF-Token":result["csrf_token"],"Cookie":cookie})))
                 self.assertEqual(response["status"],"approved")
                 call.assert_called_once_with("approve",ID)
 if __name__=="__main__":
