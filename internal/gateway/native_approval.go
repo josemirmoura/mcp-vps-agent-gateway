@@ -139,7 +139,7 @@ func validatedApprovalMessage(kind string, values map[string]any) (string, error
 			if key == "physical_ceiling" && kind == "sensitive" {
 				continue
 			}
-						return "", fmt.Errorf("cannot display missing approval field %s", key)
+			return "", fmt.Errorf("cannot display missing approval field %s", key)
 		}
 		if !utf8.ValidString(value) {
 			return "", errors.New("approval field contains invalid UTF-8")
