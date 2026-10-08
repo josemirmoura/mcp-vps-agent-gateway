@@ -1,32 +1,43 @@
-# Operador web: implementação experimental (NÃO implantada)
+# Pórtico: Central de Autorizações (pré-release)
 
-Branch: `feat/operator-approval-web-backend`; revisão de segurança requerida antes de deploy.
+**Estado: implementação em PR draft, sem deploy de produção.** As aprovações continuam exigindo confirmação do proprietário; o Broker continua autoritativo.
 
-### Arquivos
-- `web/operator-approval/index.html`: interface desktop/mobile e login.
-- `web/operator-approval/server.py`: API HTTP Python padrão, escuta **somente 127.0.0.1:8765**; não habilitar na internet diretamente.
-- `web/operator-approval/test_server.py`: testes unitários iniciais.
+## Arquitetura de menor privilégio
+- O Broker pode expor um **segundo socket Unix** em `/run/portico-operator/operator.sock`, montado no volume `operator-run`.
+- O handler desse socket aceita **somente** `admin.approval.list`, `admin.approval.approve` e `admin.approval.deny`, autenticados por um token randômico independente com no mínimo 32 caracteres. O token do operador web jamais é o token administrativo integral do Broker.
+- O contêiner `operator-portal` tem exclusivamente esse volume (sem o socket MCP geral e sem Docker socket), filesystem read-only, UID não privilegiado, capacidades Linux removidas.
+- O Broker ainda verifica os pedidos, identidade MCP, estado/expiração e grava audit trail. O frontend não amplia TTL/perfil.
+- O portal publica `8765` apenas no **loopback do host**, e só funciona externamente depois de configurar HTTPS em um reverse proxy confiável.
 
-### Dependências
-- Backend reutiliza `scripts/operator-approvals.py` e o comando administrativo existente do Broker; o usuário de execução precisaria de autoridade administrativa sobre o container Broker. **Esse é um risco material:** um comprometimento do serviço web poderia abusar dessa autoridade. Antes de habilitar publicamente, substituir acesso Docker amplo por um IPC restrito de operador, autenticação forte e isolamento com menor privilégio, e auditar toda a superfície.
-- O verificador de senha é fornecido por `PORTICO_OPERATOR_PASSWORD_SCRYPT` no formato `salthex:digesthex` (scrypt n=16384 r=8 p=1 dklen=32).
-- O frontend espera `PORTICO_OPERATOR_PUBLIC_ORIGIN` como origem exata HTTPS, obrigatória na verificação Origin dos POSTs.
-- Para publicar, adicionar reverse proxy TLS com limites de requisição, limite de login por IP real no proxy, política explícita de headers, log de acesso reduzido e validação de Host. A verificação em processo por loopback não substitui esses controles.
-- Não habilitar endpoints de aprovação em staging público sem revisão independente do threat model.
+## Configuração opt-in
+Antes de ativar o profile do portal, configurar em `.env`:
+- `VPS_AGENT_OPERATOR_APPROVAL_TOKEN`: token randômico exclusivo, 32+ caracteres; protegido, nunca compartilhado com cliente MCP.
+- `PORTICO_OPERATOR_PASSWORD_SCRYPT`: verificador `salthex:digesthex`, gerado com `hashlib.scrypt(password,salt,n=2**14,r=8,p=1,dklen=32)`. Não armazenar a senha em texto claro.
+- `PORTICO_OPERATOR_PUBLIC_ORIGIN`: origem HTTPS exata, por exemplo `https://exemplo-do-operador.invalid` (placeholder, não um endereço real).
+- `VPS_AGENT_SCOPE_ROOT`: raiz física, exibida pelo portal para alertas de autorização ampla.
 
-### API
-- `POST /api/operator/login`: senha do operador, sessão cookie Secure HttpOnly SameSite Strict de 15 minutos.
-- `GET /operator?request=apr_...`: HTML da Central (sem dados até autenticação).
-- `GET /api/operator/approvals/:id`: detalhes do pedido pendente (exige sessão).
-- `POST /api/operator/approvals/:id/decision`: JSON decision approve/deny; sessão + CSRF + Origin; Broker revalida e audita.
-- Nenhuma API entrega token administrativo ou token de aprovação ao navegador.
+Ativação **somente após revisão de segurança e provisionamento HTTPS**:
 
-### Gates bloqueadores de release
-1. Introduzir canal Broker operador com privilégio mínimo, sem Docker socket no processo web.
-2. Aplicar autenticação robusta, defesa contra força bruta distribuída, sessão persistente multiworker (ou processo único supervisionado), logout e proteção de proxies.
-3. Validar campos/permissões, expiração, origem, CSRF, condição de corrida e autorização de identidade por testes adversariais.
-4. Empacotar como serviço não-root, proxy HTTPS, health probes, instalador/update e rollback.
-5. Testar em ChatGPT desktop/mobile, navegadores mobile e clientes MCP sem elicitation. MCP Apps é trabalho separado.
-6. Apenas depois do gate de segurança, disponibilizar em uma versão Community e projetar para Cloud.
+```bash
+docker compose --profile operator-portal up -d --build
+```
 
-Nunca anunciar este protótipo como autorização web em produção.
+Por segurança, este comando **não** faz parte do instalador padrão.
+
+## Fluxo e endpoints
+- `GET /operator?request=apr_...`: página do operador.
+- `POST /api/operator/login`: verifica senha, atribui cookie de sessão de 15 min (Secure, HttpOnly, SameSite Strict).
+- `GET /api/operator/approvals/:id`: apresenta dados de pedido pendente, exige sessão.
+- `POST /api/operator/approvals/:id/decision`: decisão approve/deny; exige sessão, cabeçalho CSRF e Origin idêntico à origem pública definida; usa somente IPC restrito ao Broker.
+- Id do pedido **não é segredo nem token de concessão**. A URL nunca autoriza sem autenticação e POST explícito.
+- `scripts/operator-approvals.py` por SSH permanece fallback.
+
+## Bloqueadores de release
+1. Aprovação de threat model do socket restrito e isolamento de processo, incluindo tentativa de acesso ao socket MCP normal.
+2. E2E real: expiração, replay, sessão, CSRF, ID trocado, concorrência, revogação e testes móveis.
+3. Configurar proxy HTTPS em domínio dedicado/controlado; CSP sem inline JS/CSS como melhoria antes da exposição à internet, validar Host e encaminhamento Origin; limitar força bruta no proxy.
+4. Completar provisionamento seguro de credenciais, rotação, logs, atualização, rollback e proteção de arquivos locais.
+5. Validar navegador desktop/mobile e coexistência com confirmação nativa MCP.
+6. MCP Apps exige validação própria; interface lateral do ChatGPT não é prometida.
+
+Não colocar em produção até que os gates sejam satisfeitos.
