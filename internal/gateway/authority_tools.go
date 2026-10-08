@@ -56,6 +56,9 @@ func registerAuthorityTools(server *mcp.Server, s *Server) {
 
 		if !supportsNativeElicitation(req) {
 			out["approval_method"] = "operator_fallback"
+			if link := operatorApprovalURL(out["request_id"]); link != "" {
+				out["operator_approval_url"] = link
+			}
 			out["message"] = "This MCP client did not advertise native elicitation. No protected-file access was granted. In an authenticated SSH session on the VPS, run python3 scripts/operator-approvals.py from the Pórtico installation to review and explicitly approve or deny the request. Never share admin credentials with the AI."
 			out["operator_approval_guide"] = "docs/operator-approval-fallback.md"
 			return nil, out, nil
