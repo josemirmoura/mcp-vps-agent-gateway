@@ -84,11 +84,35 @@ jobs:
 
           # Protocol-only loopback smoke, not the full OAuth conformance set.
           # Pinned upstream commit contains the published 2026-07-28 requirement sets.
+          rc=0
           timeout 240s node "$RUNNER_TEMP/mcp-conformance/dist/index.js" \
             server \
             --url http://127.0.0.1:18991/mcp \
             --scenario server-stateless \
-            --verbose 2>&1 | tee evidence/official-stateless.log
+            --verbose > evidence/official-stateless.log 2>&1 || rc=$?
+
+          # Preserve the full machine-readable report as an artifact, but
+          # print only the concise results (not a huge tools/list schema).
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          raw = Path("evidence/official-stateless.log").read_text(errors="replace")
+          pos = raw.find("\\n[\\n")
+          if pos < 0:
+              print("Official conformance report could not be parsed:")
+              print(raw[-4000:])
+              raise SystemExit(1)
+          checks, _ = json.JSONDecoder().raw_decode(raw[pos+1:])
+          summary = {"total": len(checks), "success": 0, "failure": 0, "warning": 0, "skipped": 0}
+          for c in checks:
+              key = c.get("status", "UNKNOWN").lower()
+              summary[key] = summary.get(key, 0) + 1
+              if key not in ("success",):
+                  print(f'{key.upper()}: {c.get("id")}: {c.get("errorMessage", "")}')
+          print("OFFICIAL MCP 2026 STATELESS CHECKS:", json.dumps(summary, sort_keys=True))
+          Path("evidence/official-summary.json").write_text(json.dumps(summary, indent=2)+"\\n")
+          PY
+          exit "$rc"
 
       - name: Preserve conformance evidence
         if: always()
