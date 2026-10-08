@@ -51,7 +51,7 @@ class OperatorIPC:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
             client.settimeout(5)
             client.connect(path)
-            client.sendall(json.dumps(payload).encode() + b"\\n")
+            client.sendall(json.dumps(payload).encode() + bytes([10]))
             with client.makefile("rb") as source:
                 data = source.readline(131072)
         reply = json.loads(data)
