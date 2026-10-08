@@ -102,9 +102,6 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlsplit(self.path).path
         if path in ("/", "/operator", "/operator/"):
-            if self.session() is None:
-                self.reply(401, {"error": "login required"})
-                return
             page = UI_PATH.read_bytes()
             self.send_response(200)
             self.headers_base("text/html; charset=utf-8")
