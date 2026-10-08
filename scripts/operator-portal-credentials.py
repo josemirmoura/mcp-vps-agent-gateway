@@ -7,6 +7,8 @@ Requires --apply and an existing .env in the current Community installation.
 from __future__ import annotations
 import argparse
 import getpass
+import fcntl
+import re
 import hashlib
 import os
 from pathlib import Path
@@ -22,6 +24,12 @@ def validate_origin(value: str) -> str:
     if (u.scheme != "https" or not u.hostname or u.username or u.password or
             u.path not in ("", "/") or u.query or u.fragment or not u.netloc):
         raise ValueError("Origem deve ser somente https://hostname[:porta], sem caminho ou credenciais")
+    if not re.fullmatch(r"[A-Za-z0-9.-]+", u.hostname) or u.hostname.startswith("-"):
+        raise ValueError("Nome DNS inválido")
+    try:
+        _ = u.port
+    except ValueError as exc:
+        raise ValueError("Porta HTTPS inválida") from exc
     return f"https://{u.netloc}"
 
 def prepare(text: str, values: dict[str,str]) -> str:
@@ -47,7 +55,7 @@ def main() -> int:
     if not env.is_file() or env.is_symlink():
         raise SystemExit("Arquivo .env local ausente ou link simbólico: operação cancelada")
     mode=env.stat().st_mode
-    if mode & (stat.S_IRGRP|stat.S_IROTH):
+    if mode & 0o077:
         raise SystemExit("Proteja .env (modo 0600) antes de provisionar.")
     pwd=getpass.getpass("Crie a senha exclusiva da Central (mínimo 16 caracteres): ")
     confirm=getpass.getpass("Repita a senha: ")
@@ -61,16 +69,23 @@ def main() -> int:
        "PORTICO_OPERATOR_PUBLIC_ORIGIN": origin,
        "VPS_AGENT_OPERATOR_PORTAL_URL": origin+"/operator",
     }
-    new=prepare(env.read_text(),values)
-    # No printing of password, token, verifier, or existing .env values.
-    fd=os.open(env,os.O_WRONLY|os.O_APPEND|os.O_NOFOLLOW)
+    baseline=env.read_text()
+    new=prepare(baseline,values)
+    suffix=new[len(baseline):]
+    # Lock, recheck and append while holding an exclusive lock. No temp file
+    # or duplicate plaintext credentials should be written to disk.
+    fd=os.open(env,os.O_RDWR|os.O_APPEND|os.O_NOFOLLOW)
     try:
-        with os.fdopen(fd,"a") as out:
-            out.write(new[len(env.read_text()):]) if new.startswith(env.read_text()) else (_ for _ in ()).throw(ValueError("env changed"))
+        fcntl.flock(fd,fcntl.LOCK_EX)
+        with os.fdopen(fd,"r+",encoding="utf-8") as out:
+            if out.read()!=baseline:
+                raise SystemExit("O arquivo .env mudou; tente novamente.")
+            out.write(suffix)
             out.flush()
             os.fsync(out.fileno())
-    except Exception:
-        raise
+    finally:
+        # fdopen closes fd on success/error; flock released automatically.
+        pass
     print("Credenciais da Central configuradas no .env local (sem iniciar contêineres).")
     return 0
 
