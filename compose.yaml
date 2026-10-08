@@ -120,6 +120,7 @@ services:
     pids_limit: 80
     mem_limit: 128m
     environment:
+      PORTICO_OPERATOR_CONTAINER: "1"
       PORTICO_OPERATOR_SOCKET: /run/portico-operator/operator.sock
       PORTICO_OPERATOR_APPROVAL_TOKEN: ${VPS_AGENT_OPERATOR_APPROVAL_TOKEN:?configure a separate 32+ character token}
       PORTICO_OPERATOR_PASSWORD_SCRYPT: ${PORTICO_OPERATOR_PASSWORD_SCRYPT:?set password verifier}
