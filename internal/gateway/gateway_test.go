@@ -368,6 +368,9 @@ func TestApprovalFallsBackWithoutElicitationAndHidesConfirmTools(t *testing.T) {
 	if !strings.Contains(string(raw), "operator_fallback") {
 		t.Fatalf("expected explicit operator fallback, got %s", raw)
 	}
+	if !strings.Contains(string(raw), "operator_approval_guide") {
+		t.Fatalf("fallback must explain trusted operator approval path: %s", raw)
+	}
 	if strings.Contains(string(raw), "secret-root-token") || strings.Contains(string(raw), "approval_token") {
 		t.Fatalf("fallback leaked approval token: %s", raw)
 	}
