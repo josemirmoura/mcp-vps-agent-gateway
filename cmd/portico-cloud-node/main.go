@@ -90,13 +90,13 @@ func main() {
 	)
 
 	runner := cloudnode.Runner{
-		Client:            client,
-		Identity:          identity,
-		Broker:            ipc.Client{Socket: brokerSocket, Timeout: brokerTimeout},
-		BrokerSubject:     brokerSubject,
-		HeartbeatInterval: heartbeatInterval,
-		PollInterval:      pollInterval,
-		RenewInterval:     renewInterval,
+		Client:             client,
+		Identity:           identity,
+		Broker:             ipc.Client{Socket: brokerSocket, Timeout: brokerTimeout},
+		BrokerSubject:      brokerSubject,
+		HeartbeatInterval:  heartbeatInterval,
+		PollInterval:       pollInterval,
+		RenewInterval:      renewInterval,
 		BrokerTimeout:      brokerTimeout,
 		BrokerDrainTimeout: brokerDrainTimeout,
 	}
