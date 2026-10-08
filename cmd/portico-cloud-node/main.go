@@ -76,6 +76,7 @@ func main() {
 	pollInterval := durationEnv("PORTICO_CLOUD_POLL_INTERVAL", 2*time.Second)
 	renewInterval := durationEnv("PORTICO_CLOUD_RENEW_INTERVAL", 10*time.Second)
 	brokerTimeout := durationEnv("PORTICO_CLOUD_BROKER_TIMEOUT", 15*time.Minute)
+	brokerDrainTimeout := durationEnv("PORTICO_CLOUD_BROKER_DRAIN_TIMEOUT", 5*time.Second)
 
 	slog.Info("portico_cloud_node_start",
 		"node_id", identity.NodeID,
@@ -92,7 +93,8 @@ func main() {
 		HeartbeatInterval: heartbeatInterval,
 		PollInterval:      pollInterval,
 		RenewInterval:     renewInterval,
-		BrokerTimeout:     brokerTimeout,
+		BrokerTimeout:      brokerTimeout,
+		BrokerDrainTimeout: brokerDrainTimeout,
 	}
 	if err := runner.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		fatal("Portico Cloud node connector stopped", err)
