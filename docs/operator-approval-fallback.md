@@ -18,7 +18,7 @@ Esse resultado NÃO é uma aprovação. O operador tem duas opções:
 No terminal SSH do proprietário da instalação:
 
 ```bash
-cd /home/jmour/mcp-vps-agent-gateway
+cd /caminho/da/instalacao/mcp-vps-agent-gateway
 python3 scripts/operator-approvals.py
 ```
 
