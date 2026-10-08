@@ -29,6 +29,7 @@ operator = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(operator)
 SESSIONS: dict[str, tuple[float, str]] = {}
 LOCK = threading.Lock()
+LOGIN_FAILURES: dict[str, list[float]] = {}
 ID_RE = re.compile(r"^apr_[A-Za-z0-9_-]{8,100}$")
 API_RE = re.compile(r"^/api/operator/approvals/(apr_[A-Za-z0-9_-]{8,100})(/decision)?$")
 UI_PATH = REPO / "web/operator-approval/index.html"
@@ -137,11 +138,25 @@ class Handler(BaseHTTPRequestHandler):
             return
         path = urlsplit(self.path).path
         if path == "/api/operator/login":
+            # Bound rate limiting by remote address; TLS proxy MUST preserve access controls.
+            peer = self.client_address[0]
+            now = time.monotonic()
+            with LOCK:
+                failures = [t for t in LOGIN_FAILURES.get(peer, []) if now - t < 300]
+                LOGIN_FAILURES[peer] = failures
+                limited = len(failures) >= 5
+            if limited:
+                self.reply(429, {"error": "too many attempts"})
+                return
             try:
                 supplied = self.body().get("password")
                 if not isinstance(supplied, str) or len(supplied) > 1024 or not verify_password(supplied):
+                    with LOCK:
+                        LOGIN_FAILURES.setdefault(peer, []).append(time.monotonic())
                     self.reply(403, {"error": "invalid credentials"})
                     return
+                with LOCK:
+                    LOGIN_FAILURES.pop(peer, None)
                 sid, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
                 with LOCK:
                     if len(SESSIONS) > 500:
