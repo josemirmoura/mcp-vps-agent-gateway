@@ -21,14 +21,14 @@ type BrokerExecutor interface {
 var ErrBrokerStillRunning = errors.New("Broker operation still running after cancellation; stop Cloud node connector")
 
 type Runner struct {
-	Client            *Client
-	Identity          Identity
-	Broker            BrokerExecutor
-	BrokerSubject     string
-	HeartbeatInterval time.Duration
-	PollInterval      time.Duration
-	RenewInterval     time.Duration
-	BrokerTimeout     time.Duration
+	Client             *Client
+	Identity           Identity
+	Broker             BrokerExecutor
+	BrokerSubject      string
+	HeartbeatInterval  time.Duration
+	PollInterval       time.Duration
+	RenewInterval      time.Duration
+	BrokerTimeout      time.Duration
 	BrokerDrainTimeout time.Duration
 }
 
