@@ -54,6 +54,7 @@ jobs:
           bash -n scripts/lib/*.sh
           python3 scripts/check-installation-contract.py
           python3 scripts/check-doc-links.py
+          python3 -m unittest discover -s tests/scripts -p 'test_*.py' -v
           bash scripts/version.sh
           bash scripts/validate-compose-model.sh
 
