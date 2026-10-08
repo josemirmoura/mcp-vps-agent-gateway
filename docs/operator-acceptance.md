@@ -83,7 +83,7 @@ Before granting a project root:
 Request access to one disposable project root:
 
 - confirm ChatGPT/MCP client renders its **native elicitation/confirmation UI**, not the old custom inline iframe;
-- verify the prompt shows path, access profile, duration and physical ceiling;
+- verify path, access profile, duration and physical ceiling are all visible for both narrow and ceiling-wide root requests;
 - confirm that requests containing invisible Unicode formatting characters (bidirectional overrides, isolate marks, zero-width joiners), Unicode line/paragraph separators or invalid UTF-8 are rejected before the native approval dialog, with no delegated access granted;
 - confirm a request covering the full physical ceiling cannot proceed without the stronger current-and-future-descendants disclosure;
 - for an exact-ceiling request, confirm the stronger current-and-future-descendants warning appears; denying that broad request is sufficient for this UI check;

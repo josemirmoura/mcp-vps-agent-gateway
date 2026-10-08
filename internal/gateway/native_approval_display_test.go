@@ -95,6 +95,53 @@ func TestNativeApprovalRequiresVisibleAuthorityContext(t *testing.T) {
 	}
 }
 
+func TestNativeRootApprovalAlwaysDisplaysPhysicalCeiling(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		lang string
+		label string
+	}{
+		{name: "English", lang: "en", label: "Ceiling: /opt"},
+		{name: "Portuguese", lang: "pt-BR", label: "Limite: /opt"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("VPS_AGENT_LANG", tc.lang)
+			values := map[string]any{
+				"root": "/opt/example",
+				"physical_ceiling": "/opt",
+				"access": "work",
+				"delegation_ttl_seconds": 3600,
+				"ceiling_wide": false,
+			}
+			message, err := validatedApprovalMessage("root", values)
+			if err != nil {
+				t.Fatalf("narrow approval rejected: %v", err)
+			}
+			if !strings.Contains(message, tc.label) {
+				t.Fatalf("physical ceiling not disclosed: %q", message)
+			}
+			if len(message) > 220 || strings.Count(message, "\n") > 5 {
+				t.Fatalf("mobile-safe bounds exceeded: %q", message)
+			}
+			values["root"] = "/opt"
+			values["ceiling_wide"] = true
+			message, err = validatedApprovalMessage("root", values)
+			if err != nil {
+				t.Fatalf("ceiling-wide approval rejected: %v", err)
+			}
+			if !strings.Contains(message, tc.label) {
+				t.Fatalf("broad approval hid ceiling: %q", message)
+			}
+			if !strings.Contains(message, "/opt.") {
+				t.Fatalf("broad authority warning hidden: %q", message)
+			}
+			if len(message) > 220 || strings.Count(message, "\n") > 5 {
+				t.Fatalf("broad mobile-safe bounds exceeded: %q", message)
+			}
+		})
+	}
+}
+
 func TestNativeApprovalStateDoesNotCrossApprovalKinds(t *testing.T) {
 	state, err := encodeNativeApprovalState(nativeApprovalState{
 		Kind: "root", RequestID: "apr-test", ApprovalToken: "token-test",
