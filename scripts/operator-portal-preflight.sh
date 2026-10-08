@@ -11,7 +11,7 @@ test -f scripts/operator-approvals.py || { echo 'FAIL: missing operator fallback
 command -v docker >/dev/null || { echo 'FAIL: Docker missing'; exit 1; }
 docker compose config --quiet || { echo 'FAIL: existing Compose config invalid'; exit 1; }
 docker compose --profile operator-portal config --quiet || { echo 'FAIL: optional portal config invalid'; exit 1; }
-python3 -m py_compile web/operator-approval/server.py scripts/operator-approvals.py
+python3 -c 'import ast,pathlib; [ast.parse(pathlib.Path(p).read_text()) for p in ("web/operator-approval/server.py","scripts/operator-approvals.py")]'
 printf 'Git revision: '; git rev-parse --short HEAD
 printf 'Services:\n'; docker compose ps --format 'table {{.Name}}\t{{.Status}}'
 printf 'PASS: non-mutating preflight. NO deployment performed.\n'
