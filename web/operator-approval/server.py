@@ -159,7 +159,9 @@ class Handler(BaseHTTPRequestHandler):
                 if item is None:
                     self.reply(404, {"error": "not found or expired"})
                     return
-                ceiling = operator.physical_ceiling()
+                ceiling = os.environ.get("PORTICO_OPERATOR_PHYSICAL_CEILING", "")
+                if not ceiling.startswith("/"):
+                    raise RuntimeError("physical ceiling unavailable")
                 self.reply(200, {
                     "request_id": item["id"], "node": os.environ.get("PORTICO_OPERATOR_NODE_LABEL", "Local"),
                     "subject": item["subject"], "resource": item["target"],
@@ -236,7 +238,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    if not os.environ.get("PORTICO_OPERATOR_PASSWORD_SCRYPT") or not os.environ.get("PORTICO_OPERATOR_PUBLIC_ORIGIN") or len(os.environ.get("PORTICO_OPERATOR_APPROVAL_TOKEN", "")) < 32:
+    if not os.environ.get("PORTICO_OPERATOR_PASSWORD_SCRYPT") or not os.environ.get("PORTICO_OPERATOR_PUBLIC_ORIGIN") or len(os.environ.get("PORTICO_OPERATOR_APPROVAL_TOKEN", "")) < 32 or not os.environ.get("PORTICO_OPERATOR_PHYSICAL_CEILING", "").startswith("/"):
         raise SystemExit("Operator password verifier and public origin must be configured")
     # Binding externally is deliberately unsupported. Access only through a
     # separately authenticated, rate-limited TLS reverse proxy.
