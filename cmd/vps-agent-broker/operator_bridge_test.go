@@ -26,11 +26,16 @@ func TestOperatorBridgeRejectsMissingOrWrongToken(t *testing.T) {
 }
 
 func TestWebApprovalEligibilityRejectsElevationAndExpired(t *testing.T) {
- base := state.Approval{Status:"pending", Subject:"alice", ExpiresAt:time.Now().Add(time.Minute)}
+ base := state.Approval{Status:"pending", Subject:"alice", TTL:time.Hour, ExpiresAt:time.Now().Add(time.Minute)}
  root := base
  root.Kind="root";root.Resource="/opt/project";root.Access="work"
  if !eligibleWebApproval(root,"alice") { t.Fatal("valid root approval rejected") }
  if eligibleWebApproval(root,"bob") { t.Fatal("different subject accepted") }
+ permanent:=root;permanent.TTL=0
+ if eligibleWebApproval(permanent,"alice") {t.Fatal("permanent grant accepted")}
+ t.Setenv("VPS_AGENT_PHYSICAL_SCOPE_ROOT","/opt")
+ wide:=root;wide.Resource="/opt"
+ if eligibleWebApproval(wide,"alice") {t.Fatal("physical ceiling-wide grant accepted")}
  expired:=root;expired.ExpiresAt=time.Now().Add(-time.Second)
  if eligibleWebApproval(expired,"alice") { t.Fatal("expired request accepted") }
  broad:=base;broad.Kind="capability";broad.Capabilities=[]string{"shell.admin"}
