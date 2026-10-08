@@ -64,6 +64,9 @@ func main() {
 	slog.Info("broker_start", "socket", socket, "instance_id", b.InstanceID, "instance_name", b.InstanceName, "policy", policyFile)
 	// Isolate web approvals on a distinct Unix socket and dedicated volume.
 	operatorSocket := os.Getenv("VPS_AGENT_OPERATOR_APPROVAL_SOCKET")
+	if operatorSocket == "" && operatorToken() != "" {
+		operatorSocket = "/run/portico-operator/operator.sock"
+	}
 	if operatorSocket != "" {
 		if len(operatorToken()) < 32 {
 			slog.Error("operator_approval_token_too_short")
