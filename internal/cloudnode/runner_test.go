@@ -144,7 +144,6 @@ func TestRunnerUsesLocalBrokerSubjectAndTaskInvocationID(t *testing.T) {
 	}
 }
 
-
 func TestTaskDeliveryWindowRejectsBothExpiredDeadlines(t *testing.T) {
 	now := time.Date(2026, time.October, 8, 11, 30, 0, 0, time.UTC)
 	past := now.Add(-time.Second)
