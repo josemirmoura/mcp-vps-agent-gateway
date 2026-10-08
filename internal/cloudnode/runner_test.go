@@ -143,3 +143,55 @@ func TestRunnerUsesLocalBrokerSubjectAndTaskInvocationID(t *testing.T) {
 		t.Fatal("runner did not stop after context cancellation")
 	}
 }
+
+
+func TestTaskDeliveryWindowRejectsBothExpiredDeadlines(t *testing.T) {
+	now := time.Date(2026, time.October, 8, 11, 30, 0, 0, time.UTC)
+	past := now.Add(-time.Second)
+	future := now.Add(time.Minute)
+	for _, tc := range []struct {
+		name          string
+		leaseDeadline *time.Time
+		taskDeadline  *time.Time
+		wantError     bool
+	}{
+		{name: "valid both", leaseDeadline: &future, taskDeadline: &future},
+		{name: "expired lease", leaseDeadline: &past, taskDeadline: &future, wantError: true},
+		{name: "expired task", leaseDeadline: &future, taskDeadline: &past, wantError: true},
+		{name: "lease expires exactly now", leaseDeadline: &now, wantError: true},
+		{name: "task expires exactly now", taskDeadline: &now, wantError: true},
+		{name: "legacy no deadlines"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateTaskDeliveryWindow(Task{
+				LeaseExpiresAt: tc.leaseDeadline,
+				ExpiresAt:      tc.taskDeadline,
+			}, now)
+			if (err != nil) != tc.wantError {
+				t.Fatalf("delivery check err=%v wantError=%t", err, tc.wantError)
+			}
+		})
+	}
+}
+
+func TestRunnerDoesNotDispatchExpiredCloudTaskToBroker(t *testing.T) {
+	expired := time.Now().Add(-time.Second)
+	broker := captureBroker{requests: make(chan wire.Request, 1)}
+	runner := Runner{
+		Identity: Identity{NodeID: "node-ci"},
+		Broker: broker,
+		BrokerSubject: "operator-local",
+	}
+	err := runner.processTask(t.Context(), Task{
+		ID: "task-ci", DestinationNodeID: "node-ci", LeaseID: "lease-ci",
+		Operation: "system.info", LeaseExpiresAt: &expired,
+	})
+	if err == nil {
+		t.Fatal("expired task did not fail closed")
+	}
+	select {
+	case request := <-broker.requests:
+		t.Fatalf("expired task reached local Broker: %+v", request)
+	default:
+	}
+}
