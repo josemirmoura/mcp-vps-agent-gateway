@@ -101,7 +101,7 @@ The connector never transports a Broker admin token through Cloud.
 
 Before submitting a leased Cloud task to the local Broker, the connector checks both `lease_expires_at` and `expires_at` if supplied by Cloud. An elapsed lease or task deadline is fail-closed: no new local Broker call or stale completion is attempted. A still-valid task whose delivery lease lapsed may be safely requeued and leased again by Cloud.
 
-For a dispatched operation, the local Broker call context is bounded by the earliest of the task deadline, lease deadline and configured `PORTICO_CLOUD_BROKER_TIMEOUT`. Cancellation after an operation has started is best effort. Neither Cloud deadline enforcement nor connector cancellation proves that a host-side effect did not occur; inspect the local Broker audit for actual execution evidence. Accurate node clock synchronization is required for deadline enforcement.
+For a dispatched operation, the local Broker call context is bounded by the task's fixed expiry and configured `PORTICO_CLOUD_BROKER_TIMEOUT`. The delivery lease can be renewed: a local watchdog tracks each confirmed lease extension and requests cancellation if Cloud does not renew before the last known lease deadline, including during network outages. Cancellation after an operation has started is best effort. Neither Cloud deadline enforcement nor connector cancellation proves that a host-side effect did not occur; inspect the local Broker audit for actual execution evidence. Accurate node clock synchronization is required for deadline enforcement.
 
 
 ## Network model
