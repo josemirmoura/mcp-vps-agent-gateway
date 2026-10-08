@@ -6,8 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -125,21 +128,33 @@ func validatedApprovalMessage(kind string, values map[string]any) (string, error
 		targetKey = "path"
 	}
 	ceilingWide, _ := values["ceiling_wide"].(bool)
+	access, _ := values["access"].(string)
+	if (kind == "root" && access != "read" && access != "work" && access != "compose") ||
+		(kind == "sensitive" && access != "read") {
+		return "", errors.New("unsupported approval access profile")
+	}
 	for _, key := range []string{targetKey, "access", "physical_ceiling"} {
 		value := stringValue(values[key])
 		if value == "—" || strings.TrimSpace(value) == "" {
 			if key == "physical_ceiling" && kind == "sensitive" {
 				continue
 			}
-			if key == "physical_ceiling" && !ceilingWide {
-				continue
-			}
-			return "", fmt.Errorf("cannot display missing approval field %s", key)
+						return "", fmt.Errorf("cannot display missing approval field %s", key)
+		}
+		if !utf8.ValidString(value) {
+			return "", errors.New("approval field contains invalid UTF-8")
 		}
 		for _, r := range value {
-			if r < 32 || r == 127 {
-				return "", errors.New("approval target contains control characters; request a safe path")
+			if unicode.IsControl(r) || unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp) {
+				return "", errors.New("approval field contains invisible or direction-control characters; use a safe path")
 			}
+		}
+	}
+	if kind == "root" && !ceilingWide {
+		root, _ := values["root"].(string)
+		ceiling, _ := values["physical_ceiling"].(string)
+		if filepath.Clean(root) == filepath.Clean(ceiling) {
+			return "", errors.New("ceiling-wide approval request must disclose its full scope warning")
 		}
 	}
 	message := approvalMessage(kind, values)
