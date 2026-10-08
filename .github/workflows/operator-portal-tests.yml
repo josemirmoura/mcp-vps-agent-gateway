@@ -1,0 +1,18 @@
+name: Operator portal prototype tests
+on:
+  pull_request:
+    paths:
+      - 'web/operator-approval/**'
+      - '.github/workflows/operator-portal-tests.yml'
+  workflow_dispatch:
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m unittest discover -s web/operator-approval -p 'test_*.py' -v
