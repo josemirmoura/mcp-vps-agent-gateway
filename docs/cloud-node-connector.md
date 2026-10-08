@@ -97,6 +97,12 @@ Task-to-Broker mapping:
 
 The connector never transports a Broker admin token through Cloud.
 
+### Cancellation and uncertain host-side effects
+
+When a Cloud lease renewal is rejected, the delivery deadline elapses, or the local Broker timeout fires, the connector requests cancellation of the in-flight Broker call and waits for an actual response, up to the bounded drain interval. If the Broker ignores cancellation and does not respond, the connector **stops polling and terminates with an error**. This avoids starting another Cloud task while the prior host-side execution may still be active. A service supervisor may restart the connector, but restarting alone cannot prove host-side effects were canceled; review Broker-local audit before retrying non-idempotent work.
+
+If the Broker confirms that its call ended during cancellation, the connector returns the cancellation error and may continue its main polling loop. Timed-out work is not reported as a successful Cloud task. The connector does not implement exactly-once execution, remote kill of host processes, or global task deduplication.
+
 ### Deadline boundary
 
 Before submitting a leased Cloud task to the local Broker, the connector checks both `lease_expires_at` and `expires_at` if supplied by Cloud. An elapsed lease or task deadline is fail-closed: no new local Broker call or stale completion is attempted. A still-valid task whose delivery lease lapsed may be safely requeued and leased again by Cloud.
@@ -123,6 +129,7 @@ Production Cloud URLs require HTTPS. Plain HTTP is accepted only for loopback de
 | `PORTICO_CLOUD_POLL_INTERVAL` | `2s` | idle task polling cadence |
 | `PORTICO_CLOUD_RENEW_INTERVAL` | `10s` | active task lease renewal cadence |
 | `PORTICO_CLOUD_BROKER_TIMEOUT` | `15m` | maximum local Broker call time |
+| `PORTICO_CLOUD_BROKER_DRAIN_TIMEOUT` | `5s` | time allowed for the Broker call to acknowledge cancellation before the connector stops leasing work |
 
 For first enrollment only, the binary also accepts:
 
