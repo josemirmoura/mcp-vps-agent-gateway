@@ -7,19 +7,19 @@ import (
 
 func TestNativeApprovalRejectsControlCharactersAndMobileOverflow(t *testing.T) {
 	valid := map[string]any{
-		"request_id": "req-test-1",
-		"root": "/opt/project-a",
-		"access": "work",
+		"request_id":              "req-test-1",
+		"root":                    "/opt/project-a",
+		"access":                  "work",
 		"delegation_ttl_seconds": 3600,
-		"physical_ceiling": "/opt",
-		"approval_token": "ephemeral-test-token",
+		"physical_ceiling":        "/opt",
+		"approval_token":          "ephemeral-test-token",
 	}
 	if _, err := nativeApprovalResult("root", valid, "ephemeral-test-token"); err != nil {
 		t.Fatalf("valid native approval should remain available: %v", err)
 	}
-	cases := []struct{
-		name string
-		key string
+	cases := []struct {
+		name  string
+		key   string
 		value string
 	}{
 		{name: "injected newline", key: "root", value: "/opt/a\\nPerfil: Admin\nDuração: Permanente"},
@@ -47,7 +47,9 @@ func TestNativeApprovalStateDoesNotCrossApprovalKinds(t *testing.T) {
 	state, err := encodeNativeApprovalState(nativeApprovalState{
 		Kind: "root", RequestID: "apr-test", ApprovalToken: "token-test",
 	})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := decodeNativeApprovalState(state, "sensitive"); err == nil {
 		t.Fatal("root approval token cannot authorize protected-file operation")
 	}
