@@ -23,6 +23,8 @@ services:
       VPS_AGENT_BROKER_SOCKET: /run/vps-agent/broker.sock
       VPS_AGENT_STATE_DB: /var/lib/vps-agent/state.db
       VPS_AGENT_ADMIN_TOKEN: ${VPS_AGENT_ADMIN_TOKEN:?set VPS_AGENT_ADMIN_TOKEN in .env}
+      VPS_AGENT_OPERATOR_APPROVAL_TOKEN: ${VPS_AGENT_OPERATOR_APPROVAL_TOKEN:-}
+      VPS_AGENT_OPERATOR_APPROVAL_SOCKET: ${VPS_AGENT_OPERATOR_APPROVAL_SOCKET:-}
       VPS_AGENT_EXPECTED_SUBJECT: ${VPS_AGENT_SUBJECT:-operator}
       VPS_AGENT_HOST_ROOT: /host
       VPS_AGENT_HOST_NSENTER: "1"
@@ -46,6 +48,7 @@ services:
         source: ./state
         target: /var/lib/vps-agent
       - broker-run:/run/vps-agent
+      - operator-run:/run/portico-operator
     healthcheck:
       test: ["CMD", "/usr/local/bin/vps-agent", "audit-status", "--socket", "/run/vps-agent/broker.sock"]
       interval: 10s
@@ -102,5 +105,36 @@ services:
     cap_drop:
       - ALL
 
+  operator-portal:
+    profiles: ["operator-portal"]
+    image: python:3.12-alpine
+    working_dir: /srv/portico
+    entrypoint: ["python3", "web/operator-approval/server.py"]
+    user: "65532:65532"
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 80
+    mem_limit: 128m
+    environment:
+      PORTICO_OPERATOR_SOCKET: /run/portico-operator/operator.sock
+      PORTICO_OPERATOR_APPROVAL_TOKEN: ${VPS_AGENT_OPERATOR_APPROVAL_TOKEN:?configure a separate 32+ character token}
+      PORTICO_OPERATOR_PASSWORD_SCRYPT: ${PORTICO_OPERATOR_PASSWORD_SCRYPT:?set password verifier}
+      PORTICO_OPERATOR_PUBLIC_ORIGIN: ${PORTICO_OPERATOR_PUBLIC_ORIGIN:?set public HTTPS origin}
+      PORTICO_OPERATOR_NODE_LABEL: ${VPS_AGENT_INSTANCE_NAME:-vps-agent}
+    volumes:
+      - operator-run:/run/portico-operator
+      - ./web/operator-approval:/srv/portico/web/operator-approval:ro
+      - ./scripts/operator-approvals.py:/srv/portico/scripts/operator-approvals.py:ro
+    ports:
+      - "127.0.0.1:8765:8765"
+    depends_on:
+      broker:
+        condition: service_healthy
+
 volumes:
   broker-run:
+  operator-run:
