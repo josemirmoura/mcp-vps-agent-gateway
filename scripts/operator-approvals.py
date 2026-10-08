@@ -114,6 +114,8 @@ def request_detail(row: dict) -> dict | None:
 
 def list_requests() -> list[dict]:
     result = cli_call("approvals")
+    if result is None:  # Go encodes a nil slice as JSON null when the queue is empty.
+        return []
     if not isinstance(result, list):
         raise RuntimeError("Lista de aprovações inesperada")
     return [detail for row in result if (detail := request_detail(row))]
