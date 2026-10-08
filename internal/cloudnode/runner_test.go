@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -192,5 +193,86 @@ func TestRunnerDoesNotDispatchExpiredCloudTaskToBroker(t *testing.T) {
 	case request := <-broker.requests:
 		t.Fatalf("expired task reached local Broker: %+v", request)
 	default:
+	}
+}
+
+func TestCloudRenewalWatchdogExtendsInitialLease(t *testing.T) {
+	identity := enrolledTestIdentity(t)
+	taskID := "55555555-5555-5555-5555-555555555555"
+	leaseID := "66666666-6666-6666-6666-666666666666"
+	var renewals atomic.Int64
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/nodes/"+identity.NodeID+"/tasks/"+taskID+"/renew" {
+			http.NotFound(w, r)
+			return
+		}
+		renewals.Add(1)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"lease_expires_at": time.Now().UTC().Add(400 * time.Millisecond).Format(time.RFC3339Nano),
+		})
+	}))
+	defer server.Close()
+	client, err := NewClient(server.URL, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	initial := time.Now().Add(250 * time.Millisecond)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	runner := Runner{Client: client, Identity: identity, RenewInterval: 40 * time.Millisecond}
+	fatal := make(chan error, 1)
+	done := make(chan struct{})
+	go func() {
+		runner.renewLoop(ctx, Task{ID: taskID, LeaseID: leaseID, LeaseExpiresAt: &initial}, fatal)
+		close(done)
+	}()
+
+	select {
+	case err := <-fatal:
+		t.Fatalf("valid signed renewal unexpectedly failed: %v", err)
+	case <-time.After(550 * time.Millisecond):
+	}
+	if renewals.Load() < 1 {
+		t.Fatal("renewal requests never reached Cloud")
+	}
+	select {
+	case err := <-fatal:
+		t.Fatalf("initial lease expiry incorrectly canceled renewed execution: %v", err)
+	default:
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("renewal loop did not exit after cancellation")
+	}
+}
+
+func TestCloudRenewalWatchdogStopsWhenCloudIsUnavailable(t *testing.T) {
+	identity := enrolledTestIdentity(t)
+	taskID := "77777777-7777-7777-7777-777777777777"
+	leaseID := "88888888-8888-8888-8888-888888888888"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "unavailable", http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	client, err := NewClient(server.URL, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	initial := time.Now().Add(220 * time.Millisecond)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	runner := Runner{Client: client, Identity: identity, RenewInterval: 40 * time.Millisecond}
+	fatal := make(chan error, 1)
+	go runner.renewLoop(ctx, Task{ID: taskID, LeaseID: leaseID, LeaseExpiresAt: &initial}, fatal)
+	select {
+	case err := <-fatal:
+		if err == nil {
+			t.Fatal("expired lease watchdog returned no error")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("unrenewed lease did not expire locally")
 	}
 }
