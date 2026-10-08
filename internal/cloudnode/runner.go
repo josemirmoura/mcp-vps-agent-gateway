@@ -241,6 +241,7 @@ func (r Runner) renewLoop(ctx context.Context, task Task, fatal chan<- error) {
 	// unreachable. A successful signed renewal replaces this deadline.
 	var leaseTimer *time.Timer
 	var leaseDeadline <-chan time.Time
+	var confirmedDeadline time.Time
 	defer func() {
 		if leaseTimer != nil {
 			leaseTimer.Stop()
@@ -252,6 +253,7 @@ func (r Runner) renewLoop(ctx context.Context, task Task, fatal chan<- error) {
 			reportFatal(errors.New("Cloud lease expired during Broker execution"))
 			return false
 		}
+		confirmedDeadline = expiresAt
 		if leaseTimer == nil {
 			leaseTimer = time.NewTimer(remaining)
 			leaseDeadline = leaseTimer.C
@@ -278,7 +280,21 @@ func (r Runner) renewLoop(ctx context.Context, task Task, fatal chan<- error) {
 			reportFatal(errors.New("Cloud lease expired without renewal"))
 			return
 		case <-ticker.C:
-			expiresAt, err := r.Client.RenewTaskLease(ctx, r.Identity, task.ID, task.LeaseID)
+			// The renewal HTTP call itself cannot stall past the last known
+			// lease deadline while leaving the local Broker running.
+			requestCtx := ctx
+			var cancelRequest context.CancelFunc
+			if !confirmedDeadline.IsZero() {
+				requestCtx, cancelRequest = context.WithDeadline(ctx, confirmedDeadline)
+			}
+			expiresAt, err := r.Client.RenewTaskLease(requestCtx, r.Identity, task.ID, task.LeaseID)
+			if cancelRequest != nil {
+				cancelRequest()
+			}
+			if !confirmedDeadline.IsZero() && !time.Now().Before(confirmedDeadline) {
+				reportFatal(errors.New("Cloud lease expired while renewal was in flight"))
+				return
+			}
 			if err == nil {
 				if !setDeadline(expiresAt) {
 					return
