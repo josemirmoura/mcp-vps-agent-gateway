@@ -51,6 +51,12 @@ Security CI separately produces vulnerability reports and CycloneDX SBOM evidenc
 
 The normal updateable installation remains a tagged Git checkout because `scripts/update.sh` intentionally uses Git fast-forward semantics, migration validation, backup and rollback.
 
+## Isolated keyless-signing proof (no release)
+
+The `release-signing-proof` workflow is a one-off, non-release validation that runs when its definition reaches `main`, or when explicitly dispatched from `main`. It signs a **generated synthetic text file only**, using a short-lived GitHub Actions OIDC certificate and Sigstore/cosign. The job verifies the exact repository/workflow identity and issuer, and confirms that an altered file fails signature verification. A short-retention artifact contains only the synthetic text, SHA-256 and public signing bundle. This proof does **not** create a Git tag, GitHub Release, GHCR image, billing event, production deployment or secret.
+
+The published `release.yml` remains the authoritative, separate path for release images, source packages and their signatures. A green signing-proof run establishes that GitHub keyless blob signing works in the rehearsal environment, **not** that a released package or image has been signed or that the project is approved for stable publication. Final owner clean-install, Community license/IP approval and actual immutable release signature verification are still mandatory.
+
 ## Cryptographic release verification
 
 The current release workflow is configured to keyless-sign new release images and source artifacts with Sigstore/cosign using GitHub Actions OIDC.
