@@ -188,8 +188,8 @@ func approvalMessage(kind string, values map[string]any) string {
 	ceiling := stringValue(values["physical_ceiling"])
 	if pt {
 		message := fmt.Sprintf(
-			"Autorizar Pórtico?\nPasta: %s\nPerfil: %s\nDuração: %s",
-			target, accessLabel(access, true), duration,
+			"Autorizar Pórtico?\nPasta: %s\nLimite: %s\nPerfil: %s\nDuração: %s",
+			target, ceiling, accessLabel(access, true), duration,
 		)
 		if ceilingWide {
 			message += fmt.Sprintf("\nATENÇÃO: inclui todas as pastas atuais e futuras sob %s.", ceiling)
@@ -197,8 +197,8 @@ func approvalMessage(kind string, values map[string]any) string {
 		return message
 	}
 	message := fmt.Sprintf(
-		"Authorize Portico?\nFolder: %s\nProfile: %s\nDuration: %s",
-		target, accessLabel(access, false), duration,
+		"Authorize Portico?\nFolder: %s\nCeiling: %s\nProfile: %s\nDuration: %s",
+		target, ceiling, accessLabel(access, false), duration,
 	)
 	if ceilingWide {
 		message += fmt.Sprintf("\nWARNING: includes every current and future folder under %s.", ceiling)
