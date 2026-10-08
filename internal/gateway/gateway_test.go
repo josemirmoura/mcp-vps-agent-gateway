@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	portico "github.com/josemirmoura/mcp-vps-agent-gateway"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/securefs"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/wire"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -110,6 +111,12 @@ func TestSystemInfoPreservesInstanceIdentity(t *testing.T) {
 	raw, _ := json.Marshal(res.StructuredContent)
 	if !strings.Contains(string(raw), "inst-123") || !strings.Contains(string(raw), "VPS Agent | Loja") {
 		t.Fatalf("instance identity missing: %s", raw)
+	}
+	if !strings.Contains(string(raw), `"gateway_version":"`+portico.Version()+`"`) {
+		t.Fatalf("canonical gateway version missing: %s", raw)
+	}
+	if !strings.Contains(string(raw), `"approval_protocol":"native-mcp-elicitation-when-supported"`) {
+		t.Fatalf("approval transport indicator missing: %s", raw)
 	}
 }
 
