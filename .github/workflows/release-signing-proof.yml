@@ -1,0 +1,62 @@
+name: release-signing-proof
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/release-signing-proof.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keyless-blob-proof:
+    if: github.repository == 'josemirmoura/mcp-vps-agent-gateway' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: sigstore/cosign-installer@v4.1.2
+      - name: Sign synthetic non-release proof with GitHub OIDC
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          mkdir -p signing-proof
+          printf 'PORTICO NON-RELEASE SIGNING PROOF\nrepository=%s\nrevision=%s\n' \
+            "$GITHUB_REPOSITORY" "$GITHUB_SHA" > signing-proof/probe.txt
+          cosign sign-blob signing-proof/probe.txt \
+            --bundle signing-proof/probe.sigstore.json --yes
+      - name: Verify issuer, workflow identity, and reject altered blob
+        shell: bash
+        run: |
+          set -euo pipefail
+          identity="https://github.com/$GITHUB_REPOSITORY/.github/workflows/release-signing-proof.yml@refs/heads/main"
+          issuer="https://token.actions.githubusercontent.com"
+          cosign verify-blob signing-proof/probe.txt \
+            --bundle signing-proof/probe.sigstore.json \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer"
+          cp signing-proof/probe.txt signing-proof/altered.txt
+          printf 'TAMPERED\n' >> signing-proof/altered.txt
+          if cosign verify-blob signing-proof/altered.txt \
+            --bundle signing-proof/probe.sigstore.json \
+            --certificate-identity "$identity" \
+            --certificate-oidc-issuer "$issuer" >/dev/null 2>&1; then
+            echo "FAIL: altered synthetic proof verified" >&2
+            exit 1
+          fi
+          rm signing-proof/altered.txt
+          sha256sum signing-proof/probe.txt > signing-proof/probe.txt.sha256
+          echo "KEYLESS_PROOF_VERIFIED_NOT_A_RELEASE"
+      - name: Upload only synthetic and publicly verifiable proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: portico-keyless-signing-proof
+          path: signing-proof/
+          retention-days: 7
+          if-no-files-found: error
