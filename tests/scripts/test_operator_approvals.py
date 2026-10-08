@@ -113,6 +113,10 @@ class ApprovalTests(unittest.TestCase):
                     self.assertTrue(app.decide(item))
                     call.assert_called_once_with("deny", "--request", REQUEST)
 
+    def test_empty_broker_queue_is_not_an_error(self):
+        with mock.patch.object(app, "cli_call", return_value=None):
+            self.assertEqual(app.list_requests(), [])
+
     def test_broker_errors_fail_closed(self):
         mock_result = types.SimpleNamespace(returncode=1, stdout="", stderr="secret")
         with mock.patch.object(app.subprocess, "run", return_value=mock_result):
