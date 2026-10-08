@@ -14,6 +14,15 @@ set -a
 . ./.env
 set +a
 
+# Keep verification output private, collision-free and automatically removed.
+# Fixed filenames in shared /tmp permit symlink clobbering and concurrent-run races.
+umask 077
+VERIFY_DIR="$(mktemp -d "${TMPDIR:-/tmp}/portico-verify.XXXXXXXX")"
+export VPS_AGENT_VERIFY_DIR="$VERIFY_DIR"
+trap 'rm -rf -- "$VERIFY_DIR"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 docker compose config -q
 
 broker_id="$(docker compose ps -a -q broker 2>/dev/null || true)"
@@ -49,30 +58,30 @@ fi
 
 docker compose ps
 
-docker compose exec -T broker /usr/local/bin/vps-agent audit-status >/tmp/vps-agent-audit.json
-cat /tmp/vps-agent-audit.json
+docker compose exec -T broker /usr/local/bin/vps-agent audit-status >"$VERIFY_DIR/vps-agent-audit.json"
+cat "$VERIFY_DIR/vps-agent-audit.json"
 
 if [ "${VPS_AGENT_AUTH_MODE:-static}" = "static" ]; then
   docker compose exec -T gateway sh -c \
-    'header_name="Authorization"; bad_scheme="Bearer"; bad_value="definitely-wrong"; code="$(curl -sS -o /tmp/bad-auth.out -w "%{http_code}" -H "$header_name: $bad_scheme $bad_value" http://127.0.0.1:8080/mcp)"; test "$code" = "401"'
+    'header_name="Authorization"; bad_scheme="Bearer"; bad_value="definitely-wrong"; code="$(curl -sS -o /dev/null -w "%{http_code}" -H "$header_name: $bad_scheme $bad_value" http://127.0.0.1:8080/mcp)"; test "$code" = "401"'
 
   docker compose exec -T gateway /usr/local/bin/vps-agent-mcp-call \
     --endpoint http://127.0.0.1:8080/mcp \
     --token "$VPS_AGENT_STATIC_TOKEN" \
     --tool system.info \
-    --args '{}' >/tmp/vps-agent-system-info.json
+    --args '{}' >"$VERIFY_DIR/vps-agent-system-info.json"
 else
   echo "$(vps_agent_text "Local MCP tool call skipped for auth mode ${VPS_AGENT_AUTH_MODE}; public OAuth verification will be used." "Chamada MCP local ignorada no modo ${VPS_AGENT_AUTH_MODE}; será usada a verificação OAuth pública.")"
-  printf '{"is_error":false,"mode":"oauth-integrated"}\n' >/tmp/vps-agent-system-info.json
+  printf '{"is_error":false,"mode":"oauth-integrated"}\n' >"$VERIFY_DIR/vps-agent-system-info.json"
 fi
-cat /tmp/vps-agent-system-info.json
+cat "$VERIFY_DIR/vps-agent-system-info.json"
 
 VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - <<'PY'
 import json, os
 pt=os.environ.get("VPS_AGENT_LANG")=="pt-BR"
-a=json.load(open("/tmp/vps-agent-audit.json"))
+a=json.load(open(os.path.join(os.environ["VPS_AGENT_VERIFY_DIR"], "vps-agent-audit.json")))
 assert a["ok"] is True and a["result"]["valid"] is True, a
-s=json.load(open("/tmp/vps-agent-system-info.json"))
+s=json.load(open(os.path.join(os.environ["VPS_AGENT_VERIFY_DIR"], "vps-agent-system-info.json")))
 assert s["is_error"] is False, s
 print("VERIFICAÇÃO MCP LOCAL: OK" if pt else "LOCAL MCP VERIFICATION: PASS")
 PY
