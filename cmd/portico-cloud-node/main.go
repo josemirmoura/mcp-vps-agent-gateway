@@ -38,6 +38,10 @@ func main() {
 	}
 
 	statePath := getenv("PORTICO_CLOUD_STATE", "/var/lib/portico-cloud-node/state.json")
+	// A restart policy must never silently bypass an unconfirmed cancellation.
+	if err := cloudnode.CheckQuarantine(statePath); err != nil {
+		fatal("Portico Cloud node requires local Broker audit before restart", err)
+	}
 	nodeName := strings.TrimSpace(os.Getenv("PORTICO_CLOUD_NODE_NAME"))
 	if nodeName == "" {
 		nodeName, _ = os.Hostname()
@@ -97,6 +101,16 @@ func main() {
 		BrokerDrainTimeout: brokerDrainTimeout,
 	}
 	if err := runner.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		if errors.Is(err, cloudnode.ErrBrokerStillRunning) {
+			if quarantineErr := cloudnode.MarkQuarantine(statePath); quarantineErr != nil {
+				// Stay fail-closed if the node volume cannot persist the
+				// marker. Exit only when shutting down; startup checks
+				// remain mandatory, but durability is not assured here.
+				slog.Error("portico_cloud_quarantine_persist_failed", "error", quarantineErr)
+				<-ctx.Done()
+				return
+			}
+		}
 		fatal("Portico Cloud node connector stopped", err)
 	}
 
