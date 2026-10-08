@@ -11,22 +11,60 @@ import hashlib
 import hmac
 import http.cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import importlib.util
 import json
 import os
 from pathlib import Path
 import re
 import secrets
+import socket
 import threading
 import time
 from urllib.parse import urlsplit
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
+from datetime import timezone
+import unicodedata
+import subprocess
+import sys
+import importlib.util
 SPEC = importlib.util.spec_from_file_location("operator_approvals", REPO / "scripts/operator-approvals.py")
 assert SPEC and SPEC.loader
 operator = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(operator)
+
+class OperatorIPC:
+    @staticmethod
+    def call(action, request_id=None):
+        path = os.environ.get("PORTICO_OPERATOR_SOCKET", "/run/portico-operator/operator.sock")
+        token = os.environ.get("PORTICO_OPERATOR_APPROVAL_TOKEN", "")
+        if len(token) < 32 or not path.startswith("/"):
+            raise RuntimeError("operator IPC unconfigured")
+        tools = {"approvals": "admin.approval.list", "approve": "admin.approval.approve", "deny": "admin.approval.deny"}
+        if action not in tools:
+            raise RuntimeError("unsupported operator operation")
+        payload = {"id": secrets.token_urlsafe(12), "tool": tools[action], "admin_token": token}
+        if request_id is not None:
+            if not ID_RE.fullmatch(request_id):
+                raise RuntimeError("invalid request id")
+            payload["args"] = {"request_id": request_id}
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+            client.settimeout(5)
+            client.connect(path)
+            client.sendall(json.dumps(payload).encode() + b"\\n")
+            with client.makefile("rb") as source:
+                data = source.readline(131072)
+        reply = json.loads(data)
+        if not isinstance(reply, dict) or not reply.get("ok"):
+            raise RuntimeError("operator Broker rejected operation")
+        return reply.get("result")
+    @staticmethod
+    def list_requests():
+        rows = OperatorIPC.call("approvals") or []
+        if not isinstance(rows, list):
+            raise RuntimeError("invalid approval response")
+        return [item for row in rows if (item := operator.request_detail(row))]
+
 SESSIONS: dict[str, tuple[float, str]] = {}
 LOCK = threading.Lock()
 LOGIN_FAILURES: dict[str, list[float]] = {}
@@ -117,7 +155,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply(401, {"error": "login required"})
                 return
             try:
-                item = next((x for x in operator.list_requests() if x["id"] == match.group(1)), None)
+                item = next((x for x in OperatorIPC.list_requests() if x["id"] == match.group(1)), None)
                 if item is None:
                     self.reply(404, {"error": "not found or expired"})
                     return
@@ -181,11 +219,11 @@ class Handler(BaseHTTPRequestHandler):
                 if decision not in ("approve", "deny"):
                     self.reply(400, {"error": "invalid decision"})
                     return
-                item = next((x for x in operator.list_requests() if x["id"] == match.group(1)), None)
+                item = next((x for x in OperatorIPC.list_requests() if x["id"] == match.group(1)), None)
                 if item is None:
                     self.reply(409, {"error": "request expired or already decided"})
                     return
-                result = operator.cli_call(decision, "--request", item["id"])
+                result = OperatorIPC.call(decision, item["id"])
                 expected = "approved" if decision == "approve" else "denied"
                 if not isinstance(result, dict) or result.get("status") != expected:
                     self.reply(409, {"error": "broker refused decision"})
@@ -198,7 +236,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    if not os.environ.get("PORTICO_OPERATOR_PASSWORD_SCRYPT") or not os.environ.get("PORTICO_OPERATOR_PUBLIC_ORIGIN"):
+    if not os.environ.get("PORTICO_OPERATOR_PASSWORD_SCRYPT") or not os.environ.get("PORTICO_OPERATOR_PUBLIC_ORIGIN") or len(os.environ.get("PORTICO_OPERATOR_APPROVAL_TOKEN", "")) < 32:
         raise SystemExit("Operator password verifier and public origin must be configured")
     # Binding externally is deliberately unsupported. Access only through a
     # separately authenticated, rate-limited TLS reverse proxy.
