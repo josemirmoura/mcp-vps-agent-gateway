@@ -221,6 +221,9 @@ func TestCloudConnectorRoutesToRealLocalBrokerWithDenyAndAudit(t *testing.T) {
 	if err := json.Unmarshal(denied.Result, &deniedReply); err != nil {
 		t.Fatal(err)
 	}
+	if denied.Error != "local Broker denied operation" {
+		t.Fatalf("Broker denial was marked as Cloud success: %+v", denied)
+	}
 	if deniedReply.OK || deniedReply.Error == nil ||
 		deniedReply.Error.Code != "permission_denied" {
 		t.Fatalf("Cloud request bypassed local Broker denial: %+v", deniedReply)
