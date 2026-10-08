@@ -240,8 +240,8 @@ def main():
         raise SystemExit("Operator password verifier and public origin must be configured")
     # Binding externally is deliberately unsupported. Access only through a
     # separately authenticated, rate-limited TLS reverse proxy.
-    address = ("127.0.0.1", 8765)
-    print("Portico operator service bound to loopback only", flush=True)
+    address = ("0.0.0.0" if os.environ.get("PORTICO_OPERATOR_CONTAINER") == "1" else "127.0.0.1", 8765)
+    print("Portico operator service started behind loopback-published proxy", flush=True)
     ThreadingHTTPServer(address, Handler).serve_forever()
 
 
