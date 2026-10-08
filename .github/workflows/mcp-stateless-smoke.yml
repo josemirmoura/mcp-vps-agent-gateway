@@ -1,0 +1,92 @@
+name: official-mcp-stateless-smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/mcp-stateless-smoke.yml'
+      - 'cmd/vps-agent-gateway/**'
+      - 'internal/gateway/**'
+      - 'go.mod'
+      - 'go.sum'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/mcp-stateless-smoke.yml'
+      - 'cmd/vps-agent-gateway/**'
+      - 'internal/gateway/**'
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stateless-protocol-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build disposable unprivileged gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          go build -trimpath -o "$RUNNER_TEMP/portico-conformance-gateway" ./cmd/vps-agent-gateway
+      - name: Official MCP 2026 stateless protocol smoke
+        shell: bash
+        env:
+          VPS_AGENT_AUTH_MODE: none
+          VPS_AGENT_LISTEN: '127.0.0.1:18991'
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          export VPS_AGENT_POC_ROOT="$RUNNER_TEMP/portico-conformance-disposable"
+          "$RUNNER_TEMP/portico-conformance-gateway" > evidence/gateway.log 2>&1 &
+          gateway_pid=$!
+          trap 'kill "$gateway_pid" 2>/dev/null || true' EXIT
+
+          ready=0
+          for i in $(seq 1 50); do
+            if curl --fail --silent --show-error http://127.0.0.1:18991/healthz >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$gateway_pid" 2>/dev/null; then
+              break
+            fi
+            sleep 0.2
+          done
+          test "$ready" = 1 || {
+            echo "Disposable Gateway failed startup" >&2
+            cat evidence/gateway.log >&2
+            exit 1
+          }
+
+          # Protocol-only loopback smoke, not the full OAuth conformance set.
+          timeout 240s npx --yes @modelcontextprotocol/conformance@0.1.11 \
+            server \
+            --url http://127.0.0.1:18991/mcp \
+            --scenario server-stateless \
+            --verbose 2>&1 | tee evidence/official-stateless.log
+
+      - name: Preserve conformance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-mcp-stateless-${{ github.run_id }}
+          path: |
+            evidence/
+            results/
+          if-no-files-found: warn
+          retention-days: 30
