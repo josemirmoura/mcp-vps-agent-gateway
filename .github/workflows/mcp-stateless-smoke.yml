@@ -93,7 +93,7 @@ jobs:
 
           # Preserve the full machine-readable report as an artifact, but
           # print only the concise results (not a huge tools/list schema).
-          python3 - <<'PY'
+          python3 - "$rc" <<'PY'
           import json
           from pathlib import Path
           raw = Path("evidence/official-stateless.log").read_text(errors="replace")
@@ -104,15 +104,42 @@ jobs:
               raise SystemExit(1)
           checks, _ = json.JSONDecoder().raw_decode(raw[pos+1:])
           summary = {"total": len(checks), "success": 0, "failure": 0, "warning": 0, "skipped": 0}
+          # These four assertions require special synthetic diagnostic tools
+          # that Portico intentionally does not expose to its real clients.
+          # Report them as UNTESTED, never as passed or certified.
+          diagnostic_fixtures = {
+              "sep-2575-server-rejects-undeclared-capability",
+              "sep-2575-missing-capability-http-400",
+              "sep-2575-http-server-no-independent-requests-on-stream",
+              "sep-2575-server-no-log-without-loglevel",
+          }
+          unknown_failures = []
+          untested = []
           for c in checks:
-              key = c.get("status", "UNKNOWN").lower()
-              summary[key] = summary.get(key, 0) + 1
-              if key not in ("success",):
-                  print(f'{key.upper()}: {c.get("id")}: {c.get("errorMessage", "")}')
-          print("OFFICIAL MCP 2026 STATELESS CHECKS:", json.dumps(summary, sort_keys=True))
+              status = c.get("status", "UNKNOWN").lower()
+              summary[status] = summary.get(status, 0) + 1
+              ident = c.get("id")
+              reason = c.get("errorMessage", "") or ""
+              if status == "failure" and ident in diagnostic_fixtures and reason.startswith("Not testable: server does not list the diagnostic tool"):
+                  untested.append(ident)
+                  print(f"NOT TESTED (synthetic tool absent): {ident}: {reason}")
+              elif status == "failure" or status not in ("success", "warning", "skipped"):
+                  unknown_failures.append(ident)
+                  print(f"UNEXPECTED FAILURE: {ident}: {reason}")
+              elif status == "warning":
+                  print(f"SPEC WARNING (SHOULD): {ident}: {reason}")
+          summary["untested_diagnostic_ids"] = sorted(set(untested))
+          summary["unanticipated_failure_ids"] = unknown_failures
+          summary["upstream_commit"] = "c37eec888e1c6ff140af79987a40008548b7cc5f"
           Path("evidence/official-summary.json").write_text(json.dumps(summary, indent=2)+"\n")
+          print("PORTICO SCOPE-LIMITED MCP SMOKE:", json.dumps(summary, sort_keys=True))
+          print("This smoke does NOT establish full MCP 2026 conformance; see Community #79.")
+          if unknown_failures or len(checks) < 30 or summary["success"] < 24:
+              raise SystemExit("Conformance regression or incomplete evidence: fail closed")
+          if int(__import__('sys').argv[1]) != 0 and not untested:
+              raise SystemExit("Official runner failed without only the known non-testable fixtures")
           PY
-          exit "$rc"
+
 
       - name: Preserve conformance evidence
         if: always()
