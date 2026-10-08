@@ -831,6 +831,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 				out["approval_method"] = "operator_fallback"
 				if link := operatorApprovalURL(out["request_id"]); link != "" {
 					out["operator_approval_url"] = link
+					out["message"] = "Request pending. Open the operator_approval_url in a browser, sign in as the Portico operator and explicitly approve or deny it. The link itself grants no authority."
 				}
 				out["message"] = "This MCP client did not advertise native elicitation. No access was granted. In an authenticated SSH session on the VPS, run python3 scripts/operator-approvals.py from the Pórtico installation to review and explicitly approve or deny the pending request. Never share admin credentials with the AI."
 				out["operator_approval_guide"] = "docs/operator-approval-fallback.md"
