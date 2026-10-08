@@ -85,6 +85,15 @@ if [ ! -f .env ] || [ ! -f config/policy.yaml ]; then
   exit 1
 fi
 
+# All OAuth bootstrap responses stay within a private, per-run directory.
+# Fixed names in shared /tmp are unsafe, especially with operator credentials.
+umask 077
+VPS_AGENT_SETUP_TMP="$(mktemp -d "${TMPDIR:-/tmp}/portico-oauth.XXXXXXXX")"
+export VPS_AGENT_SETUP_TMP
+trap 'rm -rf -- "$VPS_AGENT_SETUP_TMP"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 if [ -z "$DOMAIN" ]; then
   if [ -t 0 ]; then
     if vps_agent_is_pt_br; then
@@ -394,14 +403,14 @@ fi
 
 OIDC_URL="https://$DOMAIN/.well-known/openid-configuration"
 echo "$(vps_agent_text 'Waiting for public OIDC discovery and TLS...' 'Aguardando descoberta OIDC pública e TLS...')"
-rm -f /tmp/vps-agent-oidc.json
+rm -f "$VPS_AGENT_SETUP_TMP/vps-agent-oidc.json"
 for _ in $(seq 1 90); do
-  if curl -fsS --max-time 5 "$OIDC_URL" >/tmp/vps-agent-oidc.json 2>/dev/null; then
+  if curl -fsS --max-time 5 "$OIDC_URL" >"$VPS_AGENT_SETUP_TMP/vps-agent-oidc.json" 2>/dev/null; then
     break
   fi
   sleep 2
 done
-if ! test -s /tmp/vps-agent-oidc.json; then
+if ! test -s "$VPS_AGENT_SETUP_TMP/vps-agent-oidc.json"; then
   echo "$(vps_agent_text "ERROR: OIDC discovery did not become reachable at $OIDC_URL" "ERRO: a descoberta OIDC não ficou acessível em $OIDC_URL")" >&2
   echo "$(vps_agent_text 'Check DNS, firewall/ports 80/443 and Traefik, then rerun.' 'Confira DNS, firewall/portas 80/443 e Traefik e tente novamente.')" >&2
   "${compose[@]}" ps >&2 || true
@@ -410,15 +419,16 @@ fi
 VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - "$DOMAIN" <<'PY'
 import json,os,sys
 domain=sys.argv[1]
-data=json.load(open("/tmp/vps-agent-oidc.json"))
+data=json.load(open(os.path.join(os.environ["VPS_AGENT_SETUP_TMP"], "vps-agent-oidc.json")))
 issuer=data.get("issuer","").rstrip("/")
 assert issuer == f"https://{domain}", issuer
 print("DESCOBERTA OIDC: OK" if os.environ.get("VPS_AGENT_LANG")=="pt-BR" else "OIDC DISCOVERY: PASS")
 PY
 
 DCR_READY="$(python3 - <<'PY'
+import os
 import json
-x=json.load(open("/tmp/vps-agent-oidc.json"))
+x=json.load(open(os.path.join(os.environ["VPS_AGENT_SETUP_TMP"], "vps-agent-oidc.json")))
 print("1" if x.get("registration_endpoint") else "0")
 PY
 )"
@@ -486,7 +496,7 @@ if [ "$NEEDS_BOOTSTRAP" -eq 1 ]; then
       --header "Authorization: Bearer $BOOTSTRAP_PAT" \
       --header 'Content-Type: application/json' \
       --data '{"dynamicClientRegistration":{"enabled":true,"allowUnauthenticated":true}}' \
-      >/tmp/vps-agent-dcr-settings.json
+      >"$VPS_AGENT_SETUP_TMP/vps-agent-dcr-settings.json"
   fi
 fi
 
@@ -520,9 +530,8 @@ if [ "$NEEDS_OPERATOR" -eq 1 ]; then
   fi
 
   OPERATOR_ID="$(python3 -c 'import uuid; print(uuid.uuid4())')"
-  REQUEST_FILE="$(mktemp)"
+  REQUEST_FILE="$(mktemp "$VPS_AGENT_SETUP_TMP/operator-request.XXXXXXXX")"
   chmod 600 "$REQUEST_FILE"
-  trap 'rm -f "$REQUEST_FILE"' EXIT
 
   # Password travels on a private inherited file descriptor, never argv.
   python3 - "$REQUEST_FILE" "$OPERATOR_ID" "$OPERATOR_USERNAME" "$OPERATOR_EMAIL" "$VPS_AGENT_LANG" 3<<<"$PASSWORD" <<'PY'
@@ -552,7 +561,7 @@ PY
   set +e
   HTTP_CODE="$(
     curl_zitadel_internal \
-      --output /tmp/vps-agent-create-operator.json \
+      --output "$VPS_AGENT_SETUP_TMP/vps-agent-create-operator.json" \
       --write-out '%{http_code}' \
       --request POST \
       --url "http://127.0.0.1:8080/v2/users/$ZITADEL_INTERACTIVE_USER_KIND" \
@@ -564,11 +573,10 @@ PY
   CURL_STATUS=$?
   set -e
   rm -f "$REQUEST_FILE"
-  trap - EXIT
 
   if [ "$CURL_STATUS" -ne 0 ] || { [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; }; then
     echo "$(vps_agent_text "ERROR: operator creation failed (curl=$CURL_STATUS HTTP=${HTTP_CODE:-none})." "ERRO: falha ao criar o operador (curl=$CURL_STATUS HTTP=${HTTP_CODE:-nenhum}).")" >&2
-    cat /tmp/vps-agent-create-operator.json >&2 2>/dev/null || true
+    cat "$VPS_AGENT_SETUP_TMP/vps-agent-create-operator.json" >&2 2>/dev/null || true
     exit 1
   fi
 
@@ -597,7 +605,7 @@ fi
 if [ "$NEEDS_RESOURCE" -eq 1 ]; then
   if [ -z "$RESOURCE_PROJECT_ID" ]; then
     echo "$(vps_agent_text 'Creating the dedicated OAuth resource/audience project...' 'Criando o projeto OAuth dedicado de recurso/audiência...')"
-    RESOURCE_RESPONSE="$(mktemp)"
+    RESOURCE_RESPONSE="$(mktemp "$VPS_AGENT_SETUP_TMP/resource-response.XXXXXXXX")"
     chmod 600 "$RESOURCE_RESPONSE"
     curl_zitadel_internal --fail \
       --request POST \
@@ -620,7 +628,7 @@ PY
 
   if [ -z "$INTROSPECTION_CLIENT_ID" ] || [ -z "$INTROSPECTION_CLIENT_SECRET" ]; then
     echo "$(vps_agent_text 'Creating the private token-introspection API client...' 'Criando o cliente privado de API para introspecção de token...')"
-    APP_RESPONSE="$(mktemp)"
+    APP_RESPONSE="$(mktemp "$VPS_AGENT_SETUP_TMP/app-response.XXXXXXXX")"
     chmod 600 "$APP_RESPONSE"
     curl_zitadel_internal --fail \
       --request POST \
@@ -669,10 +677,10 @@ if [ "$NEEDS_BOOTSTRAP" -eq 1 ]; then
     --user "$INTROSPECTION_CLIENT_ID:$INTROSPECTION_CLIENT_SECRET" \
     --header 'Content-Type: application/x-www-form-urlencoded' \
     --data 'token=deliberately-invalid-bootstrap-probe' \
-    >/tmp/vps-agent-introspection-probe.json
+    >"$VPS_AGENT_SETUP_TMP/vps-agent-introspection-probe.json"
   VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - <<'PY'
 import json,os
-x=json.load(open("/tmp/vps-agent-introspection-probe.json"))
+x=json.load(open(os.path.join(os.environ["VPS_AGENT_SETUP_TMP"], "vps-agent-introspection-probe.json")))
 assert x.get("active") is False, x
 print("CLIENTE PRIVADO DE INTROSPECÇÃO DE TOKEN: OK" if os.environ.get("VPS_AGENT_LANG")=="pt-BR" else "PRIVATE TOKEN INTROSPECTION CLIENT: PASS")
 PY
@@ -686,12 +694,13 @@ PY
     --header "Authorization: Bearer $BOOTSTRAP_PAT" \
     --header 'Content-Type: application/json' \
     --data '{}' \
-    >/tmp/vps-agent-users.json
+    >"$VPS_AGENT_SETUP_TMP/vps-agent-users.json"
 
   readarray -t BOOTSTRAP_IDS < <(python3 - "$DOMAIN" <<'PY'
+import os
 import json,sys
 domain=sys.argv[1].lower()
-data=json.load(open("/tmp/vps-agent-users.json"))
+data=json.load(open(os.path.join(os.environ["VPS_AGENT_SETUP_TMP"], "vps-agent-users.json")))
 operator_users=[]
 machine=[]
 for user in data.get("result", []):
@@ -719,7 +728,7 @@ PY
       --request DELETE \
       --url "http://127.0.0.1:8080/v2/users/$BOOTSTRAP_OPERATOR_ID" \
       --header "Authorization: Bearer $BOOTSTRAP_PAT" \
-      >/tmp/vps-agent-delete-bootstrap-operator.json
+      >"$VPS_AGENT_SETUP_TMP/vps-agent-delete-bootstrap-operator.json"
     echo "$(vps_agent_text 'Bootstrap IAM owner removed.' 'Proprietário IAM de bootstrap removido.')"
   fi
 
@@ -728,7 +737,7 @@ PY
       --request DELETE \
       --url "http://127.0.0.1:8080/v2/users/$BOOTSTRAP_MACHINE_ID" \
       --header "Authorization: Bearer $BOOTSTRAP_PAT" \
-      >/tmp/vps-agent-delete-bootstrap-machine.json
+      >"$VPS_AGENT_SETUP_TMP/vps-agent-delete-bootstrap-machine.json"
     echo "$(vps_agent_text 'Bootstrap machine IAM owner removed and its PAT revoked.' 'Proprietário IAM de máquina do bootstrap removido e seu PAT revogado.')"
   fi
 
@@ -755,10 +764,11 @@ fi
 
 echo "$(vps_agent_text 'Confirming OAuth dynamic-client discovery...' 'Confirmando descoberta dinâmica de cliente OAuth...')"
 for _ in $(seq 1 30); do
-  curl -fsS "$OIDC_URL" >/tmp/vps-agent-oidc.json
+  curl -fsS "$OIDC_URL" >"$VPS_AGENT_SETUP_TMP/vps-agent-oidc.json"
   if python3 - <<'PY'
+import os
 import json
-x=json.load(open("/tmp/vps-agent-oidc.json"))
+x=json.load(open(os.path.join(os.environ["VPS_AGENT_SETUP_TMP"], "vps-agent-oidc.json")))
 ok=bool(x.get("registration_endpoint")) and "S256" in x.get("code_challenge_methods_supported",[])
 raise SystemExit(0 if ok else 1)
 PY
@@ -769,7 +779,7 @@ PY
 done
 VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - <<'PY'
 import json,os
-x=json.load(open("/tmp/vps-agent-oidc.json"))
+x=json.load(open(os.path.join(os.environ["VPS_AGENT_SETUP_TMP"], "vps-agent-oidc.json")))
 endpoint=x.get("registration_endpoint","")
 assert endpoint.startswith("https://"), x
 assert "S256" in x.get("code_challenge_methods_supported",[]), x
@@ -781,7 +791,7 @@ echo "$(vps_agent_text 'Switching Gateway and Broker to the integrated operator 
 
 echo "$(vps_agent_text 'Waiting for the public MCP protected resource...' 'Aguardando o recurso MCP público protegido...')"
 for _ in $(seq 1 60); do
-  code="$(curl -sS --max-time 5 -o /tmp/vps-agent-public-unauth.txt -w '%{http_code}' "https://$DOMAIN/mcp" 2>/dev/null || true)"
+  code="$(curl -sS --max-time 5 -o "$VPS_AGENT_SETUP_TMP/vps-agent-public-unauth.txt" -w '%{http_code}' "https://$DOMAIN/mcp" 2>/dev/null || true)"
   [ "$code" = "401" ] && break
   sleep 2
 done

@@ -146,6 +146,15 @@ if "Refine config/policy.yaml" in installer_text or "Edit config/policy.yaml now
 if "--scope /opt/vps-agent-sandbox" in quick_text or "install -d" in quick_text and "/opt/vps-agent-sandbox" in quick_text:
     errors.append("docs/quick-start.md: legacy sandbox must not be the normal installation path")
 
+# Integrated OAuth setup must not use predictable shared temporary files.
+setup_auth = (ROOT / "scripts/setup-integrated-auth.sh").read_text(errors="replace")
+if "/tmp/vps-agent-" in setup_auth:
+    errors.append("scripts/setup-integrated-auth.sh: predictable /tmp OAuth bootstrap output")
+if 'VPS_AGENT_SETUP_TMP="$(mktemp -d' not in setup_auth:
+    errors.append("scripts/setup-integrated-auth.sh: missing private per-run OAuth scratch directory")
+if "trap - EXIT" in setup_auth:
+    errors.append("scripts/setup-integrated-auth.sh: nested trap disables OAuth scratch cleanup")
+
 # Clean E2E UX/security invariants (#33-#41).
 authority_text = (ROOT / "scripts/authority-summary.py").read_text(errors="replace")
 preflight_text = (ROOT / "scripts/preflight.py").read_text(errors="replace")
