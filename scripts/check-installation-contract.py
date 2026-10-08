@@ -8,6 +8,7 @@ SUPPORTED = [
     "README.md",
     "README.pt-BR.md",
     "docs/quick-start.md",
+    "docs/quick-start.pt-BR.md",
     "docs/installer-flow.md",
     "docs/chatgpt-integration.md",
     "site/index.html",
