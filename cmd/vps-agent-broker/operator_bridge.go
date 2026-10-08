@@ -25,10 +25,15 @@ type operatorBridge struct {
 
 func eligibleWebApproval(a state.Approval, expectedSubject string) bool {
  if a.Status != "pending" || !time.Now().Before(a.ExpiresAt) || a.Subject == "" ||
+  a.TTL <= 0 ||
   (expectedSubject != "" && a.Subject != expectedSubject) {
   return false
  }
  if a.Kind == "root" {
+  ceiling := os.Getenv("VPS_AGENT_PHYSICAL_SCOPE_ROOT")
+  if ceiling != "" && filepath.Clean(a.Resource) == filepath.Clean(ceiling) {
+   return false // ceiling-wide grants require interactive operator CLI
+  }
   return filepath.IsAbs(a.Resource) &&
    (a.Access == "read" || a.Access == "work" || a.Access == "compose") &&
    len(a.Capabilities) == 0
