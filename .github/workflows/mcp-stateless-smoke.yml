@@ -1,0 +1,153 @@
+name: official-mcp-stateless-smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/mcp-stateless-smoke.yml'
+      - 'cmd/vps-agent-gateway/**'
+      - 'internal/gateway/**'
+      - 'go.mod'
+      - 'go.sum'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/mcp-stateless-smoke.yml'
+      - 'cmd/vps-agent-gateway/**'
+      - 'internal/gateway/**'
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stateless-protocol-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build pinned official MCP conformance suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --quiet --filter=blob:none https://github.com/modelcontextprotocol/conformance.git "$RUNNER_TEMP/mcp-conformance"
+          git -C "$RUNNER_TEMP/mcp-conformance" checkout --quiet --detach c37eec888e1c6ff140af79987a40008548b7cc5f
+          cd "$RUNNER_TEMP/mcp-conformance"
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Build disposable unprivileged gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          go build -trimpath -o "$RUNNER_TEMP/portico-conformance-gateway" ./cmd/vps-agent-gateway
+      - name: Official MCP 2026 stateless protocol smoke
+        shell: bash
+        env:
+          VPS_AGENT_AUTH_MODE: none
+          VPS_AGENT_LISTEN: '127.0.0.1:18991'
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          export VPS_AGENT_POC_ROOT="$RUNNER_TEMP/portico-conformance-disposable"
+          "$RUNNER_TEMP/portico-conformance-gateway" > evidence/gateway.log 2>&1 &
+          gateway_pid=$!
+          trap 'kill "$gateway_pid" 2>/dev/null || true' EXIT
+
+          ready=0
+          for i in $(seq 1 50); do
+            if curl --fail --silent --show-error http://127.0.0.1:18991/healthz >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$gateway_pid" 2>/dev/null; then
+              break
+            fi
+            sleep 0.2
+          done
+          test "$ready" = 1 || {
+            echo "Disposable Gateway failed startup" >&2
+            cat evidence/gateway.log >&2
+            exit 1
+          }
+
+          # Protocol-only loopback smoke, not the full OAuth conformance set.
+          # Pinned upstream commit contains the published 2026-07-28 requirement sets.
+          rc=0
+          timeout 240s node "$RUNNER_TEMP/mcp-conformance/dist/index.js" \
+            server \
+            --url http://127.0.0.1:18991/mcp \
+            --scenario server-stateless \
+            --verbose > evidence/official-stateless.log 2>&1 || rc=$?
+
+          # Preserve the full machine-readable report as an artifact, but
+          # print only the concise results (not a huge tools/list schema).
+          python3 - "$rc" <<'PY'
+          import json
+          from pathlib import Path
+          raw = Path("evidence/official-stateless.log").read_text(errors="replace")
+          pos = raw.find("\n[\n")
+          if pos < 0:
+              print("Official conformance report could not be parsed:")
+              print(raw[-4000:])
+              raise SystemExit(1)
+          checks, _ = json.JSONDecoder().raw_decode(raw[pos+1:])
+          summary = {"total": len(checks), "success": 0, "failure": 0, "warning": 0, "skipped": 0}
+          # These four assertions require special synthetic diagnostic tools
+          # that Portico intentionally does not expose to its real clients.
+          # Report them as UNTESTED, never as passed or certified.
+          diagnostic_fixtures = {
+              "sep-2575-server-rejects-undeclared-capability",
+              "sep-2575-missing-capability-http-400",
+              "sep-2575-http-server-no-independent-requests-on-stream",
+              "sep-2575-server-no-log-without-loglevel",
+          }
+          unknown_failures = []
+          untested = []
+          for c in checks:
+              status = c.get("status", "UNKNOWN").lower()
+              summary[status] = summary.get(status, 0) + 1
+              ident = c.get("id")
+              reason = c.get("errorMessage", "") or ""
+              if status == "failure" and ident in diagnostic_fixtures and reason.startswith("Not testable: server does not list the diagnostic tool"):
+                  untested.append(ident)
+                  print(f"NOT TESTED (synthetic tool absent): {ident}: {reason}")
+              elif status == "failure" or status not in ("success", "warning", "skipped"):
+                  unknown_failures.append(ident)
+                  print(f"UNEXPECTED FAILURE: {ident}: {reason}")
+              elif status == "warning":
+                  print(f"SPEC WARNING (SHOULD): {ident}: {reason}")
+          summary["untested_diagnostic_ids"] = sorted(set(untested))
+          summary["unanticipated_failure_ids"] = unknown_failures
+          summary["upstream_commit"] = "c37eec888e1c6ff140af79987a40008548b7cc5f"
+          Path("evidence/official-summary.json").write_text(json.dumps(summary, indent=2)+"\n")
+          print("PORTICO SCOPE-LIMITED MCP SMOKE:", json.dumps(summary, sort_keys=True))
+          print("This smoke does NOT establish full MCP 2026 conformance; see Community #79.")
+          if unknown_failures or len(checks) < 30 or summary["success"] < 24:
+              raise SystemExit("Conformance regression or incomplete evidence: fail closed")
+          if int(__import__('sys').argv[1]) != 0 and not untested:
+              raise SystemExit("Official runner failed without only the known non-testable fixtures")
+          PY
+
+
+      - name: Preserve conformance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-mcp-stateless-${{ github.run_id }}
+          path: |
+            evidence/
+            results/
+          if-no-files-found: warn
+          retention-days: 30
