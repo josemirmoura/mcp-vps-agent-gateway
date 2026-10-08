@@ -276,3 +276,36 @@ func TestCloudRenewalWatchdogStopsWhenCloudIsUnavailable(t *testing.T) {
 		t.Fatal("unrenewed lease did not expire locally")
 	}
 }
+
+func TestCloudRenewalHTTPRequestCannotOverrunKnownDeadline(t *testing.T) {
+	identity := enrolledTestIdentity(t)
+	taskID := "99999999-9999-9999-9999-999999999999"
+	leaseID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-time.After(time.Second):
+			http.Error(w, "late renewal", http.StatusServiceUnavailable)
+		}
+	}))
+	defer server.Close()
+	client, err := NewClient(server.URL, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	initial := time.Now().Add(200 * time.Millisecond)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	runner := Runner{Client: client, Identity: identity, RenewInterval: 30 * time.Millisecond}
+	fatal := make(chan error, 1)
+	go runner.renewLoop(ctx, Task{ID: taskID, LeaseID: leaseID, LeaseExpiresAt: &initial}, fatal)
+	select {
+	case err := <-fatal:
+		if err == nil {
+			t.Fatal("slow renewal silently crossed the known lease deadline")
+		}
+	case <-time.After(700 * time.Millisecond):
+		t.Fatal("in-flight renewal prevented local lease expiration watchdog")
+	}
+}
