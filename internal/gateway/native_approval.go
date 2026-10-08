@@ -70,10 +70,14 @@ func nativeApprovalResult(kind string, brokerResult map[string]any, approvalToke
 	if err != nil {
 		return nil, err
 	}
+	message, err := validatedApprovalMessage(kind, brokerResult)
+	if err != nil {
+		return nil, err
+	}
 	return &mcp.CallToolResult{
 		InputRequests: mcp.InputRequestMap{
 			nativeApprovalInputKey: &mcp.ElicitParams{
-				Message: approvalMessage(kind, brokerResult),
+				Message: message,
 				RequestedSchema: &jsonschema.Schema{
 					Type: "object",
 				},
@@ -107,6 +111,42 @@ func nativeApprovalDecision(req *mcp.CallToolRequest, expectedKind string) (nati
 	default:
 		return nativeApprovalState{}, "", true, fmt.Errorf("unsupported approval action %q", result.Action)
 	}
+}
+
+// validatedApprovalMessage never asks a user to approve a scope that cannot
+// be displayed legibly, completely, and without attacker-controlled line breaks.
+// Existing broker authority checks remain the final source of truth.
+func validatedApprovalMessage(kind string, values map[string]any) (string, error) {
+	if kind != "root" && kind != "sensitive" {
+		return "", errors.New("unsupported native approval kind")
+	}
+	targetKey := "root"
+	if kind == "sensitive" {
+		targetKey = "path"
+	}
+	ceilingWide, _ := values["ceiling_wide"].(bool)
+	for _, key := range []string{targetKey, "access", "physical_ceiling"} {
+		value := stringValue(values[key])
+		if value == "—" || strings.TrimSpace(value) == "" {
+			if key == "physical_ceiling" && kind == "sensitive" {
+				continue
+			}
+			if key == "physical_ceiling" && !ceilingWide {
+				continue
+			}
+			return "", fmt.Errorf("cannot display missing approval field %s", key)
+		}
+		for _, r := range value {
+			if r < 32 || r == 127 {
+				return "", errors.New("approval target contains control characters; request a safe path")
+			}
+		}
+	}
+	message := approvalMessage(kind, values)
+	if len(message) > 220 || strings.Count(message, "\n") > 5 {
+		return "", errors.New("approval request exceeds the native mobile display limit; use a shorter path")
+	}
+	return message, nil
 }
 
 func approvalMessage(kind string, values map[string]any) string {
