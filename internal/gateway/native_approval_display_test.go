@@ -54,6 +54,7 @@ func TestNativeApprovalRejectsControlCharactersAndMobileOverflow(t *testing.T) {
 // TestNativeApprovalRequiresVisibleAuthorityContext verifies that users never
 // authorize a root that is silently the whole physical scope ceiling.
 func TestNativeApprovalRequiresVisibleAuthorityContext(t *testing.T) {
+	t.Setenv("VPS_AGENT_LANG", "en")
 	values := map[string]any{
 		"request_id": "req-visible-context",
 		"root": "/opt/projeto-á",
