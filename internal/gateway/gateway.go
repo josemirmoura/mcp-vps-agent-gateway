@@ -98,6 +98,8 @@ type systemInfoOutput struct {
 	InstanceName      string `json:"instance_name,omitempty"`
 	PhysicalScopeRoot string `json:"physical_scope_root,omitempty"`
 	WholeHost         bool   `json:"whole_host,omitempty"`
+	GatewayVersion    string `json:"gateway_version"`
+	ApprovalProtocol  string `json:"approval_protocol"`
 }
 
 type fileReadInput struct {
@@ -323,6 +325,11 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			if err := s.call(ctx, "system.info", "", "", nil, &out, false, ""); err != nil {
 				return nil, out, err
 			}
+			// Gateway-local, non-sensitive runtime facts. These let the operator
+			// distinguish an older deployed endpoint from a newer Git checkout
+			// without touching files, secrets, or privileged Broker state.
+			out.GatewayVersion = portico.Version()
+			out.ApprovalProtocol = "native-mcp-elicitation-when-supported"
 			return nil, out, nil
 		})
 
