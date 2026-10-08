@@ -47,6 +47,8 @@ jobs:
           VPS_AGENT_LANG=en python3 scripts/preflight.py | tee /tmp/preflight-en.txt
           grep -q 'Checking Portico MCP prerequisites' /tmp/preflight-en.txt
           grep -q 'Prerequisites: OK' /tmp/preflight-en.txt
+      - name: Validate verifier private temporary output and concurrency
+        run: python3 -m unittest discover -s tests/scripts -p 'test_*.py' -v
       - name: Validate integrated OAuth scope matching
         shell: bash
         run: |

@@ -17,6 +17,15 @@ set -a
 . ./.env
 set +a
 
+# Keep verification output private, collision-free and automatically removed.
+# Fixed filenames in shared /tmp permit symlink clobbering and concurrent-run races.
+umask 077
+VERIFY_DIR="$(mktemp -d "${TMPDIR:-/tmp}/portico-verify.XXXXXXXX")"
+export VPS_AGENT_VERIFY_DIR="$VERIFY_DIR"
+trap 'rm -rf -- "$VERIFY_DIR"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 PUBLIC_URL="${VPS_AGENT_PUBLIC_URL:-}"
 AUTH_MODE="${VPS_AGENT_AUTH_MODE:-static}"
 ISSUER="${VPS_AGENT_OIDC_ISSUER:-}"
@@ -62,18 +71,18 @@ METADATA_URL="${VPS_AGENT_RESOURCE_METADATA_URL:-$ORIGIN/.well-known/oauth-prote
 RESOURCE="${VPS_AGENT_OAUTH_RESOURCE:-$PUBLIC_URL}"
 
 echo "$(vps_agent_text 'Checking public health endpoint...' 'Verificando o endpoint público de saúde...')"
-curl --fail --silent --show-error "$ORIGIN/healthz" >/tmp/vps-agent-public-health.json
-cat /tmp/vps-agent-public-health.json
+curl --fail --silent --show-error "$ORIGIN/healthz" >"$VERIFY_DIR/vps-agent-public-health.json"
+cat "$VERIFY_DIR/vps-agent-public-health.json"
 
 echo
 echo "$(vps_agent_text 'Checking OAuth Protected Resource Metadata...' 'Verificando os metadados OAuth do recurso protegido...')"
-curl --fail --silent --show-error "$METADATA_URL" >/tmp/vps-agent-prm.json
-cat /tmp/vps-agent-prm.json
+curl --fail --silent --show-error "$METADATA_URL" >"$VERIFY_DIR/vps-agent-prm.json"
+cat "$VERIFY_DIR/vps-agent-prm.json"
 
 VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - "$RESOURCE" "$ISSUER" "$REQUIRED_SCOPES" <<'PY'
 import json, os, sys
 resource, issuer, required_raw = sys.argv[1:]
-data = json.load(open("/tmp/vps-agent-prm.json"))
+data = json.load(open(os.path.join(os.environ["VPS_AGENT_VERIFY_DIR"], "vps-agent-prm.json")))
 assert data.get("resource") == resource, (data, resource)
 servers = [x.rstrip("/") for x in data.get("authorization_servers", [])]
 assert issuer.rstrip("/") in servers, (data, issuer)
@@ -86,12 +95,12 @@ PY
 
 echo
 echo "$(vps_agent_text 'Checking integrated Authorization Server discovery...' 'Verificando a descoberta do servidor de autorização integrado...')"
-curl --fail --silent --show-error "$ISSUER/.well-known/openid-configuration" >/tmp/vps-agent-oidc-discovery.json
+curl --fail --silent --show-error "$ISSUER/.well-known/openid-configuration" >"$VERIFY_DIR/vps-agent-oidc-discovery.json"
 VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - "$ISSUER" <<'PY'
 import json, os, sys
 from urllib.parse import urlparse
 issuer=sys.argv[1].rstrip("/")
-data=json.load(open("/tmp/vps-agent-oidc-discovery.json"))
+data=json.load(open(os.path.join(os.environ["VPS_AGENT_VERIFY_DIR"], "vps-agent-oidc-discovery.json")))
 assert data.get("issuer","").rstrip("/") == issuer, data
 for field in ("authorization_endpoint", "token_endpoint"):
     value=data.get(field,"")
@@ -117,10 +126,10 @@ echo
 echo "$(vps_agent_text 'Checking private audience-bound token introspection...' 'Verificando a introspecção privada de token vinculada à audiência...')"
 docker compose exec -T gateway sh -c '
   curl --fail --silent --show-error     --request POST     --url "$VPS_AGENT_INTEGRATED_INTROSPECTION_URL"     --user "$VPS_AGENT_INTEGRATED_INTROSPECTION_CLIENT_ID:$VPS_AGENT_INTEGRATED_INTROSPECTION_CLIENT_SECRET"     --header "Host: $VPS_AGENT_INTEGRATED_INTROSPECTION_HOST"     --header "X-Forwarded-Proto: https"     --header "Content-Type: application/x-www-form-urlencoded"     --data "token=deliberately-invalid-verification-probe"
-' >/tmp/vps-agent-introspection-probe.json
+' >"$VERIFY_DIR/vps-agent-introspection-probe.json"
 VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - <<'PY'
 import json, os
-x=json.load(open("/tmp/vps-agent-introspection-probe.json"))
+x=json.load(open(os.path.join(os.environ["VPS_AGENT_VERIFY_DIR"], "vps-agent-introspection-probe.json")))
 assert x.get("active") is False, x
 print("INTROSPECÇÃO PRIVADA VINCULADA À AUDIÊNCIA: OK" if os.environ.get("VPS_AGENT_LANG")=="pt-BR" else "PRIVATE AUDIENCE-BOUND INTROSPECTION: PASS")
 PY
@@ -128,19 +137,19 @@ PY
 echo
 echo "$(vps_agent_text 'Checking that unauthenticated MCP access fails closed with OAuth discovery challenge...' 'Verificando se o acesso MCP sem autenticação é negado com o desafio OAuth correto...')"
 code="$(curl --silent --show-error \
-  --dump-header /tmp/vps-agent-public-unauth-headers.txt \
-  --output /tmp/vps-agent-public-unauth.txt \
+  --dump-header "$VERIFY_DIR/vps-agent-public-unauth-headers.txt" \
+  --output "$VERIFY_DIR/vps-agent-public-unauth.txt" \
   --write-out '%{http_code}' \
   "$PUBLIC_URL" || true)"
 if [ "$code" != "401" ]; then
   echo "$(vps_agent_text "Expected HTTP 401 from unauthenticated MCP request, got $code." "Esperávamos HTTP 401 da chamada MCP sem autenticação, mas recebemos $code.")" >&2
-  cat /tmp/vps-agent-public-unauth.txt >&2 || true
+  cat "$VERIFY_DIR/vps-agent-public-unauth.txt" >&2 || true
   exit 1
 fi
 VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - "$METADATA_URL" <<'PY'
 import os, sys
 metadata_url=sys.argv[1]
-raw=open("/tmp/vps-agent-public-unauth-headers.txt", errors="replace").read()
+raw=open(os.path.join(os.environ["VPS_AGENT_VERIFY_DIR"], "vps-agent-public-unauth-headers.txt"), errors="replace").read()
 headers={}
 for line in raw.splitlines():
     if ":" not in line:
@@ -163,11 +172,11 @@ if [ -n "${VPS_AGENT_TEST_ACCESS_TOKEN:-}" ]; then
     --endpoint "$PUBLIC_URL" \
     --token "$VPS_AGENT_TEST_ACCESS_TOKEN" \
     --tool system.info \
-    --args '{}' >/tmp/vps-agent-public-system-info.json
-  cat /tmp/vps-agent-public-system-info.json
+    --args '{}' >"$VERIFY_DIR/vps-agent-public-system-info.json"
+  cat "$VERIFY_DIR/vps-agent-public-system-info.json"
   VPS_AGENT_LANG="$VPS_AGENT_LANG" python3 - <<'PY'
 import json, os
-x=json.load(open("/tmp/vps-agent-public-system-info.json"))
+x=json.load(open(os.path.join(os.environ["VPS_AGENT_VERIFY_DIR"], "vps-agent-public-system-info.json")))
 assert x["is_error"] is False, x
 print("CHAMADA MCP OAUTH PÚBLICA: OK" if os.environ.get("VPS_AGENT_LANG")=="pt-BR" else "PUBLIC OAUTH MCP CALL: PASS")
 PY
