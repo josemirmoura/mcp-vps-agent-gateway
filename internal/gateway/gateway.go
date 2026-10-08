@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"time"
 
+	portico "github.com/josemirmoura/mcp-vps-agent-gateway"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/ipc"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/securefs"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/wire"
@@ -299,7 +300,7 @@ func NewMCPServer(exec Executor) *mcp.Server {
 func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 	s := &Server{Executor: exec, Metrics: metrics}
 	server := mcp.NewServer(
-		&mcp.Implementation{Name: "portico-mcp", Version: "v0.1.0"},
+		&mcp.Implementation{Name: "portico-mcp", Version: portico.Version()},
 		&mcp.ServerOptions{
 			Instructions: serverInstructions(),
 			Capabilities: &mcp.ServerCapabilities{
