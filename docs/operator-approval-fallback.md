@@ -18,7 +18,8 @@ Esse resultado NÃO é uma aprovação. O operador tem duas opções:
 No terminal SSH do proprietário da instalação:
 
 ```bash
-cd /caminho/da/instalacao/mcp-vps-agent-gateway
+# Ajuste este caminho caso tenha instalado o Pórtico em outro diretório.
+cd ~/mcp-vps-agent-gateway
 python3 scripts/operator-approvals.py
 ```
 
