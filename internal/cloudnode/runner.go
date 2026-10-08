@@ -15,15 +15,21 @@ type BrokerExecutor interface {
 	Call(context.Context, wire.Request) (wire.Response, error)
 }
 
+// ErrBrokerStillRunning means the Broker did not acknowledge cancellation.
+// Fail closed: the node must stop polling instead of risking overlapping
+// local operations or re-dispatch of a task with uncertain host side effects.
+var ErrBrokerStillRunning = errors.New("Broker operation still running after cancellation; stop Cloud node connector")
+
 type Runner struct {
-	Client            *Client
-	Identity          Identity
-	Broker            BrokerExecutor
-	BrokerSubject     string
-	HeartbeatInterval time.Duration
-	PollInterval      time.Duration
-	RenewInterval     time.Duration
-	BrokerTimeout     time.Duration
+	Client             *Client
+	Identity           Identity
+	Broker             BrokerExecutor
+	BrokerSubject      string
+	HeartbeatInterval  time.Duration
+	PollInterval       time.Duration
+	RenewInterval      time.Duration
+	BrokerTimeout      time.Duration
+	BrokerDrainTimeout time.Duration
 }
 
 func (r Runner) Run(ctx context.Context) error {
@@ -47,6 +53,9 @@ func (r Runner) Run(ctx context.Context) error {
 	}
 	if r.BrokerTimeout <= 0 {
 		r.BrokerTimeout = 15 * time.Minute
+	}
+	if r.BrokerDrainTimeout <= 0 {
+		r.BrokerDrainTimeout = 5 * time.Second
 	}
 
 	go r.heartbeatLoop(ctx)
@@ -79,6 +88,11 @@ func (r Runner) Run(ctx context.Context) error {
 				"operation", task.Operation,
 				"error", err,
 			)
+			if errors.Is(err, ErrBrokerStillRunning) {
+				// Unknown execution outcome: never acquire another Cloud
+				// task in this connector process until operator review.
+				return err
+			}
 		}
 	}
 
@@ -168,14 +182,53 @@ func (r Runner) processTask(ctx context.Context, task Task) error {
 		brokerDone <- brokerResult{response: response, err: err}
 	}()
 
+	// A cancellation request over IPC does not prove the Broker stopped.
+	// Wait for its actual response before taking more tasks; if the Broker
+	// ignores cancellation, terminate polling rather than overlap work.
+	waitForBroker := func() error {
+		grace := r.BrokerDrainTimeout
+		if grace <= 0 {
+			grace = 5 * time.Second
+		}
+		timer := time.NewTimer(grace)
+		defer timer.Stop()
+		select {
+		case <-brokerDone:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			return ErrBrokerStillRunning
+		}
+	}
+
 	var result brokerResult
 	select {
 	case <-ctx.Done():
+		cancelBroker()
 		return nil
 	case err := <-renewFatal:
 		cancelBroker()
+		if drainErr := waitForBroker(); drainErr != nil {
+			return drainErr
+		}
 		return err
+	case <-brokerCtx.Done():
+		cancelBroker()
+		if drainErr := waitForBroker(); drainErr != nil {
+			return drainErr
+		}
+		return brokerCtx.Err()
 	case result = <-brokerDone:
+		// A completion racing the deadline must not be reported as success.
+		if err := brokerCtx.Err(); err != nil {
+			return err
+		}
+		select {
+		case err := <-renewFatal:
+			return err
+		default:
+		}
 	}
 
 	var completion Completion
