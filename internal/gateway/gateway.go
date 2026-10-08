@@ -304,6 +304,10 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			Instructions: serverInstructions(),
 			Capabilities: &mcp.ServerCapabilities{
 				Logging: &mcp.LoggingCapabilities{},
+				// The SDK serves prompts/list with an empty list even when no
+				// prompts are registered. Keep discovery consistent with that
+				// read-only endpoint (MCP 2026-07-28, SEP-2575).
+				Prompts: &mcp.PromptCapabilities{},
 			},
 		},
 	)
