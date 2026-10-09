@@ -42,7 +42,7 @@ class ReleaseSourceVerifierTests(unittest.TestCase):
             "assert '--certificate-oidc-issuer' in args\n"
             "assert 'https://token.actions.githubusercontent.com' in args\n"
             "assert 'github' in args[args.index('--certificate-identity-regexp')+1]\n"
-            "with open(os.environ['FAKE_COSIGN_LOG'],'a') as f: f.write(args[1]+'\n')\n"
+            "with open(os.environ['FAKE_COSIGN_LOG'],'a') as f: f.write(args[1]+'\\n')\n"
             "if os.environ.get('FAKE_COSIGN_DENY')=='1': sys.exit(1)\n"
         )
         fake.chmod(0o700)
