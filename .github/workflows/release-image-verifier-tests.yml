@@ -1,0 +1,27 @@
+name: Release image signature verifier tests
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify-release-images.py'
+      - 'tests/scripts/test_release_image_verifier.py'
+      - 'docs/release-image-verification.md'
+      - '.github/workflows/release-image-verifier-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax check and independent negative-path tests
+        run: |
+          python3 -m py_compile scripts/verify-release-images.py tests/scripts/test_release_image_verifier.py
+          python3 -m unittest discover -s tests/scripts -p 'test_release_image_verifier.py' -v
