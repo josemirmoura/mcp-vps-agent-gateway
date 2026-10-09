@@ -42,7 +42,7 @@ class ReleaseSourceVerifierTests(unittest.TestCase):
             "assert '--certificate-oidc-issuer' in args\n"
             "assert 'https://token.actions.githubusercontent.com' in args\n"
             "assert 'github' in args[args.index('--certificate-identity-regexp')+1]\n"
-            "with open(os.environ['FAKE_COSIGN_LOG'],'a') as f: f.write(args[1]+'\\n')\n"
+            "with open(os.environ['FAKE_COSIGN_LOG'],'a') as f: f.write(args[1]+'\n')\n"
             "if os.environ.get('FAKE_COSIGN_DENY')=='1': sys.exit(1)\n"
         )
         fake.chmod(0o700)
@@ -124,7 +124,7 @@ class ReleaseSourceVerifierTests(unittest.TestCase):
     def test_duplicate_version_entry_is_rejected(self):
         with tarfile.open(self.archive, "w:gz") as pack:
             for version in ["0.1.0-rc.7", "0.1.0-evil"]:
-                payload = (version + "\\n").encode()
+                payload = (version + "\n").encode()
                 item = tarfile.TarInfo("mcp-vps-agent/VERSION")
                 item.size = len(payload)
                 pack.addfile(item, io.BytesIO(payload))
@@ -135,7 +135,7 @@ class ReleaseSourceVerifierTests(unittest.TestCase):
 
     def test_archive_with_escaping_member_is_rejected(self):
         with tarfile.open(self.archive, "w:gz") as pack:
-            payload = b"0.1.0-rc.7\\n"
+            payload = b"0.1.0-rc.7\n"
             item = tarfile.TarInfo("mcp-vps-agent/VERSION")
             item.size = len(payload)
             pack.addfile(item, io.BytesIO(payload))
@@ -149,7 +149,7 @@ class ReleaseSourceVerifierTests(unittest.TestCase):
 
     def resign_fixture_checksum(self):
         digest = hashlib.sha256(self.archive.read_bytes()).hexdigest()
-        (self.dist / SHA).write_text(f"{digest}  dist/{ARCHIVE}\\n")
+        (self.dist / SHA).write_text(f"{digest}  dist/{ARCHIVE}\n")
 
     def test_untrusted_tag_format_fails_before_cosign(self):
         result = self.execute(tag="v0.1.0;echo injected")
