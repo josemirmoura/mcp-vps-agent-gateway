@@ -4,6 +4,7 @@ A fake cosign executable proves the verifier invokes both signature checks
 with fixed issuer/identity and refuses negative cases; it does NOT simulate
 cryptographic trust. Real Sigstore acceptance remains a separate release gate.
 """
+import gzip
 import hashlib
 import io
 import os
@@ -54,6 +55,9 @@ class ReleaseSourceVerifierTests(unittest.TestCase):
 
     def create_package(self, version):
         with tarfile.open(self.archive, "w:gz") as archive:
+            root = tarfile.TarInfo("mcp-vps-agent")
+            root.type = tarfile.DIRTYPE
+            archive.addfile(root)
             payload = (version+"\n").encode()
             item = tarfile.TarInfo("mcp-vps-agent/VERSION")
             item.size = len(payload)
@@ -77,6 +81,40 @@ class ReleaseSourceVerifierTests(unittest.TestCase):
         self.assertEqual(len(checked), 2)
         self.assertTrue(checked[0].endswith(SHA))
         self.assertTrue(checked[1].endswith(ARCHIVE))
+
+    def test_actual_git_archive_root_entry_is_accepted(self):
+        # An actual git archive --prefix writes a root directory named
+        # "mcp-vps-agent" rather than "mcp-vps-agent/".
+        source = self.base / "fixture-repo"
+        source.mkdir()
+        (source / "VERSION").write_text("0.1.0-rc.7\n")
+        subprocess.run(["git", "init", "-q", str(source)], check=True)
+        subprocess.run(["git", "-C", str(source), "add", "VERSION"], check=True)
+        subprocess.run(
+            ["git", "-C", str(source), "-c", "user.name=Verifier Test",
+             "-c", "user.email=verifier@example.invalid", "commit", "-qm", "init"],
+            check=True,
+        )
+        archived = subprocess.run(
+            ["git", "-C", str(source), "archive", "--format=tar",
+             "--prefix=mcp-vps-agent/", "HEAD"],
+            check=True, capture_output=True,
+        ).stdout
+        with tarfile.open(fileobj=io.BytesIO(archived), mode="r:") as bundle:
+            self.assertEqual(bundle.getmembers()[0].name, "mcp-vps-agent")
+        self.archive.write_bytes(gzip.compress(archived))
+        self.resign_fixture_checksum()
+        result = self.execute()
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_declared_zip_bomb_is_rejected_without_extracting(self):
+        entry = tarfile.TarInfo("mcp-vps-agent/huge.file")
+        entry.size = 2 * 1024 * 1024 * 1024
+        self.archive.write_bytes(gzip.compress(entry.tobuf() + bytes(1024)))
+        self.resign_fixture_checksum()
+        result = self.execute()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unpacked size limit", result.stderr)
 
     def test_mutated_archive_rejected_after_verifying_checksum_signature(self):
         self.archive.write_bytes(self.archive.read_bytes()+b"changed")
