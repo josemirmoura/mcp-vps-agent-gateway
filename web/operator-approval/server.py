@@ -69,7 +69,7 @@ SESSIONS: dict[str, tuple[float, str]] = {}
 LOCK = threading.Lock()
 LOGIN_FAILURES: dict[str, list[float]] = {}
 ID_RE = re.compile(r"^apr_[A-Za-z0-9_-]{8,100}$")
-API_RE = re.compile(r"^/api/operator/approvals/(apr_[A-Za-z0-9_-]{8,100})(/decision)?$")
+API_RE = re.compile(r"^/operator/api/approvals/(apr_[A-Za-z0-9_-]{8,100})(/decision)?$")
 UI_PATH = REPO / "web/operator-approval/index.html"
 COOKIE = "portico_operator"
 MAX_AGE = 900
@@ -187,7 +187,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(403, {"error": "origin denied"})
             return
         path = urlsplit(self.path).path
-        if path == "/api/operator/login":
+        if path == "/operator/api/login":
             # Bound rate limiting by remote address; TLS proxy MUST preserve access controls.
             peer = self.client_address[0]
             now = time.monotonic()
@@ -212,7 +212,7 @@ class Handler(BaseHTTPRequestHandler):
                     if len(SESSIONS) > 500:
                         SESSIONS.clear()
                     SESSIONS[sid] = (time.monotonic() + MAX_AGE, csrf)
-                self.reply(200, {"ok": True}, {"Set-Cookie": f"{COOKIE}={sid}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age={MAX_AGE}"})
+                self.reply(200, {"ok": True}, {"Set-Cookie": f"{COOKIE}={sid}; HttpOnly; Secure; SameSite=Strict; Path=/operator; Max-Age={MAX_AGE}"})
             except (ValueError, json.JSONDecodeError):
                 self.reply(400, {"error": "invalid payload"})
             return
