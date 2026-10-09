@@ -22,15 +22,25 @@ The CI saves the official output and per-scenario `checks.json` artifacts. `scri
 
 | Classification | Meaning |
 | --- | --- |
-| **PASS** | Every required check in this scenario succeeded. |
+| **PASS** | All enforced checks succeeded; informational notes alone are not failures. |
 | **FAIL** | A required check fails unexpectedly, or the report is corrupt. |
-| **SKIPPED** | No failures, but some/all checks were not executed. Not a pass. |
-| **NOT_TESTED** | No test evidence, or the official diagnostic tool is absent. Not a pass. |
+| **SKIPPED** | No required failure, but skipped or warning-only coverage remains. Not a pass. |
+| **NOT_TESTED** | No evidence or a required **synthetic diagnostic fixture** is absent (for example a `test_*` tool/prompt or disposable resource). Not a pass and never reclassified as compliant. |
 | **NOT_APPLICABLE** | Client-role requirements when evaluating Portico's server, or optional non-scored extensions. |
 
 In particular, the original stateless smoke on `main` reported **24 success, 4 diagnostic-only NOT TESTED, 2 skipped** across 30 checks. That one scenario is **not the 37-scenario requirements suite** and does not prove complete conformance.
 
 The evidence workflow is intentionally named `mcp-requirements-evidence-not-release-gate`: a green report-generation job only proves that the pinned test harness ran and classified evidence. **It cannot declare release readiness by itself.** The report has an explicit `release_gate_passed` Boolean, which is true only when all 37 scored scenarios PASS and the official runner exits zero. For an enforced gate, invoke the matrix parser with `--enforce`; failures then exit nonzero.
+
+## Measured official run and uncovered capabilities (2026-10-09)
+
+First full frozen requirements run on public Community PR #98, SHA `c4e18d9186aa2771285e45085caa40420ddf37a2`, [GitHub Actions run 38003928769](https://github.com/josemirmoura/mcp-vps-agent-gateway/actions/runs/38003928769), produced an immutable CI artifact `block2-mcp-2026-requirements-38003928769` (artifact ID `11650955192`). Upstream code was pinned to `c37eec888e1c6ff140af79987a40008548b7cc5f`. Runner exit `1`.
+
+The initial machine classification was **7 PASS, 28 FAIL, 1 NOT_TESTED, 1 SKIPPED** out of 37. Inspection of **all actual `checks.json` records** found many supposed failures only say `unknown tool "test_*"`, `unknown prompt "test_*"`, or the disposable fixture resource does not exist. These are **missing test fixtures**, not evidence that unrelated Portico production tools failed. It also found an `INFO` about optional SSE responses and `WARNING` assertions that should not be treated as the same category as a hard protocol failure.
+
+The classifier is now refined to distinguish fixture-unavailable `NOT_TESTED`, verified protocol `FAIL`, and `SKIPPED/WARNING`; **none of those count as PASS or release-ready**. Based on reanalysis of this same artifact, the expected revised classification is **8 PASS, 2 FAIL, 3 SKIPPED, 24 NOT_TESTED**. This revision still awaits confirmation by the CI running the updated classifier SHA. In particular the `completion/complete` absence and multi-round InputRequiredResult check remain reported as FAIL; further applicability/fixture review is required before treating either as a production defect or exception.
+
+A separate conformance fixture that is *actually attached to the Portico Handler* is needed to exercise content tool variants, prompts, resources and multi-round elicitation on the real transport. Do not add fake `test_*` operations to the real user-facing Gateway catalog and do not hide them behind a broad expected-failures baseline. Because the Gateway registration layer is reserved for **Block 1**, any necessary injection seam must go via a documented handoff to Block 5 rather than a conflicting edit in this Block.
 
 ## OAuth Resource Server
 
