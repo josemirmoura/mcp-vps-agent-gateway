@@ -79,7 +79,7 @@ O fluxo guiado cobre pré-requisitos, escopo de autoridade, containers, verifica
 
 Veja:
 
-- [Quick Start](docs/quick-start.md)
+- [Início rápido (PT-BR)](docs/quick-start.pt-BR.md) | [English](docs/quick-start.md)
 - [Contrato de instalação](docs/installation-contract.md)
 - [Fluxo de instalação](docs/installer-flow.md)
 - [Integração ChatGPT](docs/chatgpt-integration.md)
