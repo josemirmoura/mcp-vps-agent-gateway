@@ -268,17 +268,17 @@ func (b *Broker) discoverScope(ctx context.Context, req wire.Request) wire.Respo
 		}
 		path := filepath.Join(physical, entry.Name())
 		dirs = append(dirs, map[string]any{
-			"name": entry.Name(),
-			"path": path,
+			"name":            entry.Name(),
+			"path":            path,
 			"read_authorized": pathWithinAnyRoot(readRoots, path),
 			"work_authorized": pathWithinAnyRoot(writeRoots, path),
 		})
 	}
 	return ok(req.ID, map[string]any{
 		"physical_ceiling": physical,
-		"discovery_only": true,
-		"directories": dirs,
-		"note": "Directory names are visible for discovery; contents remain subject to explicit root authorization.",
+		"discovery_only":   true,
+		"directories":      dirs,
+		"note":             "Directory names are visible for discovery; contents remain subject to explicit root authorization.",
 	})
 }
 
@@ -382,16 +382,16 @@ func (b *Broker) requestSensitiveAccess(ctx context.Context, req wire.Request) w
 		return deny(req.ID, "approval_unavailable", err.Error())
 	}
 	result, _ := json.Marshal(map[string]any{
-		"request_id": a.ID,
-		"status": a.Status,
-		"kind": "sensitive",
-		"path": path,
-		"access": access,
+		"request_id":             a.ID,
+		"status":                 a.Status,
+		"kind":                   "sensitive",
+		"path":                   path,
+		"access":                 access,
 		"delegation_ttl_seconds": int64(ttl / time.Second),
-		"approval_expires_at": a.ExpiresAt,
-		"approval_required": true,
-		"physical_ceiling": filepath.Clean(os.Getenv("VPS_AGENT_PHYSICAL_SCOPE_ROOT")),
-		"approval_token": token,
+		"approval_expires_at":    a.ExpiresAt,
+		"approval_required":      true,
+		"physical_ceiling":       filepath.Clean(os.Getenv("VPS_AGENT_PHYSICAL_SCOPE_ROOT")),
+		"approval_token":         token,
 	})
 	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
 		return deny(req.ID, "state_error", "sensitive approval request created but operation journal update failed: "+err.Error())
@@ -434,8 +434,11 @@ func (b *Broker) validateSensitiveApproval(ctx context.Context, approval state.A
 }
 
 func (b *Broker) confirmSensitiveAccess(ctx context.Context, req wire.Request) wire.Response {
-	if !b.adminOK(req.AdminToken) { return deny(req.ID,"operator_required","MCP client acceptance is not operator authentication") }
-	b.elevationMu.Lock(); defer b.elevationMu.Unlock()
+	if !b.adminOK(req.AdminToken) {
+		return deny(req.ID, "operator_required", "MCP client acceptance is not operator authentication")
+	}
+	b.elevationMu.Lock()
+	defer b.elevationMu.Unlock()
 	if b.State == nil {
 		return deny(req.ID, "state_required", "sensitive access confirmation requires durable state")
 	}
@@ -492,9 +495,9 @@ func (b *Broker) listSensitiveAccess(ctx context.Context, req wire.Request) wire
 				continue
 			}
 			rows = append(rows, map[string]any{
-				"grant_id": grant.ID,
-				"path": path,
-				"access": access,
+				"grant_id":   grant.ID,
+				"path":       path,
+				"access":     access,
 				"expires_at": grant.ExpiresAt,
 			})
 		}

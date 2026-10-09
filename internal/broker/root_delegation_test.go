@@ -42,10 +42,10 @@ func TestDynamicRootApprovalActivatesAndRevokesWithoutPolicyReload(t *testing.T)
 		Compose: policy.ResourcePolicy{
 			Actions: []string{"validate", "up", "down", "pull"},
 		},
-		Network: policy.NetworkPolicy{Mode: "blocked"},
+		Network:   policy.NetworkPolicy{Mode: "blocked"},
 		Privilege: policy.PrivilegePolicy{Admin: "broker-only"},
-		Replay: policy.ReplayPolicy{RequireIdempotencyForSafeWrites: true},
-		Grant: policy.GrantPolicy{MaxTTLMinutes: 60, OutOfBandApproval: true, StepUpAuth: true},
+		Replay:    policy.ReplayPolicy{RequireIdempotencyForSafeWrites: true},
+		Grant:     policy.GrantPolicy{MaxTTLMinutes: 60, OutOfBandApproval: true, StepUpAuth: true},
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
@@ -98,9 +98,9 @@ func TestDynamicRootApprovalActivatesAndRevokesWithoutPolicyReload(t *testing.T)
 	}
 
 	badConfirmArgs, _ := json.Marshal(map[string]any{
-		"request_id": pending.RequestID,
+		"request_id":     pending.RequestID,
 		"approval_token": "model-does-not-have-the-token",
-		"decision": "approve",
+		"decision":       "approve",
 	})
 	badConfirm := b.Handle(ctx, wire.Request{
 		ID: "bad-confirm", Subject: "alice", Tool: "permissions.confirm_root_access",
@@ -111,9 +111,9 @@ func TestDynamicRootApprovalActivatesAndRevokesWithoutPolicyReload(t *testing.T)
 	}
 
 	otherSubjectArgs, _ := json.Marshal(map[string]any{
-		"request_id": pending.RequestID,
+		"request_id":     pending.RequestID,
 		"approval_token": pending.ApprovalToken,
-		"decision": "approve",
+		"decision":       "approve",
 	})
 	otherSubject := b.Handle(ctx, wire.Request{
 		ID: "other-subject", Subject: "mallory", Tool: "permissions.confirm_root_access",
@@ -124,12 +124,12 @@ func TestDynamicRootApprovalActivatesAndRevokesWithoutPolicyReload(t *testing.T)
 	}
 
 	confirmArgs, _ := json.Marshal(map[string]any{
-		"request_id": pending.RequestID,
+		"request_id":     pending.RequestID,
 		"approval_token": pending.ApprovalToken,
-		"decision": "approve",
+		"decision":       "approve",
 	})
 	approved := b.Handle(ctx, wire.Request{
-		ID: "approve", Subject: "alice", AdminToken:b.AdminToken, Tool: "permissions.confirm_root_access",
+		ID: "approve", Subject: "alice", AdminToken: b.AdminToken, Tool: "permissions.confirm_root_access",
 		Args: confirmArgs,
 	})
 	if !approved.OK {
@@ -181,10 +181,10 @@ func TestDynamicRootRequestCannotEscapePhysicalCeiling(t *testing.T) {
 	cfg := &policy.Config{
 		Version: 1, Mode: "scoped",
 		Filesystem: policy.FilesystemPolicy{Actions: []string{"read", "write"}},
-		Network: policy.NetworkPolicy{Mode: "blocked"},
-		Privilege: policy.PrivilegePolicy{Admin: "broker-only"},
-		Replay: policy.ReplayPolicy{RequireIdempotencyForSafeWrites: true},
-		Grant: policy.GrantPolicy{MaxTTLMinutes: 60},
+		Network:    policy.NetworkPolicy{Mode: "blocked"},
+		Privilege:  policy.PrivilegePolicy{Admin: "broker-only"},
+		Replay:     policy.ReplayPolicy{RequireIdempotencyForSafeWrites: true},
+		Grant:      policy.GrantPolicy{MaxTTLMinutes: 60},
 	}
 	store, err := state.Open(":memory:")
 	if err != nil {
@@ -222,10 +222,10 @@ func TestDynamicPhysicalCeilingRequiresAndAcceptsOperatorApproval(t *testing.T) 
 			Enabled: true, CWDRoots: []string{},
 			MaxRuntimeSeconds: 60, MaxOutputBytes: 1 << 20,
 		},
-		Network: policy.NetworkPolicy{Mode: "blocked"},
+		Network:   policy.NetworkPolicy{Mode: "blocked"},
 		Privilege: policy.PrivilegePolicy{Admin: "broker-only"},
-		Replay: policy.ReplayPolicy{RequireIdempotencyForSafeWrites: true},
-		Grant: policy.GrantPolicy{MaxTTLMinutes: 60, OutOfBandApproval: true, StepUpAuth: true},
+		Replay:    policy.ReplayPolicy{RequireIdempotencyForSafeWrites: true},
+		Grant:     policy.GrantPolicy{MaxTTLMinutes: 60, OutOfBandApproval: true, StepUpAuth: true},
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
@@ -278,9 +278,9 @@ func TestDynamicPhysicalCeilingRequiresAndAcceptsOperatorApproval(t *testing.T) 
 	}
 
 	wrongSubjectArgs, _ := json.Marshal(map[string]any{
-		"request_id": pending.RequestID,
+		"request_id":     pending.RequestID,
 		"approval_token": pending.ApprovalToken,
-		"decision": "approve",
+		"decision":       "approve",
 	})
 	wrongSubject := b.Handle(ctx, wire.Request{
 		ID: "wrong-subject", Subject: "bob", Tool: "permissions.confirm_root_access",
@@ -291,12 +291,12 @@ func TestDynamicPhysicalCeilingRequiresAndAcceptsOperatorApproval(t *testing.T) 
 	}
 
 	confirmArgs, _ := json.Marshal(map[string]any{
-		"request_id": pending.RequestID,
+		"request_id":     pending.RequestID,
 		"approval_token": pending.ApprovalToken,
-		"decision": "approve",
+		"decision":       "approve",
 	})
 	approved := b.Handle(ctx, wire.Request{
-		ID: "approve-ceiling", Subject: "alice", AdminToken:b.AdminToken, Tool: "permissions.confirm_root_access",
+		ID: "approve-ceiling", Subject: "alice", AdminToken: b.AdminToken, Tool: "permissions.confirm_root_access",
 		Args: confirmArgs,
 	})
 	if !approved.OK {
@@ -351,10 +351,10 @@ func TestDynamicRootApprovalWorksFromEmptyStaticBaseline(t *testing.T) {
 			Enabled: true, CWDRoots: []string{},
 			MaxRuntimeSeconds: 60, MaxOutputBytes: 1 << 20,
 		},
-		Network: policy.NetworkPolicy{Mode: "blocked"},
+		Network:   policy.NetworkPolicy{Mode: "blocked"},
 		Privilege: policy.PrivilegePolicy{Admin: "broker-only"},
-		Replay: policy.ReplayPolicy{RequireIdempotencyForSafeWrites: true},
-		Grant: policy.GrantPolicy{MaxTTLMinutes: 60, OutOfBandApproval: true, StepUpAuth: true},
+		Replay:    policy.ReplayPolicy{RequireIdempotencyForSafeWrites: true},
+		Grant:     policy.GrantPolicy{MaxTTLMinutes: 60, OutOfBandApproval: true, StepUpAuth: true},
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
@@ -406,12 +406,12 @@ func TestDynamicRootApprovalWorksFromEmptyStaticBaseline(t *testing.T) {
 	}
 
 	confirmArgs, _ := json.Marshal(map[string]any{
-		"request_id": pending.RequestID,
+		"request_id":     pending.RequestID,
 		"approval_token": pending.ApprovalToken,
-		"decision": "approve",
+		"decision":       "approve",
 	})
 	approved := b.Handle(ctx, wire.Request{
-		ID: "empty-approve", Subject: "alice", AdminToken:b.AdminToken, Tool: "permissions.confirm_root_access",
+		ID: "empty-approve", Subject: "alice", AdminToken: b.AdminToken, Tool: "permissions.confirm_root_access",
 		Args: confirmArgs,
 	})
 	if !approved.OK {

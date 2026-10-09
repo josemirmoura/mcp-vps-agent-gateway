@@ -7,12 +7,12 @@ import (
 
 func TestNativeApprovalRejectsControlCharactersAndMobileOverflow(t *testing.T) {
 	valid := map[string]any{
-		"request_id":              "req-test-1",
-		"root":                    "/opt/project-a",
-		"access":                  "work",
+		"request_id":             "req-test-1",
+		"root":                   "/opt/project-a",
+		"access":                 "work",
 		"delegation_ttl_seconds": 3600,
-		"physical_ceiling":        "/opt",
-		"approval_token":          "ephemeral-test-token",
+		"physical_ceiling":       "/opt",
+		"approval_token":         "ephemeral-test-token",
 	}
 	if _, err := validatedApprovalMessage("root", valid); err != nil {
 		t.Fatalf("valid native approval should remain available: %v", err)
@@ -50,18 +50,17 @@ func TestNativeApprovalRejectsControlCharactersAndMobileOverflow(t *testing.T) {
 	}
 }
 
-
 // TestNativeApprovalRequiresVisibleAuthorityContext verifies that users never
 // authorize a root that is silently the whole physical scope ceiling.
 func TestNativeApprovalRequiresVisibleAuthorityContext(t *testing.T) {
 	t.Setenv("VPS_AGENT_LANG", "en")
 	values := map[string]any{
-		"request_id": "req-visible-context",
-		"root": "/opt/projeto-á",
-		"access": "read",
+		"request_id":             "req-visible-context",
+		"root":                   "/opt/projeto-á",
+		"access":                 "read",
 		"delegation_ttl_seconds": 600,
-		"physical_ceiling": "/opt",
-		"ceiling_wide": false,
+		"physical_ceiling":       "/opt",
+		"ceiling_wide":           false,
 	}
 	if _, err := validatedApprovalMessage("root", values); err != nil {
 		t.Fatalf("legitimate accented scope must remain displayable: %v", err)
@@ -97,8 +96,8 @@ func TestNativeApprovalRequiresVisibleAuthorityContext(t *testing.T) {
 
 func TestNativeRootApprovalAlwaysDisplaysPhysicalCeiling(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		lang string
+		name  string
+		lang  string
 		label string
 	}{
 		{name: "English", lang: "en", label: "Ceiling: /opt"},
@@ -107,11 +106,11 @@ func TestNativeRootApprovalAlwaysDisplaysPhysicalCeiling(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("VPS_AGENT_LANG", tc.lang)
 			values := map[string]any{
-				"root": "/opt/example",
-				"physical_ceiling": "/opt",
-				"access": "work",
+				"root":                   "/opt/example",
+				"physical_ceiling":       "/opt",
+				"access":                 "work",
 				"delegation_ttl_seconds": 3600,
-				"ceiling_wide": false,
+				"ceiling_wide":           false,
 			}
 			message, err := validatedApprovalMessage("root", values)
 			if err != nil {

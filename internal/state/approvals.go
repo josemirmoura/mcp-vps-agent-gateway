@@ -14,8 +14,8 @@ const MaxPendingApprovals = 256
 var ErrApprovalQueueFull = errors.New("pending approval capacity reached; consult or cancel existing requests")
 
 type Approval struct {
-	Fingerprint string `json:"Fingerprint,omitempty"`
-	NodeID string `json:"NodeID,omitempty"`
+	Fingerprint  string `json:"Fingerprint,omitempty"`
+	NodeID       string `json:"NodeID,omitempty"`
 	ID           string
 	Subject      string
 	Capabilities []string
@@ -69,11 +69,15 @@ func (s *Store) createApproval(ctx context.Context, subject string, capabilities
 		 WHERE (SELECT COUNT(*) FROM approvals WHERE status='pending' AND expires_at>? AND subject=?) < ?
 		 AND (SELECT COUNT(*) FROM approvals WHERE status='pending' AND expires_at>?) < ?`,
 		id, subject, string(raw), ttl.Nanoseconds(), now.UnixNano(), exp.UnixNano(), kind, resource, access,
-		now.UnixNano(),subject,MaxPendingApprovalsPerSubject,now.UnixNano(),MaxPendingApprovals)
+		now.UnixNano(), subject, MaxPendingApprovalsPerSubject, now.UnixNano(), MaxPendingApprovals)
 	if err != nil {
 		return Approval{}, err
 	}
-	if count,err:=res.RowsAffected();err!=nil{return Approval{},err}else if count!=1{return Approval{},ErrApprovalQueueFull}
+	if count, err := res.RowsAffected(); err != nil {
+		return Approval{}, err
+	} else if count != 1 {
+		return Approval{}, ErrApprovalQueueFull
+	}
 	return Approval{
 		ID: id, Subject: subject, Capabilities: caps, TTL: ttl, Status: "pending",
 		CreatedAt: now, ExpiresAt: exp, Kind: kind, Resource: resource, Access: access,
@@ -153,7 +157,7 @@ func (s *Store) DecideApproval(ctx context.Context, id, decision string) (Approv
 func (s *Store) ListPendingApprovals(ctx context.Context) ([]Approval, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT request_id,subject,capabilities,ttl_ns,status,created_at,expires_at,kind,resource,access
-		  FROM approvals WHERE status='pending' AND expires_at>? ORDER BY created_at`,time.Now().UnixNano())
+		  FROM approvals WHERE status='pending' AND expires_at>? ORDER BY created_at`, time.Now().UnixNano())
 	if err != nil {
 		return nil, err
 	}

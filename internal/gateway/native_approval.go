@@ -1,15 +1,15 @@
 package gateway
 
 import (
- "encoding/json"
- "errors"
- "fmt"
- "os"
- "path/filepath"
- "strconv"
- "strings"
- "unicode"
- "unicode/utf8"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // validatedApprovalMessage never asks a user to approve a scope that cannot

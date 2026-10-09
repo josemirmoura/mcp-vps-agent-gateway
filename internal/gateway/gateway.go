@@ -84,8 +84,8 @@ func SubjectFromContext(ctx context.Context) string {
 }
 
 type Server struct {
-	Executor Executor
-	Metrics  *runtimeMetrics
+	Executor      Executor
+	Metrics       *runtimeMetrics
 	navigationKey []byte
 }
 
@@ -302,14 +302,16 @@ func NewMCPServer(exec Executor) *mcp.Server {
 
 func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 	s := &Server{Executor: exec, Metrics: metrics}
-	key:=make([]byte,32)
-	if _,err:=rand.Read(key);err==nil{s.navigationKey=key}
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err == nil {
+		s.navigationKey = key
+	}
 	server := mcp.NewServer(
 		&mcp.Implementation{Name: "portico-mcp", Version: portico.Version()},
 		&mcp.ServerOptions{
 			Instructions: serverInstructions(),
 			Capabilities: &mcp.ServerCapabilities{
-				Logging: &mcp.LoggingCapabilities{},
+				Logging:    &mcp.LoggingCapabilities{},
 				Extensions: approvalServerExtensions(),
 				// The SDK serves prompts/list with an empty list even when no
 				// prompts are registered. Keep discovery consistent with that
@@ -322,7 +324,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 		},
 	)
 	registerAuthorityTools(server, s)
-	registerApprovalStatus(server,s)
+	registerApprovalStatus(server, s)
 	registerApprovalApp(server)
 
 	mcp.AddTool(server, annotatedTool("system.info", "Return non-sensitive host/runtime information."),
@@ -504,7 +506,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 
 	for _, action := range []string{"start", "stop", "restart", "reload", "enable", "disable"} {
 		action := action
-		mcp.AddTool(server, annotatedTool("service." + action, "Perform the typed systemd " + action + " action when server-side policy permits it."),
+		mcp.AddTool(server, annotatedTool("service."+action, "Perform the typed systemd "+action+" action when server-side policy permits it."),
 			func(ctx context.Context, _ *mcp.CallToolRequest, in serviceActionInput) (*mcp.CallToolResult, serviceOutput, error) {
 				var out serviceOutput
 				if err := s.call(ctx, "service."+action, in.Name, action, nil, &out, true, in.OperationID); err != nil {
@@ -629,7 +631,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 
 	for _, action := range []string{"pull", "up", "down"} {
 		action := action
-		mcp.AddTool(server, annotatedTool("compose." + action, "Perform the typed Docker Compose " + action + " action when policy permits it."),
+		mcp.AddTool(server, annotatedTool("compose."+action, "Perform the typed Docker Compose "+action+" action when policy permits it."),
 			func(ctx context.Context, _ *mcp.CallToolRequest, in composeInput) (*mcp.CallToolResult, map[string]any, error) {
 				var out map[string]any
 				if err := s.call(ctx, "compose."+action, in.ProjectDir, action, nil, &out, true, in.OperationID); err != nil {
@@ -717,7 +719,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 
 	for _, action := range []string{"install", "remove"} {
 		action := action
-		mcp.AddTool(server, annotatedTool("package." + action, "Perform typed APT " + action + " only for packages permitted by policy."),
+		mcp.AddTool(server, annotatedTool("package."+action, "Perform typed APT "+action+" only for packages permitted by policy."),
 			func(ctx context.Context, _ *mcp.CallToolRequest, in packageActionInput) (*mcp.CallToolResult, map[string]any, error) {
 				var out map[string]any
 				if err := s.call(ctx, "package."+action, in.Name, action, nil, &out, true, in.OperationID); err != nil {
@@ -747,7 +749,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 
 	for _, action := range []string{"add", "delete", "lock", "unlock"} {
 		action := action
-		mcp.AddTool(server, annotatedTool("user." + action, "Perform typed local-user " + action + " only when policy permits it."),
+		mcp.AddTool(server, annotatedTool("user."+action, "Perform typed local-user "+action+" only when policy permits it."),
 			func(ctx context.Context, _ *mcp.CallToolRequest, in userActionInput) (*mcp.CallToolResult, map[string]any, error) {
 				var out map[string]any
 				args, _ := json.Marshal(map[string]any{"create_home": in.CreateHome})
@@ -778,7 +780,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 
 	for _, action := range []string{"add", "delete"} {
 		action := action
-		mcp.AddTool(server, annotatedTool("group." + action, "Perform typed local-group " + action + " only when policy permits it."),
+		mcp.AddTool(server, annotatedTool("group."+action, "Perform typed local-group "+action+" only when policy permits it."),
 			func(ctx context.Context, _ *mcp.CallToolRequest, in groupActionInput) (*mcp.CallToolResult, map[string]any, error) {
 				var out map[string]any
 				if err := s.call(ctx, "group."+action, in.Name, action, nil, &out, true, in.OperationID); err != nil {
@@ -809,11 +811,15 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 
 	mcp.AddTool(server, approvalTool("permissions.request_root_access", "Request access inside the physical ceiling. Adaptive Apps/elicitation/HTTPS/SSH presentation; only the independently authenticated operator can approve."),
 		func(ctx context.Context, req *mcp.CallToolRequest, in rootAccessRequestInput) (*mcp.CallToolResult, any, error) {
-			if out,handled,err:=s.navigationContinuation(ctx,req,"root",in.Root);handled { return nil,out,err }
+			if out, handled, err := s.navigationContinuation(ctx, req, "root", in.Root); handled {
+				return nil, out, err
+			}
 			var out map[string]any
-			args,_:=json.Marshal(in)
-			if err:=s.call(ctx,"permissions.request_root_access",in.Root,"request",args,&out,true,in.OperationID);err!=nil { return nil,out,err }
-		return s.presentApproval(ctx,req,"root",out)
+			args, _ := json.Marshal(in)
+			if err := s.call(ctx, "permissions.request_root_access", in.Root, "request", args, &out, true, in.OperationID); err != nil {
+				return nil, out, err
+			}
+			return s.presentApproval(ctx, req, "root", out)
 		})
 
 	mcp.AddTool(server, annotatedTool("permissions.revoke_root_access", "Revoke this authenticated subject's dynamic access to one delegated root. This can only reduce dynamic authority; it cannot remove static policy roots."),
@@ -856,10 +862,11 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 	return server
 }
 
-
 func (s *Server) callWithGrant(ctx context.Context, tool, resource, action string, args []byte, out any, operationID, grantID string) (err error) {
 	started := time.Now()
-	if s.Metrics != nil { defer func() { s.Metrics.observeTool(tool, started, err) }() }
+	if s.Metrics != nil {
+		defer func() { s.Metrics.observeTool(tool, started, err) }()
+	}
 	id, err := randomID()
 	if err != nil {
 		return err
@@ -873,7 +880,9 @@ func (s *Server) callWithGrant(ctx context.Context, tool, resource, action strin
 	}
 	resp, err := s.Executor.Call(ctx, req)
 	if err != nil {
-		if s.Metrics != nil { s.Metrics.observeIPCFailure() }
+		if s.Metrics != nil {
+			s.Metrics.observeIPCFailure()
+		}
 		return err
 	}
 	if !resp.OK {
@@ -892,7 +901,9 @@ func (s *Server) callWithGrant(ctx context.Context, tool, resource, action strin
 
 func (s *Server) call(ctx context.Context, tool, resource, action string, args []byte, out any, write bool, operationID string) (err error) {
 	started := time.Now()
-	if s.Metrics != nil { defer func() { s.Metrics.observeTool(tool, started, err) }() }
+	if s.Metrics != nil {
+		defer func() { s.Metrics.observeTool(tool, started, err) }()
+	}
 	id, err := randomID()
 	if err != nil {
 		return err
@@ -909,7 +920,9 @@ func (s *Server) call(ctx context.Context, tool, resource, action string, args [
 	}
 	resp, err := s.Executor.Call(ctx, req)
 	if err != nil {
-		if s.Metrics != nil { s.Metrics.observeIPCFailure() }
+		if s.Metrics != nil {
+			s.Metrics.observeIPCFailure()
+		}
 		return err
 	}
 	if !resp.OK {

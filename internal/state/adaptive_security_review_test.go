@@ -21,7 +21,7 @@ func TestApprovalScopeFingerprintRejectsChangedSecurityFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	changes := []struct {
-		name string
+		name  string
 		apply func(*Approval)
 	}{
 		{"subject", func(a *Approval) { a.Subject = "mallory" }},

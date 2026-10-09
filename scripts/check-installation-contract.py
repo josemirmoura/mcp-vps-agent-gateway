@@ -257,7 +257,7 @@ ux_sources = {
 for rel, markers in ux_requirements.items():
     source = ux_sources[rel]
     for required in markers:
-        if required not in source:
+        if required not in source and re.sub(r"\s+", " ", required) not in re.sub(r"\s+", " ", source):
             errors.append(f"{rel}: clean-E2E invariant missing: {required}")
 
 if "dynamic delegation of the entire physical ceiling is not allowed" in broker_text:

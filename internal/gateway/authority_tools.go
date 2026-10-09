@@ -30,11 +30,15 @@ func registerAuthorityTools(server *mcp.Server, s *Server) {
 	})
 
 	mcp.AddTool(server, approvalTool("permissions.request_sensitive_access", "Request temporary access to one protected file. Operator session and request-bound step-up are required; client acceptance alone never grants access."), func(ctx context.Context, req *mcp.CallToolRequest, in sensitiveAccessRequestInput) (*mcp.CallToolResult, any, error) {
-		if out,handled,err:=s.navigationContinuation(ctx,req,"sensitive",in.Path);handled { return nil,out,err }
+		if out, handled, err := s.navigationContinuation(ctx, req, "sensitive", in.Path); handled {
+			return nil, out, err
+		}
 		var out map[string]any
-		args,_:=json.Marshal(in)
-		if err:=s.call(ctx,"permissions.request_sensitive_access",in.Path,"request",args,&out,true,in.OperationID);err!=nil { return nil,out,err }
-		return s.presentApproval(ctx,req,"sensitive",out)
+		args, _ := json.Marshal(in)
+		if err := s.call(ctx, "permissions.request_sensitive_access", in.Path, "request", args, &out, true, in.OperationID); err != nil {
+			return nil, out, err
+		}
+		return s.presentApproval(ctx, req, "sensitive", out)
 	})
 
 	mcp.AddTool(server, annotatedTool("permissions.list_sensitive_access", "List this authenticated subject's active temporary protected-file grants."), func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {

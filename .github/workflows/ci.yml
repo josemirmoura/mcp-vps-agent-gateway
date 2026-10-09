@@ -83,16 +83,6 @@ jobs:
         run: bash scripts/validate-compose-model.sh
       - name: Format ephemeral workspace
         run: gofmt -w $(find . -name '*.go' -type f -print)
-      - name: Export candidate formatting checkpoint
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import base64, json, pathlib, subprocess
-          for name in subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines():
-              if name.endswith('.go'):
-                  item = {'path': name, 'content': pathlib.Path(name).read_text()}
-                  print('PORTICO_FORMATTED_GO:' + base64.b64encode(json.dumps(item).encode()).decode())
-          PY
       - name: Vet
         run: go vet ./...
       - name: Test with race detector

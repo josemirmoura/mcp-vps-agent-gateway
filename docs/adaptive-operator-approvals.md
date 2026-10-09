@@ -1,6 +1,7 @@
 # Autorizações adaptativas por cliente MCP
 
 Estado: candidato para revisão, derivado da PR #88. Nenhuma implantação desta alteração foi realizada.
+Implementação e revisões na [PR #93](https://github.com/josemirmoura/mcp-vps-agent-gateway/pull/93).
 
 ## Autoridade e canais
 
@@ -15,6 +16,8 @@ O Broker mantém o pedido persistente e decide autoridade, escopo físico, sujei
 
 Não há detecção por marca, user-agent ou nome informado pelo cliente. Sinalização ausente ou inválida usa fallback. O wrapper só tenta enquadrar a Central se o handshake MCP Apps confirmar a versão e `hostCapabilities.sandbox.csp.frameDomains`. Timeout, enquadramento bloqueado, cookies indisponíveis ou bridge recusado mantêm o portal e SSH visíveis. Não existe tool pública de aprovação.
 
+No sandbox mínimo, login usa clique/Enter sem submissão nativa de formulário. Abrir o portal externo usa `ui/open-link` somente após clique do operador e se `hostCapabilities.openLinks` estiver anunciado; o URL HTTPS permanece visível para cópia quando o host não abrir links.
+
 ## Isolamento da identidade
 
 A página MCP Apps não contém credenciais. A autenticação e a decisão ocorrem em iframe HTTPS de outra origem, com proteção de mesma origem do navegador. As origens ancestrais devem ser configuradas explicitamente; sem elas o enquadramento fica desabilitado. A Central externa conserva `X-Frame-Options: DENY` e `frame-ancestors 'none'`.
@@ -26,6 +29,8 @@ O socket restrito recebe somente a identidade configurada do serviço operador e
 Cada decisão precisa de nonce de uso único, válido por até 60 segundos e vinculado à sessão, pedido, fingerprint imutável e máquina. O Broker verifica novamente a fingerprint e a política corrente. Para aprovar arquivos protegidos e perfis work/compose, a Central exige verificação fresca da senha local por pedido; isso é reautenticação, não MFA/passkey. Negar continua possível sem essa nova digitação. Uma sessão autenticada evita repetir senha para pedidos read de pasta, mantendo confirmação explícita em cada pedido.
 
 O Broker grava decisão, grant e auditoria na mesma transação SQLite. Expiração, cancelamento, decisões concorrentes e replay não criam grants duplicados. Perda de resposta exige consulta de estado antes de repetir. `permissions.approval_status` distingue pedido pendente, decisão histórica, grant expirado e revogado. Operações subsequentes reautorizam no Broker.
+
+A fila ativa limita pedidos pendentes não expirados a 64 por sujeito e 256 por instalação, de forma atômica. Expiração e cancelamento liberam espaço. A Central consulta um pedido por ID no IPC restrito, evitando depender do tamanho de uma listagem global. Sessão e nonce são revalidados depois da verificação de senha e antes do consumo, inclusive quando expiram ou há logout simultâneo.
 
 ## Contrato público
 

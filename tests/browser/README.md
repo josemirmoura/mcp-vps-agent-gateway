@@ -2,7 +2,7 @@
 
 `adaptive_approval.mjs` runs the actual operator HTTPS server, portal assets and MCP Apps wrapper in Chromium. A loopback-only TLS fixture simulates the restricted Broker reply and a reference host bridge. It does not connect to production or prove compatibility in ChatGPT, Claude, VS Code or a physical phone.
 
-The desktop and mobile Chromium profiles cover session reuse with explicit decisions, approve/deny final states, critical password step-up, logout, independent embedded cookies, browser same-origin isolation, host attempts to trigger approval, and portal fallback when framing is not confirmed. `web/operator-approval/test_bridge.mjs` separately tests malformed/spoofed bridge messages, origin/source binding and fallback timeouts without requiring a browser.
+The 16 desktop/mobile Chromium cases cover session reuse with explicit decisions, approve/deny final states, critical password step-up, logout, browser same-origin isolation, host attempts to trigger approval, and portal fallback when framing is not confirmed. The fixture maps three independent HTTPS sites to loopback and adds a second AI-host site: assertions verify actual CHIPS partition keys, prevent another host from inheriting an owner session, exercise click/Enter login without `allow-forms`, and click the external fallback through host `ui/open-link` without `allow-popups`. `web/operator-approval/test_bridge.mjs` separately tests malformed/spoofed bridge messages, origin/source binding, late responses for a reused app and fallback timeouts without requiring a browser.
 
 Run the lightweight bridge tests:
 

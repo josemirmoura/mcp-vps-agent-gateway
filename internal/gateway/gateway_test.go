@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	portico "github.com/josemirmoura/mcp-vps-agent-gateway"
@@ -82,7 +82,6 @@ func TestStaticAuth(t *testing.T) {
 	}
 }
 
-
 type instanceExecutor struct{}
 
 func (instanceExecutor) Call(_ context.Context, req wire.Request) (wire.Response, error) {
@@ -90,8 +89,8 @@ func (instanceExecutor) Call(_ context.Context, req wire.Request) (wire.Response
 		return wire.ErrorResponse(req.ID, "unexpected_tool", req.Tool), nil
 	}
 	raw, _ := json.Marshal(map[string]any{
-		"hostname": "host-a",
-		"instance_id": "inst-123",
+		"hostname":      "host-a",
+		"instance_id":   "inst-123",
 		"instance_name": "VPS Agent | Loja",
 	})
 	return wire.Response{ID: req.ID, OK: true, Result: raw}, nil
@@ -103,11 +102,15 @@ func TestSystemInfoPreservesInstanceIdentity(t *testing.T) {
 
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "v1"}, nil)
 	session, err := client.Connect(context.Background(), &mcp.StreamableClientTransport{Endpoint: ts.URL + "/mcp"}, nil)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer session.Close()
 
 	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "system.info", Arguments: map[string]any{}})
-	if err != nil || res.IsError { t.Fatalf("system.info failed: err=%v result=%+v", err, res) }
+	if err != nil || res.IsError {
+		t.Fatalf("system.info failed: err=%v result=%+v", err, res)
+	}
 	raw, _ := json.Marshal(res.StructuredContent)
 	if !strings.Contains(string(raw), "inst-123") || !strings.Contains(string(raw), "VPS Agent | Loja") {
 		t.Fatalf("instance identity missing: %s", raw)
@@ -120,40 +123,39 @@ func TestSystemInfoPreservesInstanceIdentity(t *testing.T) {
 	}
 }
 
-
 type approvalExecutor struct{}
 
 func (approvalExecutor) Call(_ context.Context, req wire.Request) (wire.Response, error) {
 	switch req.Tool {
 	case "permissions.request_root_access":
 		raw, _ := json.Marshal(map[string]any{
-			"request_id": "apr_root_test",
-			"status": "pending",
-			"kind": "root",
-			"root": req.Resource,
-			"access": "work",
+			"request_id":             "apr_root_test",
+			"status":                 "pending",
+			"kind":                   "root",
+			"root":                   req.Resource,
+			"access":                 "work",
 			"delegation_ttl_seconds": 3600,
-			"approval_required": true,
-			"ceiling_wide": false,
-			"physical_ceiling": req.Resource,
-			"approval_token": "secret-root-token",
+			"approval_required":      true,
+			"ceiling_wide":           false,
+			"physical_ceiling":       req.Resource,
+			"approval_token":         "secret-root-token",
 		})
 		return wire.Response{ID: req.ID, OK: true, Result: raw}, nil
 	case "permissions.approval_status":
-		return response(req.ID,map[string]any{"request_id":req.Resource,"status":"pending","resource":"/opt/project-a","authoritative":true}),nil
+		return response(req.ID, map[string]any{"request_id": req.Resource, "status": "pending", "resource": "/opt/project-a", "authoritative": true}), nil
 	case "permissions.confirm_root_access":
 		return approvalConfirmation(req, "secret-root-token", "root")
 	case "permissions.request_sensitive_access":
 		raw, _ := json.Marshal(map[string]any{
-			"request_id": "apr_sensitive_test",
-			"status": "pending",
-			"kind": "sensitive",
-			"path": req.Resource,
-			"access": "read",
+			"request_id":             "apr_sensitive_test",
+			"status":                 "pending",
+			"kind":                   "sensitive",
+			"path":                   req.Resource,
+			"access":                 "read",
 			"delegation_ttl_seconds": 600,
-			"approval_required": true,
-			"physical_ceiling": "/opt",
-			"approval_token": "secret-sensitive-token",
+			"approval_required":      true,
+			"physical_ceiling":       "/opt",
+			"approval_token":         "secret-sensitive-token",
 		})
 		return wire.Response{ID: req.ID, OK: true, Result: raw}, nil
 	case "permissions.confirm_sensitive_access":
@@ -178,24 +180,35 @@ func approvalConfirmation(req wire.Request, expectedToken, kind string) (wire.Re
 	}
 	raw, _ := json.Marshal(map[string]any{
 		"status": status,
-		"kind": kind,
+		"kind":   kind,
 	})
 	return wire.Response{ID: req.ID, OK: true, Result: raw}, nil
 }
 
 func TestNativeAcceptanceNeverAuthorizesWithoutOperatorProof(t *testing.T) {
- for _,action:=range []string{"accept","decline","cancel"} {
-  t.Run(action,func(t *testing.T){
-   t.Setenv("VPS_AGENT_OPERATOR_PORTAL_URL","https://operator.example.test/operator")
-   ts:=httptest.NewServer(Handler(approvalExecutor{},AuthConfig{Mode:"none",StaticSubject:"alice"}));defer ts.Close()
-   client:=mcp.NewClient(&mcp.Implementation{Name:"arbitrary-agent",Version:"v1"},&mcp.ClientOptions{ElicitationHandler:func(context.Context,*mcp.ElicitRequest)(*mcp.ElicitResult,error){return &mcp.ElicitResult{Action:action},nil}})
-   session,err:=client.Connect(context.Background(),&mcp.StreamableClientTransport{Endpoint:ts.URL+"/mcp"},nil);if err!=nil{t.Fatal(err)};defer session.Close()
-   res,err:=session.CallTool(context.Background(),&mcp.CallToolParams{Name:"permissions.request_root_access",Arguments:map[string]any{"root":"/opt/project-a","access":"read","ttl_seconds":300}})
-   if err!=nil||res.IsError{t.Fatalf("navigation failed: %v %+v",err,res)}
-   raw,_:=json.Marshal(res.StructuredContent)
-   if !strings.Contains(string(raw),`"status":"pending"`)||strings.Contains(string(raw),"approval_token")||strings.Contains(string(raw),"secret-root-token"){t.Fatalf("client intent became authority or leaked credentials: %s",raw)}
-  })
- }
+	for _, action := range []string{"accept", "decline", "cancel"} {
+		t.Run(action, func(t *testing.T) {
+			t.Setenv("VPS_AGENT_OPERATOR_PORTAL_URL", "https://operator.example.test/operator")
+			ts := httptest.NewServer(Handler(approvalExecutor{}, AuthConfig{Mode: "none", StaticSubject: "alice"}))
+			defer ts.Close()
+			client := mcp.NewClient(&mcp.Implementation{Name: "arbitrary-agent", Version: "v1"}, &mcp.ClientOptions{ElicitationHandler: func(context.Context, *mcp.ElicitRequest) (*mcp.ElicitResult, error) {
+				return &mcp.ElicitResult{Action: action}, nil
+			}})
+			session, err := client.Connect(context.Background(), &mcp.StreamableClientTransport{Endpoint: ts.URL + "/mcp"}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer session.Close()
+			res, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "permissions.request_root_access", Arguments: map[string]any{"root": "/opt/project-a", "access": "read", "ttl_seconds": 300}})
+			if err != nil || res.IsError {
+				t.Fatalf("navigation failed: %v %+v", err, res)
+			}
+			raw, _ := json.Marshal(res.StructuredContent)
+			if !strings.Contains(string(raw), `"status":"pending"`) || strings.Contains(string(raw), "approval_token") || strings.Contains(string(raw), "secret-root-token") {
+				t.Fatalf("client intent became authority or leaked credentials: %s", raw)
+			}
+		})
+	}
 }
 
 func TestApprovalPromptsStayCompactForMobile(t *testing.T) {
@@ -262,7 +275,7 @@ func TestApprovalFallsBackWithoutElicitationAndHidesConfirmTools(t *testing.T) {
 	defer session.Close()
 
 	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-		Name: "permissions.request_root_access",
+		Name:      "permissions.request_root_access",
 		Arguments: map[string]any{"root": "/opt/project-a", "access": "read"},
 	})
 	if err != nil || res.IsError {

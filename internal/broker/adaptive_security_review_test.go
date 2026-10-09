@@ -24,10 +24,10 @@ func securityReviewFullBroker(t *testing.T) (*Broker, *state.Store) {
 	t.Cleanup(func() { _ = store.Close() })
 	cfg := &policy.Config{
 		Version: 1, Mode: "full", Enabled: true,
-		Features: policy.Features{FullModeEnabled: true},
+		Features:     policy.Features{FullModeEnabled: true},
 		Capabilities: []string{"shell.admin", "systemd.admin"},
-		Grant: policy.GrantPolicy{Required: true, MaxTTLMinutes: 60, OutOfBandApproval: true, StepUpAuth: true},
-		Network: policy.NetworkPolicy{Mode: "blocked", UnrestrictedRequiresSeparateApproval: true},
+		Grant:        policy.GrantPolicy{Required: true, MaxTTLMinutes: 60, OutOfBandApproval: true, StepUpAuth: true},
+		Network:      policy.NetworkPolicy{Mode: "blocked", UnrestrictedRequiresSeparateApproval: true},
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatal(err)
@@ -128,7 +128,7 @@ func TestBrokerDecisionRetainsOperatorSnapshotAndDestinationBinding(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	cases := []struct { name, node, fingerprint string }{
+	cases := []struct{ name, node, fingerprint string }{
 		{"destination_changed", "node-b", state.ApprovalFingerprint(a, "node-a")},
 		{"snapshot_from_other_node", "node-a", state.ApprovalFingerprint(a, "node-b")},
 		{"displayed_resource_changed", "node-a", state.ApprovalFingerprint(state.Approval{ID: a.ID, Subject: a.Subject, Resource: "/opt/another-project"}, "node-a")},
@@ -152,7 +152,7 @@ func TestBrokerDecisionRetainsOperatorSnapshotAndDestinationBinding(t *testing.T
 func TestApprovalRevalidatesCurrentFullCapabilityPolicy(t *testing.T) {
 	ctx := context.Background()
 	changes := []struct {
-		name string
+		name  string
 		apply func(*policy.Config)
 	}{
 		{"capability_removed", func(c *policy.Config) { c.Capabilities = []string{"systemd.admin"} }},
@@ -168,7 +168,9 @@ func TestApprovalRevalidatesCurrentFullCapabilityPolicy(t *testing.T) {
 			if !request.OK {
 				t.Fatalf("baseline request failed: %+v", request)
 			}
-			var pending struct { RequestID string `json:"request_id"` }
+			var pending struct {
+				RequestID string `json:"request_id"`
+			}
 			if err := json.Unmarshal(request.Result, &pending); err != nil || pending.RequestID == "" {
 				t.Fatalf("invalid pending response: %s, err=%v", request.Result, err)
 			}
