@@ -15,6 +15,7 @@ is_present() { [ -e "$1" ] || [ -L "$1" ]; }
 
 on_failure() {
   code=$?
+  [ "$code" -ne 0 ] || code=1
   trap - EXIT HUP INT TERM
   if [ "$phase" = saving ]; then
     # Original root contains some still-unmoved entries; only move the
