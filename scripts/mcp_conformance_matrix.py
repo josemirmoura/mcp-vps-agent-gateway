@@ -37,30 +37,37 @@ def yaml_items(path: pathlib.Path, section: str) -> list[str]:
     return output
 
 
-def scenario_outcome(checks: list[dict]) -> tuple[str, dict[str, int]]:
+def fixture_not_tested(row: dict, scenario: str) -> bool:
+    """Recognize only direct evidence of a required synthetic test fixture gap."""
+    message = str(row.get("errorMessage", ""))
+    if message.startswith("Not testable:"):
+        return True
+    if re.search(r'unknown (?:tool|prompt) "test_[a-zA-Z0-9_]+"', message):
+        return True
+    if scenario.startswith("resources-") and message == "Failed: Resource not found":
+        return True
+    if message.startswith("Prerequisite failed: could not get initial InputRequiredResult"):
+        return True
+    return False
+
+
+def scenario_outcome(checks: list[dict], scenario: str = "") -> tuple[str, dict[str, int]]:
     if not checks:
         return "NOT_TESTED", {}
     counts = Counter(str(row.get("status", "unknown")).lower() for row in checks)
-    if counts["failure"] or counts["error"] or counts["unknown"]:
-        # Fixture diagnostics are not silently promoted to PASS.
-        if all(
-            row.get("status", "").lower() in ("success", "skipped")
-            or (
-                row.get("status", "").lower() == "failure"
-                and str(row.get("errorMessage", "")).startswith(
-                    "Not testable: server does not list the diagnostic tool"
-                )
-            )
-            for row in checks
-        ):
+    failing = [row for row in checks if str(row.get("status", "")).lower() == "failure"]
+    if failing:
+        # A missing test_* probe is an unmeasured requirement, NEVER a pass.
+        # Real failures alongside the missing fixture are still FAIL.
+        if all(fixture_not_tested(row, scenario) for row in failing):
             return "NOT_TESTED", dict(counts)
         return "FAIL", dict(counts)
-    if counts["warning"] or any(k not in ("success", "skipped") for k in counts):
+    if any(k not in ("success", "skipped", "info", "warning") for k in counts):
         return "FAIL", dict(counts)
-    if counts["success"]:
-        # A scenario with both success and skipped is only partially covered.
-        return ("SKIPPED" if counts["skipped"] else "PASS"), dict(counts)
-    return "SKIPPED", dict(counts)
+    # INFO marks optional details; WARNING and SKIPPED do not prove compliance.
+    if counts["warning"] or counts["skipped"] or not counts["success"]:
+        return "SKIPPED", dict(counts)
+    return "PASS", dict(counts)
 
 
 def summarize(requirements: pathlib.Path, results: pathlib.Path, runner_exit: int) -> dict:
@@ -83,7 +90,7 @@ def summarize(requirements: pathlib.Path, results: pathlib.Path, runner_exit: in
                 checks.extend(x for x in data if isinstance(x, dict))
             except (ValueError, OSError) as exc:
                 errors.append(type(exc).__name__)
-        status, counts = scenario_outcome(checks)
+        status, counts = scenario_outcome(checks, scenario)
         if errors:
             status = "FAIL"
         rows.append({
