@@ -218,17 +218,12 @@ bash scripts/remove.sh --purge --remove-source
 
 A limpeza não elimina pastas de projetos delegados, imagens de terceiros, aplicações, bancos de dados ou serviços não pertencentes ao Portico. A pasta antiga /opt/vps-agent-sandbox só é removida caso esteja vazia.
 
-## Releases estáveis
+## Seleção da versão e segurança da instalação
 
-Depois que v0.1.0 for publicado como estável, instalações voltadas a produção deverão utilizar uma tag Git, em vez de acompanhar a branch main.
+A release estável `v0.1.0` **ainda não foi publicada**. Não tente clonar uma tag estável inexistente nem trate a branch `main` mutável como release assinada.
 
-~~~bash
-git clone --branch v0.1.0 \
-  https://github.com/josemirmoura/mcp-vps-agent-gateway.git
-cd mcp-vps-agent-gateway
-bash scripts/install.sh
-~~~
+Para inspeção e validação de pré-lançamento, use o clone indicado no começo deste guia. Depois da publicação e verificação de uma release imutável, selecione a tag efetivamente publicada e verifique os checksums, digests e assinaturas correspondentes. O checkout Git permite atualização controlada com checagem de fast-forward, backup e rollback, sujeitos ao aceite real do lifecycle.
 
-Esse checkout Git é intencional: o atualizador valida fast-forward, migrações, backup e rollback automático.
+Até lá, este é um candidato pré-estável. A conclusão exige instalação limpa em Linux, chamada MCP autenticada de cliente compatível e auditoria do Broker, sem prometer aprovação visual mobile já aceita.
 
-Este documento é a versão brasileira do [Quick Start em inglês](quick-start.md).
+[English Quick Start](quick-start.md).
