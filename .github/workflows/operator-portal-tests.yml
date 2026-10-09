@@ -40,3 +40,5 @@ jobs:
       - run: bash scripts/validate-compose-model.sh
       - run: go test ./cmd/vps-agent-broker ./internal/broker ./internal/ipc
       - run: python3 -m unittest discover -s web/operator-approval -p 'test_*.py' -v
+      - name: Verify browser decision flow cannot overwrite success with 404
+        run: node --test web/operator-approval/test_app.mjs
