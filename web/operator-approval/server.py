@@ -306,17 +306,20 @@ class Handler(BaseHTTPRequestHandler):
         prefix = "/operator/embed/api" if embedded else "/operator/api"
         if path == prefix + "/login":
             try:
+                verified_binding = binding()
                 code = self.auth_attempt(self.body().get("password"))
                 if code != 200:
                     self.reply(code, {"error": "invalid credentials or rate limit"}); return
                 old = self.session(embedded)
                 sid, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
                 with LOCK:
+                    if verified_binding != binding():
+                        self.reply(409, {"error": "operator binding changed during authentication"}); return
                     prune()
                     if len(SESSIONS) >= 500:
                         self.reply(429, {"error": "session capacity exceeded"}); return
                     if old: SESSIONS.pop(old[0], None)
-                    SESSIONS[sid] = (time.monotonic() + MAX_AGE, csrf, binding())
+                    SESSIONS[sid] = (time.monotonic() + MAX_AGE, csrf, verified_binding)
                 key = EMBED_COOKIE if embedded else COOKIE
                 cookie_path = "/operator/embed" if embedded else "/operator"
                 cookie = f"{key}={sid}; HttpOnly; Secure; Path={cookie_path}; Max-Age={MAX_AGE}; " + ("SameSite=None; Partitioned" if embedded else "SameSite=Strict")

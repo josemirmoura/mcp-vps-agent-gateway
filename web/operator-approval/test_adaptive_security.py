@@ -154,6 +154,21 @@ class OperatorSecurity(unittest.TestCase):
         self.assertEqual(code, 200); self.assertIsNone(app.session_from_cookie(cookie))
         self.assertEqual(self.req("/operator/api/approvals/" + ID + "/decision", {"decision": "approve", "decision_nonce": details["decision_nonce"]}, cookie, details["csrf_token"])[0], 401)
 
+    def test_login_cannot_bind_old_password_verification_to_changed_operator_configuration(self):
+        for key, value in (("PORTICO_OPERATOR_ID", "other-owner"),
+                           ("PORTICO_OPERATOR_NODE_ID", "node-b"),
+                           ("PORTICO_OPERATOR_PASSWORD_SCRYPT", "rotated"),
+                           ("PORTICO_OPERATOR_APPROVAL_TOKEN", "rotated-scoped-credential")):
+            with self.subTest(binding=key), patch.dict(os.environ):
+                def rotate_during_verification(password):
+                    os.environ[key] = value
+                    return True
+                with patch.object(app, "verify_password", side_effect=rotate_during_verification):
+                    code, headers, _ = self.req("/operator/api/login", {"password": "previous-password"})
+                self.assertEqual(code, 409)
+                self.assertNotIn("Set-Cookie", headers)
+                self.assertEqual(app.SESSIONS, {})
+
     def test_one_shot_nonce_bound_to_session_request_and_broker_snapshot(self):
         cookie, _ = self.login(); details = self.details(cookie)
         other, _ = self.login(); other_details = self.details(other)
