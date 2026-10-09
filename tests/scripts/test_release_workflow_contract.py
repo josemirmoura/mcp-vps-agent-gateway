@@ -34,8 +34,13 @@ class ReleaseWorkflowSecurityContract(unittest.TestCase):
         security = job("security", source)
         prepare = job("prepare-tag", source)
         self.assertIn("go test -race -count=1 ./...", validate)
-        self.assertIn("needs: [validate, security]", prepare)
+        self.assertIn("needs: [validate, security, image-security]", prepare)
         self.assertIn("git merge-base --is-ancestor", validate)
+        images = job("image-security", source)
+        self.assertIn("target: [gateway, broker, cloud-node]", images)
+        self.assertIn("arch: [amd64, arm64]", images)
+        self.assertIn("trivy-action@v0.36.0", images)
+        self.assertIn("exit-code: '1'", images)
         for expected in ("govulncheck", "gosec", "gitleaks"):
             self.assertIn(expected, security)
         for forbidden in ("continue-on-error:", "|| true", "exit 0"):
@@ -45,7 +50,7 @@ class ReleaseWorkflowSecurityContract(unittest.TestCase):
         source = self.workflow
         self.assertIn("needs: prepare-tag", job("images", source))
         self.assertIn("needs: images", job("github-release", source))
-        self.assertIn("needs: [validate, security]", job("prepare-tag", source))
+        self.assertIn("needs: [validate, security, image-security]", job("prepare-tag", source))
 
     def test_token_permissions_are_job_scoped(self):
         before_jobs, rest = self.workflow.split("\njobs:\n", 1)
