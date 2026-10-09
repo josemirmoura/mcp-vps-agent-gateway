@@ -95,7 +95,7 @@ O sucesso da conexão **não** concede permissões adicionais. O cliente pode so
 
 Clientes compatíveis podem apresentar MCP Apps ou elicitation nativa. **Não há garantia de que o ChatGPT da sua conta ofereça essas interfaces ou que o botão de aprovação apareça corretamente.** Uma confirmação no chat não deve ser tratada como prova autônoma da identidade do proprietário.
 
-Na ausência de interface embutida realmente compatível, utilize um portal HTTPS autenticado **se o runtime instalado o incluir e o disponibilizar**, ou um procedimento CLI/SSH local de operador, conforme a versão. Não considere links, IDs de solicitação nem mensagens produzidas pela IA como autorização. Não siga instruções que peçam aprovação automática pelo assistente.
+Quando o chat não oferece elicitation, a Community já dispõe do CLI local `scripts/operator-approvals.py` para revisão de pedidos pendentes por um operador confiável via SSH; confira os passos no [Início rápido PT-BR](quick-start.pt-BR.md) e no [Guia de fallback do operador](operator-approval-fallback.md). Um portal HTTPS autenticado só pode ser utilizado **se a versão instalada realmente o incluir, configurar e validar**. Não considere links, IDs de solicitação nem mensagens produzidas pela IA como autorização. Não siga instruções que peçam aprovação automática pelo assistente.
 
 O suporte dessas alternativas está em implementação e homologação nos PRs de autorizações. Para instalações baseadas na `main` ainda não integrada, confira no terminal e na lista de ferramentas o fluxo efetivamente disponível; não presuma as interfaces novas.
 
