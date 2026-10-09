@@ -93,6 +93,19 @@ Broker ativa read / work / compose apenas para a raiz aprovada
 
 O modelo de IA não pode aprovar a própria ampliação de permissões. Em clientes com suporte a elicitação MCP, a confirmação ocorre na interface nativa, sem uma ferramenta de autoaprovação nem um token utilizável pelo modelo. O Broker vincula a decisão à identidade autenticada e à solicitação pendente.
 
+## Autorização Scoped quando o chat não mostra elicitation
+
+Se o resultado indicar `approval_method=operator_fallback` e `request_id=apr_...`, existe um pedido **pendente**, não uma aprovação. Em uma sessão SSH confiável, separada do chat, já dentro do checkout do Pórtico na sua máquina Linux, use o CLI Community de operador:
+
+~~~bash
+python3 scripts/operator-approvals.py --list
+python3 scripts/operator-approvals.py
+~~~
+
+O primeiro comando lista pedidos pendentes não expirados. O segundo permite revisão interativa. Compare o ID exibido na conversa com a identidade, pasta, perfil e duração. Somente o operador com acesso autorizado à máquina deve digitar a frase exata `APROVAR apr_...` ou `NEGAR apr_...`. Divergência, prazo expirado ou cancelamento não concedem nada. Também é possível usar `python3 scripts/operator-approvals.py --request apr_ID_REAL` com o **ID real** da solicitação.
+
+O CLI exige conta confiável com acesso Docker, que corresponde a um privilégio administrativo poderoso no Linux. Esse acesso, o login SSH e tokens do operador não devem ficar disponíveis para a IA. Um link/ID, isoladamente, não autoriza nada; estar conectado ao ChatGPT não comprova a identidade do aprovador. Depois, consulte `permissions.list_root_access` para verificar a delegação. Esse fallback **não** comprova que os botões de autorização nativos do ChatGPT funcionam. Veja também o [guia completo de fallback do operador](operator-approval-fallback.md), já disponível em português.
+
 ## Perfil restrito a um projeto
 
 Escolha este perfil quando o Portico não deve operar fora de uma pasta específica.
