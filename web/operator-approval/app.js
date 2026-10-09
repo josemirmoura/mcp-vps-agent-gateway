@@ -6,7 +6,7 @@ const requestId=new URL(location.href).searchParams.get('request');
 const validId=/^apr_[a-zA-Z0-9_-]{8,100}$/;
 const embedded=location.pathname==='/operator/embed';
 const api=embedded?'/operator/embed/api':'/operator/api';
-let csrf='',nonce='',stepUp=false,sessionCsrf='',loginBusy=false;
+let csrf='',nonce='',stepUp=false,sessionCsrf='',loggingIn=false;
 function status(message){$('status').textContent=message}
 function notify(state){if(embedded&&window.parent!==window)window.parent.postMessage({type:'portico-operator',request_id:requestId,status:state},'*')}
 async function readJSON(response){if(!response.ok){const errors={401:'Sessão não autenticada. Entre na Central segura.',403:'Operador sem autorização ou verificação recusada.',404:'Pedido indisponível para este operador.',409:'Decisão expirada, repetida ou sessão alterada. Consulte o estado.',428:'Confirme novamente a identidade para esta operação.',503:'Broker temporariamente indisponível. Consulte o estado antes de repetir.'};throw Error(errors[response.status]||'Não foi possível confirmar a solicitação.')}return response.json()}
@@ -57,16 +57,15 @@ $('deny').addEventListener('click',()=>decide('deny'));
 $('refresh').addEventListener('click',load);
 $('logout').addEventListener('click',async()=>{if(!sessionCsrf)return;try{await readJSON(await fetch(api+'/logout',{method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':sessionCsrf}}));sessionCsrf='';csrf='';nonce='';$('details').hidden=true;$('login-panel').hidden=false;status('Sessão encerrada.')}catch(e){status(e.message)}});
 async function login(){
- // A sandbox without allow-forms aborts native submission before the submit
- // event. Use explicit button/keyboard actions and same-origin fetch instead.
- if(loginBusy||!$('login-form').reportValidity())return;
- loginBusy=true;$('login-button').disabled=true;$('login-error').textContent='';
+ if(loggingIn||!$('login-form').reportValidity())return;
+ loggingIn=true;$('login').disabled=true;$('login-error').textContent='';
  const password=$('password').value;$('password').value='';
- try{await readJSON(await fetch(api+'/login',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})}));$('login-panel').hidden=true;await load()}
- catch(err){$('login-error').textContent=err.message}
- finally{loginBusy=false;$('login-button').disabled=false}
+ try{await readJSON(await fetch(api+'/login',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})}));$('login-panel').hidden=true;await load()}catch(err){$('login-error').textContent=err.message}finally{loggingIn=false;$('login').disabled=false}
 }
-$('login-button').addEventListener('click',login);
-$('password').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();if(!e.repeat)void login()}});
+// The minimum MCP Apps sandbox suppresses native form submission before its
+// submit event. Explicit click/Enter fetches work without allow-forms.
 $('login-form').addEventListener('submit',e=>{e.preventDefault();void login()});
+$('login').addEventListener('click',login);
+$('password').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();if(!e.repeat)void login()}});
+notify('ready');
 load();

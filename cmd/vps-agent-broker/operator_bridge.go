@@ -61,12 +61,12 @@ func eligibleWebApproval(a state.Approval, expectedSubject string) bool {
 
 func (h *operatorBridge) Handle(ctx context.Context, r wire.Request) wire.Response {
  switch r.Tool {
- case "admin.approval.list", "admin.approval.approve", "admin.approval.deny", "admin.approval.status":
+ case "admin.approval.list", "admin.approval.get", "admin.approval.approve", "admin.approval.deny", "admin.approval.status":
  default:
   return wire.ErrorResponse(r.ID, "permission_denied", "operator socket restricts operations")
  }
  if h.broker == nil || h.broker.State == nil || h.token == "" ||
-  operatorIdentity() == "" || r.Subject != operatorIdentity() || h.broker.ExpectedSubject == "" ||
+  operatorIdentity() == "" || r.Subject != operatorIdentity() || h.broker.ExpectedSubject == "" || h.broker.InstanceID=="" ||
   len(r.AdminToken) != len(h.token) ||
   subtle.ConstantTimeCompare([]byte(r.AdminToken), []byte(h.token)) != 1 {
   return wire.ErrorResponse(r.ID, "permission_denied", "operator authentication failed")
@@ -102,6 +102,12 @@ func (h *operatorBridge) Handle(ctx context.Context, r wire.Request) wire.Respon
   return h.broker.Handle(ctx,r)
  }
  a, err := h.broker.State.GetApproval(ctx, in.RequestID)
+ if r.Tool=="admin.approval.get" {
+  if err!=nil || !eligibleWebApproval(a,h.broker.ExpectedSubject) { return wire.Response{ID:r.ID,OK:true,Result:json.RawMessage("null")} }
+  a.Fingerprint=state.ApprovalFingerprint(a,h.broker.InstanceID);a.NodeID=h.broker.InstanceID
+  raw,err:=json.Marshal(a);if err!=nil{return wire.ErrorResponse(r.ID,"encode_error","request unavailable")}
+  return wire.Response{ID:r.ID,OK:true,Result:raw}
+ }
  if err != nil || !eligibleWebApproval(a, h.broker.ExpectedSubject) {
   return wire.ErrorResponse(r.ID, "permission_denied", "request not eligible for web approval")
  }

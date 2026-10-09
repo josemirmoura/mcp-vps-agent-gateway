@@ -9,8 +9,7 @@ without `allow-forms` or `allow-modals`. Operator login must work through an
 explicit button click or Enter key and same-origin fetch. Native form submission
 cannot be the trigger: the [HTML submission algorithm](https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#form-submission-algorithm)
 stops for the sandboxed forms flag **before dispatching the submit event**.
-The desktop embedded case exercises the button; the mobile profile exercises
-Enter. Neither action can approve a request without a separate owner decision.
+Both desktop and mobile profiles exercise button and Enter login. Neither action can approve a request without a separate owner decision.
 
 Locator waits expire before the enclosing test timeout. On failure the suite
 records only allowlisted synthetic frame status, browser errors and fixture
@@ -37,15 +36,7 @@ The suite requires Python 3, OpenSSL and a Chromium binary. A missing browser fa
 
 Real-client evidence must additionally record the actual client/account/version, capabilities from MCP initialize, the Apps handshake, observed sandbox ancestors, owner authentication, approve/deny/expiry/replay outcomes and audit evidence on an isolated staging node. A successful reference harness must not be recorded as a real-client pass.
 
-## Recorded regression
-
-The [pre-fix diagnostic run](https://github.com/josemirmoura/mcp-vps-agent-gateway/actions/runs/37911066069)
-on 2026-10-09 reproduced blocked native form submission in both Chromium
-profiles: the login panel remained visible, the initial protected GET returned
-401, and no login POST or Broker decision occurred. This is evidence of the
-failure and its cause, not successful acceptance of the repaired candidate.
-
-The repair uses the existing authenticated same-origin API through explicit
-button/keyboard actions. Validate the final PR head before recording browser
-acceptance. Preserve the minimum sandbox and do not add allow-forms to conceal
-this regression.
+PR #93 independently fixed the sandbox submission bug and expanded the browser
+harness in commit `1cd4e0fb4b0a483cbf3fcd539a0d6cbe4acb5bce`. The follow-up
+preserves that implementation and adds native input validation, ignores Enter
+key-repeat/composition, and tests rejection plus duplicate in-flight logins.
