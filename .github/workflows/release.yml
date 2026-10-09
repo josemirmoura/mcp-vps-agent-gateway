@@ -11,10 +11,13 @@ on:
         required: true
         type: string
 
+# Each job elevates only the GitHub privileges it requires.
 permissions:
-  contents: write
-  packages: write
-  id-token: write
+  contents: read
+
+concurrency:
+  group: community-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 env:
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
@@ -58,9 +61,41 @@ jobs:
           bash scripts/version.sh
           bash scripts/validate-compose-model.sh
 
-  prepare-tag:
-    needs: validate
+  security:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Resolve exact module dependencies
+        run: go mod download
+      - name: Fail closed on reachable Go vulnerabilities
+        shell: bash
+        run: |
+          set -euo pipefail
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)/bin/govulncheck" ./...
+      - name: Fail closed on static security findings
+        shell: bash
+        run: |
+          set -euo pipefail
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
+          "$(go env GOPATH)/bin/gosec" -fmt=json -out=gosec.json ./...
+      - name: Fail closed on repository secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          go install github.com/zricethezav/gitleaks/v8@v8.24.3
+          "$(go env GOPATH)/bin/gitleaks" dir . --redact --exit-code=2 --report-format=json --report-path=results.json
+
+  prepare-tag:
+    needs: [validate, security]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -88,6 +123,10 @@ jobs:
   images:
     needs: prepare-tag
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     strategy:
       matrix:
         include:
@@ -135,6 +174,9 @@ jobs:
   github-release:
     needs: images
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v7
         with:
