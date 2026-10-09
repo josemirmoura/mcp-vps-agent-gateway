@@ -34,8 +34,8 @@ class PortalSecurityTests(unittest.TestCase):
             app.SESSIONS["valid"] = (float("inf"), "csrf")
         self.assertEqual(app.session_from_cookie("portico_operator=valid"), ("valid", "csrf"))
     def test_request_id_rejects_special_characters(self):
-        self.assertIsNone(app.API_RE.fullmatch("/api/operator/approvals/apr_12345678/../../deny"))
-        self.assertIsNone(app.API_RE.fullmatch("/api/operator/approvals/apr_12345678%2Fdecision"))
+        self.assertIsNone(app.API_RE.fullmatch("/operator/api/approvals/apr_12345678/../../deny"))
+        self.assertIsNone(app.API_RE.fullmatch("/operator/api/approvals/apr_12345678%2Fdecision"))
     def test_portal_path_exists(self):
         self.assertTrue(app.UI_PATH.is_file())
 
