@@ -123,6 +123,49 @@ class ReleaseSourceVerifierTests(unittest.TestCase):
         result = self.execute()
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_archive_symlink_outside_root_is_rejected(self):
+        with tarfile.open(self.archive, "w:gz") as pack:
+            data = b"0.1.0-rc.7\n"
+            version = tarfile.TarInfo("mcp-vps-agent/VERSION")
+            version.size = len(data)
+            pack.addfile(version, io.BytesIO(data))
+            link = tarfile.TarInfo("mcp-vps-agent/docs/unsafe")
+            link.type = tarfile.SYMTYPE
+            link.linkname = "../../../etc/shadow"
+            pack.addfile(link)
+        self.resign_fixture_checksum()
+        result = self.execute()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsafe link target", result.stderr)
+
+    def test_archive_symlink_within_root_is_accepted(self):
+        with tarfile.open(self.archive, "w:gz") as pack:
+            data = b"0.1.0-rc.7\n"
+            version = tarfile.TarInfo("mcp-vps-agent/VERSION")
+            version.size = len(data)
+            pack.addfile(version, io.BytesIO(data))
+            link = tarfile.TarInfo("mcp-vps-agent/docs/safe")
+            link.type = tarfile.SYMTYPE
+            link.linkname = "../VERSION"
+            pack.addfile(link)
+        self.resign_fixture_checksum()
+        result = self.execute()
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_archive_special_file_type_is_rejected(self):
+        with tarfile.open(self.archive, "w:gz") as pack:
+            data = b"0.1.0-rc.7\n"
+            version = tarfile.TarInfo("mcp-vps-agent/VERSION")
+            version.size = len(data)
+            pack.addfile(version, io.BytesIO(data))
+            fifo = tarfile.TarInfo("mcp-vps-agent/fifo")
+            fifo.type = tarfile.FIFOTYPE
+            pack.addfile(fifo)
+        self.resign_fixture_checksum()
+        result = self.execute()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsupported member type", result.stderr)
+
     def test_declared_zip_bomb_is_rejected_without_extracting(self):
         entry = tarfile.TarInfo("mcp-vps-agent/huge.file")
         entry.size = 2 * 1024 * 1024 * 1024
