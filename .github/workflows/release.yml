@@ -78,12 +78,30 @@ jobs:
           set -euo pipefail
           go install golang.org/x/vuln/cmd/govulncheck@latest
           "$(go env GOPATH)/bin/govulncheck" ./...
-      - name: Fail closed on static security findings
+      - name: Fail closed on static security findings and incomplete SSA analysis
         shell: bash
         run: |
           set -euo pipefail
-          go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
-          "$(go env GOPATH)/bin/gosec" -fmt=json -out=gosec.json ./...
+          # Mirror the patched-toolchain scanner build in the main security CI.
+          # Build the scanner separately so x/tools does not alter product deps.
+          mkdir -p "$RUNNER_TEMP/portico-gosec-build" "$RUNNER_TEMP/portico-gosec-bin"
+          (
+            cd "$RUNNER_TEMP/portico-gosec-build"
+            go mod init portico-gosec-compat
+            go get github.com/securego/gosec/v2/cmd/gosec@v2.29.0
+            go get golang.org/x/tools@v0.51.0
+            go build -o "$RUNNER_TEMP/portico-gosec-bin/gosec" github.com/securego/gosec/v2/cmd/gosec
+          )
+          "$RUNNER_TEMP/portico-gosec-bin/gosec" -fmt=json -out=gosec.json ./...
+          python3 - <<'PY'
+          import json
+          report=json.load(open("gosec.json"))
+          errors=report.get("Golang errors") or {}
+          if errors:
+              print(f"SECURITY BLOCKED: {len(errors)} paths have incomplete Gosec type/SSA analysis")
+              raise SystemExit(1)
+          print("GOSEC SSA: complete")
+          PY
       - name: Fail closed on repository secrets
         shell: bash
         run: |
