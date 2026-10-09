@@ -1,0 +1,70 @@
+name: Block 3 staged lifecycle fault recovery
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/update.sh'
+      - 'scripts/lib/update-snapshot.py'
+      - 'scripts/lib/restore-identity-volume.sh'
+      - 'tests/scripts/test_update_staged_restore.py'
+      - 'tests/scripts/test_update_prebackup_recovery.py'
+      - '.github/workflows/block3-lifecycle-recovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staged-restore-unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate updater shell and Python helpers
+        run: |
+          bash -n scripts/update.sh
+          sh -n scripts/lib/restore-identity-volume.sh
+          python3 -m py_compile scripts/lib/update-snapshot.py tests/scripts/test_update_staged_restore.py
+      - name: Test staged archive and post-backup rollback
+        run: python3 -m unittest discover -s tests/scripts -p 'test_update_staged_restore.py' -v
+      - name: Test earlier pre-backup recovery
+        run: python3 -m unittest discover -s tests/scripts -p 'test_update_prebackup_recovery.py' -v
+
+  disposable-docker-volume:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate restore with a real disposable Docker volume
+        shell: bash
+        run: |
+          set -euo pipefail
+          id="portico-block3-test-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          volume="$id-volume"
+          d="$(mktemp -d)"
+          docker volume create "$volume" >/dev/null
+          trap 'docker volume rm -f "$volume" >/dev/null 2>&1 || true; rm -rf "$d"' EXIT
+          mkdir -p "$d/backup" "$d/source"
+          printf 'old-data\n' > "$d/old"
+          printf 'new-data\n' > "$d/source/marker"
+          tar -czf "$d/backup/identity.tar.gz" -C "$d/source" .
+          docker run --rm -v "$volume:/target" -v "$d/old:/source/old:ro" alpine:3.22 sh -c 'cp /source/old /target/marker'
+          docker run --rm --network none -v "$volume:/target" \
+             -v "$d/backup:/backup:ro" -v "$PWD/scripts/lib/restore-identity-volume.sh:/restore.sh:ro" \
+             alpine:3.22 sh /restore.sh /backup/identity.tar.gz
+          actual="$(docker run --rm -v "$volume:/target:ro" alpine:3.22 cat /target/marker)"
+          test "$actual" = new-data
+
+          printf 'corrupt tar' > "$d/backup/identity-broken.tar.gz"
+          if docker run --rm --network none -v "$volume:/target" \
+             -v "$d/backup:/backup:ro" -v "$PWD/scripts/lib/restore-identity-volume.sh:/restore.sh:ro" \
+             alpine:3.22 sh /restore.sh /backup/identity-broken.tar.gz; then
+            echo 'Corrupted archive unexpectedly accepted' >&2
+            exit 1
+          fi
+          actual="$(docker run --rm -v "$volume:/target:ro" alpine:3.22 cat /target/marker)"
+          test "$actual" = new-data
+          echo 'DOCKER VOLUME RESTORE: PASS (success + failed archive preserved)'
