@@ -29,7 +29,7 @@ A ação cria um worktree separado e um snapshot protegido do banco SQLite, da c
 Antes de publicar na internet:
 1. Validar o CI completo no SHA **exato** escolhido, inclusive análise de vulnerabilidades, docker/package, 3 VPS, full acceptance e testes do portal.
 2. Revisar que `operator-portal` monta somente o socket `operator-run`, e que a bridge permite apenas `admin.approval.list/approve/deny`. O gateway mantém socket separado.
-3. Escolher origem HTTPS do operador sob controle do proprietário. O frontend usa `/operator`, `/operator/app.js`, `/operator/style.css`, `/api/operator/login` e `/api/operator/approvals/:id`; o proxy deve encaminhar essas rotas para `127.0.0.1:8765`, com validação de Host e Origin, proteção de login e limite de requisições. Não permitir proxy público direto ao socket.
+3. Para a instalação atual, utilizar `https://mcp.josemirmoura.com.br/operator` no domínio TLS já existente, respeitando as rotas MCP/OAuth e sem modificar o Gateway atual. Validar o DNS e o certificado real antes de ativar. O frontend usa `/operator`, `/operator/app.js`, `/operator/style.css`, `/operator/api/login` e `/operator/api/approvals/:id`. O cookie tem Path=/operator, evitando tráfego para `/mcp` e `/oauth`. O arquivo opt-in `compose.operator-portal.edge.yaml` publica somente essas rotas por Traefik na rede `${VPS_AGENT_EDGE_NETWORK}` e aplica limite à rota de login. A aplicação confirma Host e Origin públicos; a porta 8765 publicada no host permanece restrita ao loopback. Não permitir proxy público direto ao socket.
 4. Validar política de cookies Secure/HttpOnly/SameSite, sessões expiradas, CSRF, conteúdo cache no-store, CSP sem inline, URL com identificador opaco e nenhuma credencial no browser.
 5. Configurar credenciais exclusivas pelo utilitário `scripts/operator-portal-credentials.py` somente no terminal confiável, sem transmitir senha/token no chat.
 6. Testar via HTTPS real: listar, negar, aprovar pedidos temporários específicos e comprovar trilha de auditoria e revogação; testar replay/concorrência/expiração/elevação/permanência/escopo completo e UX mobile.
@@ -44,3 +44,9 @@ Antes de publicar na internet:
 
 ## Entrega
 O resultado esperado para Community é um link HTTPS de autorização emitido pelo Gateway apenas para requisições elegíveis, exigindo login independente e decisão explícita do operador. A aprovação permanece vinculada ao sujeito MCP e à política do Broker. O fallback por SSH continua funcional quando não houver navegador ou capacidade de elicitation.
+
+## Verificação do Traefik na VPS (2026-10-09)
+- O operador confirmou que o contêiner Gateway e o Traefik pertencem à rede `traefik-public`; o `gateway` atualmente registra somente o router MCP para `/mcp`, `/healthz` e metadados OAuth. O proxy Zitadel tem routers próprios em `compose.integrated-auth.yaml`.
+- `compose.operator-portal.edge.yaml` declara router TLS dedicado para `/operator` e subrotas, priority=1500, e router do login com prioridade=1600 e rate limit. O router MCP continua priority=1000 e as rotas de autenticação têm prioridades menores; não há takeover da raiz `/`.
+- Para ativar a rota opt-in, a instância precisará usar os três arquivos `-f compose.yaml -f compose.integrated-auth.yaml -f compose.operator-portal.edge.yaml`. Não executar `docker compose up` genérico antes de conferir o modelo efetivo da instalação.
+- A escolha do mesmo host demanda Host+Origin corretos, cookie restrito a `/operator`, e testes negativos para impedir encaminhamento de credenciais à conexão MCP.
