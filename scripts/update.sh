@@ -252,7 +252,7 @@ if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ]; then
   bash ./scripts/verify-public.sh
 fi
 
-trap - ERR
+trap - ERR INT TERM
 printf '{"time":"%s","from":"%s","to":"%s","result":"success"}\n' \
   "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$current" "$target_sha" >> state/update.log
 
