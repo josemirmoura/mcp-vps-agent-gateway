@@ -1,5 +1,7 @@
 # Portico MCP Quick Start
 
+[Português (Brasil)](quick-start.pt-BR.md) · [Installation contract](installation-contract.md)
+
 Portico MCP is installed from the terminal using the repository's transparent Docker Compose and shell scripts.
 
 ## Requirements
@@ -87,11 +89,13 @@ After ChatGPT is connected, a project is authorized dynamically:
 permissions.request_root_access
         |
         v
-native MCP client confirmation (elicitation)
+host-owned MCP elicitation when supported and verified
         |
         v
-Broker activates read / work / compose for that root
+Broker applies the policy and activates only an authorized delegation
 ~~~
+
+The native in-chat approval surface is not universally available in ChatGPT and has not completed desktop/mobile acceptance for the final Community candidate. If the client does not support that flow, the request stays pending and the operator must use only a separately deployed and authenticated approval channel supported by the exact installed runtime. A URL or request ID cannot authorize anything.
 
 The model cannot approve its own permission expansion. On elicitation-capable clients, opaque approval state travels only through the protocol round trip; the model does not receive a self-approval tool or usable approval token. The Broker binds the decision to the authenticated subject and pending request.
 
@@ -218,15 +222,10 @@ bash scripts/remove.sh --purge --remove-source
 
 The purge never deletes arbitrary delegated project directories, third-party images, applications, databases or services. The legacy `/opt/vps-agent-sandbox` directory is removed only when it is empty.
 
-## Stable releases
+## Release selection and installation safety
 
-After `v0.1.0` is frozen, production-oriented installs should use a tagged Git checkout rather than `main`:
+The `v0.1.0` stable release is **not yet published**. Do not try to clone a nonexistent stable tag or treat a moving `main` checkout as a signed release.
 
-~~~bash
-git clone --branch v0.1.0 \
-  https://github.com/josemirmoura/mcp-vps-agent-gateway.git
-cd mcp-vps-agent-gateway
-bash scripts/install.sh
-~~~
+For engineering/preview inspection, use the clone command at the top of this guide. For a production-oriented installation **after an exact release is published and verified**, choose the published immutable tag and verify the matching source and image signatures/digests first. The installer uses a Git checkout because controlled updates need fast-forward checks, backup and rollback, subject to actual lifecycle acceptance.
 
-The Git checkout is intentional: the update mechanism preserves fast-forward verification, state migration checks, backup and automatic rollback.
+Until then, this is a pre-stable candidate, not a guarantee of successful recovery or completed mobile authorization UX. Final operator acceptance includes a clean Linux install, an authenticated real MCP client call and Broker audit proof.
