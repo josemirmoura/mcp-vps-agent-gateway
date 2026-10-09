@@ -20,3 +20,19 @@ func TestVersionMatchesCanonicalManifest(t *testing.T) {
 		t.Fatalf("not a SemVer product version: %q", want)
 	}
 }
+
+func TestVersionManifestFallbackAndPrerelease(t *testing.T) {
+    for _, tc := range []struct{
+        raw string
+        want string
+    }{
+        {"", "dev"},
+        {"  \n  ", "dev"},
+        {"0.1.0-rc.7\n", "v0.1.0-rc.7"},
+        {"0.1.0", "v0.1.0"},
+    } {
+        if got:=versionFromManifest(tc.raw);got!=tc.want {
+            t.Errorf("versionFromManifest(%q)=%q; want %q",tc.raw,got,tc.want)
+        }
+    }
+}
