@@ -38,6 +38,8 @@ O suporte MCP Apps geral não garante que o host permita **iframe aninhado do op
 | `elicitation: {url: {}}` | URL suportada; não implica suporte form |
 | Capacidade não anunciada | Não enviar elicitation nem inferir pelo nome do cliente |
 | `ui/initialize` com protocolo UI `2026-01-26` | Handshake MCP Apps; distinto da versão do protocolo MCP principal |
+| `hostCapabilities.serverTools` como objeto válido | Permite consultar `permissions.approval_status` pelo host; ausente ou malformado mantém consulta pelo portal/SSH |
+| `hostCapabilities.openLinks` como objeto válido | Permite solicitar `ui/open-link` após clique explícito; ausente ou malformado mantém URL visível |
 | Handshake sem o enquadramento necessário, timeout, frame/cookie bloqueado | Manter link HTTPS e orientação SSH; não tratar como autorização |
 
 O SDK fixado suporta MCP **2026-07-28**, com `server/discover` e capacidades em `params._meta["io.modelcontextprotocol/clientCapabilities"]` **a cada solicitação** [8,10]. Para **2025-11-25**, usa `initialize.params.capabilities` e a inicialização legado [11]. A sonda testa ambas separadamente; erro em uma revisão não é ocultado por negociação automática. O runtime deixa negociação e compatibilidade de transporte ao SDK oficial.

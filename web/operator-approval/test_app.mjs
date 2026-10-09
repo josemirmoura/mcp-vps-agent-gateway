@@ -28,7 +28,7 @@ async function scenario(decision){
     }
     if(calls.length===2 && opts.method==='POST'){
       return {ok:true,status:200,json:async()=>({
-        status:decision==='approve'?'approved':'denied'})};
+        request_id:'apr_12345678',status:decision==='approve'?'approved':'denied'})};
     }
     return {ok:false,status:404,json:async()=>({error:'not found'})};
   };

@@ -300,6 +300,38 @@ class OperatorSecurity(unittest.TestCase):
             self.assertEqual(details["operator"], "owner-a")
             self.assertFalse(details["step_up_required"])
 
+    def test_concurrent_approve_and_deny_consume_nonce_only_once(self):
+        cookie, _ = self.login()
+        details = self.details(cookie)
+        barrier = threading.Barrier(3)
+        results, failures = [], []
+        path = "/operator/api/approvals/" + ID + "/decision"
+
+        def decision(action):
+            try:
+                barrier.wait(5)
+                results.append(self.req(path, {
+                    "decision_nonce": details["decision_nonce"], "decision": action,
+                }, cookie, details["csrf_token"])[0])
+            except Exception as error:
+                failures.append(error)
+
+        with patch.object(app.OperatorIPC, "call", side_effect=lambda action, *a, **kw: {
+                "request_id": ID, "status": "approved" if action == "approve" else "denied",
+        }) as call:
+            workers = [threading.Thread(target=decision, args=(action,), daemon=True)
+                       for action in ("approve", "deny")]
+            for worker in workers:
+                worker.start()
+            barrier.wait(5)
+            for worker in workers:
+                worker.join(5)
+                self.assertFalse(worker.is_alive())
+            self.assertFalse(failures)
+            self.assertEqual(sorted(results), [200, 409])
+            self.assertEqual(call.call_count, 1)
+        self.assertNotIn(details["decision_nonce"], app.NONCES)
+
 
 if __name__ == "__main__":
     unittest.main()

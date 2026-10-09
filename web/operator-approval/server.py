@@ -92,8 +92,10 @@ class OperatorIPC:
             client.sendall(json.dumps(payload).encode() + b"\n")
             with client.makefile("rb") as source:
                 data = source.readline(131072)
+        if not data.endswith(b"\n"):
+            raise RuntimeError("incomplete operator IPC response")
         reply = json.loads(data)
-        if not isinstance(reply, dict) or not reply.get("ok"):
+        if not isinstance(reply, dict) or reply.get("id") != payload["id"] or reply.get("ok") is not True:
             raise RuntimeError("operator Broker rejected operation")
         return reply.get("result")
 

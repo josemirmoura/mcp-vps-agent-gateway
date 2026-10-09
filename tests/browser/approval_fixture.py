@@ -136,7 +136,7 @@ window.addEventListener('message', async event=>{
  if(event.source!==frame.contentWindow||event.origin!==config.appOrigin)return;
  const value=event.data;window.bridgeMessages.push(value);
  if(value?.method==='ui/initialize'){
-  send({jsonrpc:'2.0',id:value.id,result:{protocolVersion:'2026-01-26',hostCapabilities:{openLinks:{},sandbox:{csp:{frameDomains:config.frame==='allowed'?[config.operatorOrigin]:[]}}}}});
+  send({jsonrpc:'2.0',id:value.id,result:{protocolVersion:'2026-01-26',hostCapabilities:{serverTools:{},openLinks:{},sandbox:{csp:{frameDomains:config.frame==='allowed'?[config.operatorOrigin]:[]}}}}});
  }
  if(value?.method==='ui/notifications/initialized')send({jsonrpc:'2.0',method:'ui/notifications/tool-result',params:{structuredContent:{request_id:config.requestID,operator_approval_url:config.operatorOrigin+'/operator?request='+config.requestID}}});
  if(value?.method==='tools/call'){

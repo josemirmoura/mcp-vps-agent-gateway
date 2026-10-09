@@ -18,6 +18,8 @@ Não há detecção por marca, user-agent ou nome informado pelo cliente. Sinali
 
 No sandbox mínimo, login usa clique/Enter sem submissão nativa de formulário. Abrir o portal externo usa `ui/open-link` somente após clique do operador e se `hostCapabilities.openLinks` estiver anunciado; o URL HTTPS permanece visível para cópia quando o host não abrir links.
 
+Consultar o estado pelo wrapper exige `hostCapabilities.serverTools` como objeto válido. Sem essa capacidade, mensagens do iframe não produzem chamadas a tools nem confirmação de autoridade: consultar pela Central HTTPS ou SSH. Valores booleanos, listas ou texto não ativam `serverTools`/`openLinks`.
+
 ## Isolamento da identidade
 
 A página MCP Apps não contém credenciais. A autenticação e a decisão ocorrem em iframe HTTPS de outra origem, com proteção de mesma origem do navegador. As origens ancestrais devem ser configuradas explicitamente; sem elas o enquadramento fica desabilitado. A Central externa conserva `X-Frame-Options: DENY` e `frame-ancestors 'none'`.
@@ -31,6 +33,8 @@ Cada decisão precisa de nonce de uso único, válido por até 60 segundos e vin
 O Broker grava decisão, grant e auditoria na mesma transação SQLite. Expiração, cancelamento, decisões concorrentes e replay não criam grants duplicados. Perda de resposta exige consulta de estado antes de repetir. `permissions.approval_status` distingue pedido pendente, decisão histórica, grant expirado e revogado. Operações subsequentes reautorizam no Broker.
 
 A fila ativa limita pedidos pendentes não expirados a 64 por sujeito e 256 por instalação, de forma atômica. Expiração e cancelamento liberam espaço. A Central consulta um pedido por ID no IPC restrito, evitando depender do tamanho de uma listagem global. Sessão e nonce são revalidados depois da verificação de senha e antes do consumo, inclusive quando expiram ou há logout simultâneo.
+
+A UI mantém uma decisão em andamento por vez e congela sua prova; respostas de consultas anteriores não restauram controles após logout nem sobrescrevem um estado mais recente. Logout durante step-up impede o POST posterior de decisão. Logout não desfaz uma decisão já enviada/confirmada pelo Broker nem revoga grants: consultar o estado e usar revogação explícita. A resposta de decisão precisa corresponder ao ID exibido; o BFF também verifica ID e enquadramento completo da resposta IPC.
 
 ## Contrato público
 
