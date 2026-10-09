@@ -13,6 +13,7 @@
 <dl>
 <dt>Solicitação</dt><dd id="request_id"></dd>
 <dt>Máquina</dt><dd id="node"></dd>
+<dt>Operador</dt><dd id="operator"></dd>
 <dt>Cliente MCP</dt><dd id="subject"></dd>
 <dt>Recurso</dt><dd id="resource"></dd>
 <dt>Permissão</dt><dd id="access"></dd>
@@ -20,8 +21,10 @@
 <dt>Expira em</dt><dd id="expires"></dd>
 </dl>
 <div class="notice" id="warning" hidden>ATENÇÃO: esta autorização abrange todo o limite físico indicado, incluindo subpastas futuras.</div>
+<section id="step-up-panel" class="notice" hidden><label for="step-up-password">Confirme sua senha da Central para autorizar esta operação</label><p><input id="step-up-password" type="password" autocomplete="current-password"></p><small>A verificação vale apenas para este pedido.</small></section>
 <div class="actions"><button id="deny" class="deny" disabled>Negar</button><button id="approve" class="approve" disabled>Autorizar</button></div>
 </div></section>
+<p><button id="refresh">Consultar estado</button><button id="logout">Encerrar sessão</button></p>
 <p class="muted"><small>As autorizações são verificadas pelo Broker local. Abrir esta página ou receber uma confirmação do ChatGPT não concede acesso.</small></p>
 </main>
 <script src="/operator/app.js" defer></script></body></html>

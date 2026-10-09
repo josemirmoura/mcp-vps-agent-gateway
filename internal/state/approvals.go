@@ -9,6 +9,8 @@ import (
 )
 
 type Approval struct {
+	Fingerprint string `json:"Fingerprint,omitempty"`
+	NodeID string `json:"NodeID,omitempty"`
 	ID           string
 	Subject      string
 	Capabilities []string

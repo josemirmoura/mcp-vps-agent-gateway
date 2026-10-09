@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/ipc"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/state"
@@ -201,8 +203,13 @@ func decideApproval(args []string, approve bool) {
 		os.Exit(2)
 	}
 	payload, _ := json.Marshal(map[string]any{"request_id": *requestID})
+	operator:=os.Getenv("VPS_AGENT_OPERATOR_ID")
+	if operator==""{operator="local-owner"}
+	valid:=utf8.ValidString(operator)&&len(operator)<=1024
+	for _,r:=range operator{if unicode.IsControl(r)||unicode.In(r,unicode.Cf,unicode.Zl,unicode.Zp){valid=false}}
+	if !valid{fmt.Fprintln(os.Stderr,"configured operator identity is invalid");os.Exit(2)}
 	call(*socket, wire.Request{
-		ID: "operator-" + name, Tool: tool, AdminToken: *token, Args: payload,
+		ID: "operator-" + name, Subject:operator, Tool: tool, AdminToken: *token, Args: payload,
 	})
 }
 

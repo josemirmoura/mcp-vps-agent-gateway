@@ -756,9 +756,16 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			out, err := firewallAction(ctx, in.Action, in.Port, in.Protocol, in.Source)
 			return map[string]any{"action": in.Action, "port": in.Port, "protocol": in.Protocol, "source": in.Source, "output": out}, err
 		})
+	case "permissions.approval_status":
+		return b.approvalStatus(ctx, req)
+	case "permissions.cancel_approval":
+		b.elevationMu.Lock(); defer b.elevationMu.Unlock()
+		return b.cancelApproval(ctx, req)
 	case "permissions.request_root_access":
 		return b.requestRootAccess(ctx, req)
 	case "permissions.confirm_root_access":
+		if !b.adminOK(req.AdminToken) { return deny(req.ID,"operator_required","MCP client acceptance is not operator authentication") }
+		b.elevationMu.Lock(); defer b.elevationMu.Unlock()
 		return b.confirmRootAccess(ctx, req)
 	case "permissions.revoke_root_access":
 		return b.revokeRootAccess(ctx, req)
@@ -1257,7 +1264,7 @@ func (b *Broker) requestRootAccess(ctx context.Context, req wire.Request) wire.R
 	if err != nil {
 		return deny(req.ID, "permission_denied", err.Error())
 	}
-	if in.TTLSeconds < 0 {
+	if in.TTLSeconds < 0 || in.TTLSeconds > int64(b.Policy.MaxGrantTTL()/time.Second) {
 		return deny(req.ID, "invalid_ttl", "ttl_seconds cannot be negative")
 	}
 	ttl := time.Duration(in.TTLSeconds) * time.Second
@@ -1435,10 +1442,10 @@ func (b *Broker) requestElevation(ctx context.Context, req wire.Request) wire.Re
 	if err := json.Unmarshal(req.Args, &in); err != nil {
 		return deny(req.ID, "invalid_args", err.Error())
 	}
-	ttl := time.Duration(in.TTLSeconds) * time.Second
-	if ttl <= 0 || ttl > b.Policy.MaxGrantTTL() {
+	if in.TTLSeconds <= 0 || in.TTLSeconds > int64(b.Policy.MaxGrantTTL()/time.Second) {
 		return deny(req.ID, "invalid_ttl", "ttl exceeds policy")
 	}
+	ttl := time.Duration(in.TTLSeconds) * time.Second
 	for _, cap := range in.Capabilities {
 		if !b.Policy.CanGrant(cap) {
 			return deny(req.ID, "permission_denied", "requested capability is not grantable by policy: "+cap)
@@ -1456,6 +1463,8 @@ func (b *Broker) requestElevation(ctx context.Context, req wire.Request) wire.Re
 func (b *Broker) decideApproval(ctx context.Context, req wire.Request, decision string) wire.Response {
 	var in struct {
 		RequestID string `json:"request_id"`
+		Fingerprint string `json:"snapshot_hash"`
+		NodeID string `json:"node_id"`
 	}
 	if err := json.Unmarshal(req.Args, &in); err != nil {
 		return deny(req.ID, "invalid_args", err.Error())
@@ -1464,6 +1473,9 @@ func (b *Broker) decideApproval(ctx context.Context, req wire.Request, decision 
 	if err != nil {
 		return deny(req.ID, "state_error", err.Error())
 	}
+	if in.Fingerprint!="" && (in.NodeID!=b.InstanceID || in.Fingerprint!=state.ApprovalFingerprint(pending,b.InstanceID)) { return deny(req.ID,"scope_mismatch","operator snapshot or destination changed") }
+	if decision=="approved" && b.ExpectedSubject!="" && pending.Subject!=b.ExpectedSubject { return deny(req.ID,"identity_mismatch","request no longer belongs to this Broker operator binding") }
+	if decision == "approved" && b.Policy == nil { return deny(req.ID,"permission_denied","current policy is required") }
 	if decision == "approved" && pending.Kind == "root" {
 		root, access, err := b.normalizeDelegatedRoot(pending.Resource, pending.Access)
 		if err != nil {
@@ -1472,40 +1484,24 @@ func (b *Broker) decideApproval(ctx context.Context, req wire.Request, decision 
 		pending.Resource = root
 		pending.Access = access
 	}
-	if decision == "approved" && pending.Kind == "capability" && len(pending.Capabilities) == 1 {
-		if _, _, ok := decodeSensitiveCapability(pending.Capabilities[0]); ok {
+	if decision == "approved" && pending.Kind == "capability" {
+		sensitiveGrant:=false
+		if len(pending.Capabilities)==1 { _,_,sensitiveGrant=decodeSensitiveCapability(pending.Capabilities[0]) }
+		if sensitiveGrant {
 			if err := b.validateSensitiveApproval(ctx, pending); err != nil {
 				return deny(req.ID, "permission_denied", "protected-file approval no longer satisfies the current authority boundary: "+err.Error())
 			}
+		} else {
+			for _,cap:=range pending.Capabilities { if !b.Policy.CanGrant(cap) { return deny(req.ID,"permission_denied","capability is no longer grantable by current policy") } }
 		}
 	}
-	a, err := b.State.DecideApproval(ctx, in.RequestID, decision)
-	if err != nil {
-		return deny(req.ID, "state_error", err.Error())
-	}
-	if decision == "denied" {
-		return ok(req.ID, map[string]any{"request_id": a.ID, "status": "denied", "kind": a.Kind})
-	}
-	if a.Kind == "root" {
-		d, err := b.State.IssueRootDelegation(ctx, a.Subject, a.Resource, a.Access, a.ID, a.TTL)
-		if err != nil {
-			return deny(req.ID, "state_error", err.Error())
-		}
-		return ok(req.ID, map[string]any{
-			"request_id": a.ID,
-			"status": "approved",
-			"kind": "root",
-			"delegation": d,
-		})
-	}
-	g, err := b.State.IssueGrant(ctx, a.Subject, a.Capabilities, a.TTL)
-	if err != nil {
-		return deny(req.ID, "state_error", err.Error())
-	}
-	return ok(req.ID, map[string]any{
-		"request_id": a.ID, "status": "approved", "kind": "capability", "grant_id": g.ID,
-		"subject": g.Subject, "capabilities": g.Capabilities, "expires_at": g.ExpiresAt,
-	})
+	if decision == "approved" && pending.TTL > b.Policy.MaxGrantTTL() { return deny(req.ID,"invalid_ttl","grant exceeds current policy") }
+	resolved, err := b.State.ResolveApproval(ctx,pending,decision,state.AuditEvent{InstanceID:b.InstanceID,InstanceName:b.InstanceName,Subject:req.Subject,Tool:req.Tool,Resource:pending.Resource,ActionID:req.InvocationID})
+	if err != nil { return deny(req.ID,"state_error",err.Error()) }
+	out:=map[string]any{"request_id":pending.ID,"status":resolved.Approval.Status,"kind":pending.Kind}
+	if resolved.Root!=nil { out["delegation"]=resolved.Root }
+	if resolved.Grant!=nil { out["grant_id"]=resolved.Grant.ID;out["subject"]=resolved.Grant.Subject;out["capabilities"]=resolved.Grant.Capabilities;out["expires_at"]=resolved.Grant.ExpiresAt }
+	return ok(req.ID,out)
 }
 
 func (b *Broker) revokeAllElevatedAccess(ctx context.Context) (int, error) {

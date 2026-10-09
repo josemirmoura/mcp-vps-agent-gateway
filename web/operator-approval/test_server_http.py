@@ -78,7 +78,7 @@ class HttpContract(unittest.TestCase):
         self.assertEqual(c.exception.code,403)
     def test_login_and_read_details(self):
         item={"id":ID,"subject":"subject","target":"/opt/project","access":"work",
-              "ttl_ns":900000000000,"expires":app.dt.datetime.now(app.dt.timezone.utc)+app.dt.timedelta(minutes=8),"kind":"root"}
+              "ttl_ns":900000000000,"expires":app.dt.datetime.now(app.dt.timezone.utc)+app.dt.timedelta(minutes=8),"kind":"root", "fingerprint":"a"*64, "node_id":""}
         with patch.dict(os.environ,{"PORTICO_OPERATOR_PUBLIC_ORIGIN":"https://operator.example.test",
             "PORTICO_OPERATOR_PHYSICAL_CEILING":"/opt"}),patch.object(app.OperatorIPC,"list_requests",return_value=[item]):
             with patch.object(app,"verify_password",return_value=True):
@@ -92,10 +92,10 @@ class HttpContract(unittest.TestCase):
             with self.assertRaises(HTTPError) as e:
                 self.client.open(self.req(f"/operator/api/approvals/{ID}/decision","POST",{"decision":"approve"},{"Cookie":cookie}))
             self.assertEqual(e.exception.code,403)
-            with patch.object(app.OperatorIPC,"call",return_value={"status":"approved"}) as call:
+            with patch.object(app.OperatorIPC,"call",return_value={"status":"denied"}) as call:
                 response=json.load(self.client.open(self.req(f"/operator/api/approvals/{ID}/decision",
-                         "POST",{"decision":"approve"},{"X-CSRF-Token":result["csrf_token"],"Cookie":cookie})))
-                self.assertEqual(response["status"],"approved")
-                call.assert_called_once_with("approve",ID)
+                         "POST",{"decision":"deny", "decision_nonce":result["decision_nonce"]},{"X-CSRF-Token":result["csrf_token"],"Cookie":cookie})))
+                self.assertEqual(response["status"],"denied")
+                call.assert_called_once_with("deny",ID,snapshot_hash="a"*64,node_id="",step_up=False)
 if __name__=="__main__":
     unittest.main()

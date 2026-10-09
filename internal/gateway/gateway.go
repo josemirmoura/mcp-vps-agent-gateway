@@ -86,6 +86,7 @@ func SubjectFromContext(ctx context.Context) string {
 type Server struct {
 	Executor Executor
 	Metrics  *runtimeMetrics
+	navigationKey []byte
 }
 
 type systemInfoOutput struct {
@@ -301,12 +302,15 @@ func NewMCPServer(exec Executor) *mcp.Server {
 
 func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 	s := &Server{Executor: exec, Metrics: metrics}
+	key:=make([]byte,32)
+	if _,err:=rand.Read(key);err==nil{s.navigationKey=key}
 	server := mcp.NewServer(
 		&mcp.Implementation{Name: "portico-mcp", Version: portico.Version()},
 		&mcp.ServerOptions{
 			Instructions: serverInstructions(),
 			Capabilities: &mcp.ServerCapabilities{
 				Logging: &mcp.LoggingCapabilities{},
+				Extensions: approvalServerExtensions(),
 				// The SDK serves prompts/list with an empty list even when no
 				// prompts are registered. Keep discovery consistent with that
 				// read-only endpoint (MCP 2026-07-28, SEP-2575).
@@ -318,6 +322,8 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 		},
 	)
 	registerAuthorityTools(server, s)
+	registerApprovalStatus(server,s)
+	registerApprovalApp(server)
 
 	mcp.AddTool(server, annotatedTool("system.info", "Return non-sensitive host/runtime information."),
 		func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, systemInfoOutput, error) {
@@ -329,7 +335,7 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			// distinguish an older deployed endpoint from a newer Git checkout
 			// without touching files, secrets, or privileged Broker state.
 			out.GatewayVersion = portico.Version()
-			out.ApprovalProtocol = "native-mcp-elicitation-when-supported"
+			out.ApprovalProtocol = "adaptive-operator-approval-v1"
 			return nil, out, nil
 		})
 
@@ -801,56 +807,14 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			return nil, out, nil
 		})
 
-	mcp.AddTool(server, annotatedTool("permissions.request_root_access", "Request operator-approved access to a filesystem root inside the configured physical ceiling. On clients with MCP elicitation support, the client renders its native confirmation UI and the Broker activates authority only after acceptance."),
+	mcp.AddTool(server, approvalTool("permissions.request_root_access", "Request access inside the physical ceiling. Adaptive Apps/elicitation/HTTPS/SSH presentation; only the independently authenticated operator can approve."),
 		func(ctx context.Context, req *mcp.CallToolRequest, in rootAccessRequestInput) (*mcp.CallToolResult, any, error) {
-			if state, decision, handled, err := nativeApprovalDecision(req, "root"); handled {
-				if err != nil {
-					return nil, nil, err
-				}
-				var out map[string]any
-				args, _ := json.Marshal(map[string]any{
-					"request_id": state.RequestID,
-					"approval_token": state.ApprovalToken,
-					"decision": decision,
-				})
-				if err := s.call(ctx, "permissions.confirm_root_access", state.RequestID, decision, args, &out, true, state.RequestID+":"+decision); err != nil {
-					return nil, out, err
-				}
-				return nil, out, nil
-			}
-
+			if out,handled,err:=s.navigationContinuation(ctx,req,"root",in.Root);handled { return nil,out,err }
 			var out map[string]any
-			args, _ := json.Marshal(in)
-			if err := s.call(ctx, "permissions.request_root_access", in.Root, "request", args, &out, true, in.OperationID); err != nil {
-				return nil, out, err
-			}
-			approvalToken, _ := out["approval_token"].(string)
-			delete(out, "approval_token")
-
-			if link := operatorWebApprovalLink(out); link != "" {
-				out["approval_method"] = "operator_web"
-				out["operator_approval_url"] = link
-				out["message"] = "Pórtico: solicitação pendente. Abra operator_approval_url em seu navegador, entre como operador e confirme ou negue. O link não concede acesso."
-				return nil, out, nil
-			}
-			if !supportsNativeElicitation(req) {
-				out["approval_method"] = "operator_fallback"
-				if link := operatorWebApprovalLink(out); link != "" {
-					out["operator_approval_url"] = link
-					out["message"] = "Pórtico: pedido pendente. Abra operator_approval_url no navegador, entre com a conta do operador e confirme a decisão. O link não concede acesso."
-				} else {
-					out["message"] = "Pórtico: pedido pendente. Use uma sessão SSH autenticada e scripts/operator-approvals.py para decidir. Não compartilhe credenciais com a IA."
-				}
-				out["operator_approval_guide"] = "docs/operator-approval-fallback.md"
-				return nil, out, nil
-			}
-			approval, err := nativeApprovalResult("root", out, approvalToken)
-			if err != nil {
-				return nil, nil, err
-			}
-			return approval, nil, nil
+			args,_:=json.Marshal(in)
+			if err:=s.call(ctx,"permissions.request_root_access",in.Root,"request",args,&out,true,in.OperationID);err!=nil { return nil,out,err }
+		return s.presentApproval(ctx,req,"root",out)
 		})
-
 
 	mcp.AddTool(server, annotatedTool("permissions.revoke_root_access", "Revoke this authenticated subject's dynamic access to one delegated root. This can only reduce dynamic authority; it cannot remove static policy roots."),
 		func(ctx context.Context, _ *mcp.CallToolRequest, in rootAccessRevokeInput) (*mcp.CallToolResult, map[string]any, error) {

@@ -341,7 +341,7 @@ func (b *Broker) requestSensitiveAccess(ctx context.Context, req wire.Request) w
 	if !protected {
 		return deny(req.ID, "invalid_args", "path is not classified as a protected secret")
 	}
-	if in.TTLSeconds < 0 {
+	if in.TTLSeconds < 0 || in.TTLSeconds > int64(b.Policy.MaxGrantTTL()/time.Second) {
 		return deny(req.ID, "invalid_ttl", "ttl_seconds cannot be negative")
 	}
 	ttl := time.Duration(in.TTLSeconds) * time.Second
@@ -434,6 +434,8 @@ func (b *Broker) validateSensitiveApproval(ctx context.Context, approval state.A
 }
 
 func (b *Broker) confirmSensitiveAccess(ctx context.Context, req wire.Request) wire.Response {
+	if !b.adminOK(req.AdminToken) { return deny(req.ID,"operator_required","MCP client acceptance is not operator authentication") }
+	b.elevationMu.Lock(); defer b.elevationMu.Unlock()
 	if b.State == nil {
 		return deny(req.ID, "state_required", "sensitive access confirmation requires durable state")
 	}

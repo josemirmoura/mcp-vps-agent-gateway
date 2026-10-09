@@ -14,7 +14,7 @@ func TestNativeApprovalRejectsControlCharactersAndMobileOverflow(t *testing.T) {
 		"physical_ceiling":        "/opt",
 		"approval_token":          "ephemeral-test-token",
 	}
-	if _, err := nativeApprovalResult("root", valid, "ephemeral-test-token"); err != nil {
+	if _, err := validatedApprovalMessage("root", valid); err != nil {
 		t.Fatalf("valid native approval should remain available: %v", err)
 	}
 	cases := []struct {
@@ -43,7 +43,7 @@ func TestNativeApprovalRejectsControlCharactersAndMobileOverflow(t *testing.T) {
 				values[k] = v
 			}
 			values[tc.key] = tc.value
-			if _, err := nativeApprovalResult("root", values, "ephemeral-test-token"); err == nil {
+			if _, err := validatedApprovalMessage("root", values); err == nil {
 				t.Fatalf("unsafe native approval must not be displayed: %s", tc.name)
 			}
 		})
@@ -139,23 +139,5 @@ func TestNativeRootApprovalAlwaysDisplaysPhysicalCeiling(t *testing.T) {
 				t.Fatalf("broad mobile-safe bounds exceeded: %q", message)
 			}
 		})
-	}
-}
-
-func TestNativeApprovalStateDoesNotCrossApprovalKinds(t *testing.T) {
-	state, err := encodeNativeApprovalState(nativeApprovalState{
-		Kind: "root", RequestID: "apr-test", ApprovalToken: "token-test",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := decodeNativeApprovalState(state, "sensitive"); err == nil {
-		t.Fatal("root approval token cannot authorize protected-file operation")
-	}
-	if _, err := decodeNativeApprovalState(state, "root"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := decodeNativeApprovalState("invalid", "root"); err == nil {
-		t.Fatal("invalid request state must be rejected")
 	}
 }

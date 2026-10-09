@@ -129,7 +129,7 @@ func TestDynamicRootApprovalActivatesAndRevokesWithoutPolicyReload(t *testing.T)
 		"decision": "approve",
 	})
 	approved := b.Handle(ctx, wire.Request{
-		ID: "approve", Subject: "alice", Tool: "permissions.confirm_root_access",
+		ID: "approve", Subject: "alice", AdminToken:b.AdminToken, Tool: "permissions.confirm_root_access",
 		Args: confirmArgs,
 	})
 	if !approved.OK {
@@ -296,7 +296,7 @@ func TestDynamicPhysicalCeilingRequiresAndAcceptsOperatorApproval(t *testing.T) 
 		"decision": "approve",
 	})
 	approved := b.Handle(ctx, wire.Request{
-		ID: "approve-ceiling", Subject: "alice", Tool: "permissions.confirm_root_access",
+		ID: "approve-ceiling", Subject: "alice", AdminToken:b.AdminToken, Tool: "permissions.confirm_root_access",
 		Args: confirmArgs,
 	})
 	if !approved.OK {
@@ -411,7 +411,7 @@ func TestDynamicRootApprovalWorksFromEmptyStaticBaseline(t *testing.T) {
 		"decision": "approve",
 	})
 	approved := b.Handle(ctx, wire.Request{
-		ID: "empty-approve", Subject: "alice", Tool: "permissions.confirm_root_access",
+		ID: "empty-approve", Subject: "alice", AdminToken:b.AdminToken, Tool: "permissions.confirm_root_access",
 		Args: confirmArgs,
 	})
 	if !approved.OK {

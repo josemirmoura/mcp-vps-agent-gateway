@@ -11,7 +11,7 @@ async function scenario(decision){
   const elements=new Map();
   for(const id of ['status','details','login-panel','login-form','login-error',
     'approve','deny','request_id','node','subject','resource','access','ttl',
-    'expires','warning','password']){
+    'expires','warning','password','operator','step-up-panel','step-up-password','refresh','logout']){
     elements.set(id,{hidden:id==='details'||id==='login-panel',disabled:false,
       textContent:'',value:'',handlers:{},
       addEventListener(event,callback){this.handlers[event]=callback;}});
@@ -24,7 +24,7 @@ async function scenario(decision){
         request_id:'apr_12345678',node:'test',subject:'operator',
         resource:'/opt/test',access:'read',ttl_label:'300 segundos',
         expires_at:'2026-10-09T00:59:00Z',ceiling_wide:false,
-        status:'pending',csrf_token:'test-csrf'})};
+        status:'pending',csrf_token:'test-csrf',decision_nonce:'nonce',step_up_required:false})};
     }
     if(calls.length===2 && opts.method==='POST'){
       return {ok:true,status:200,json:async()=>({

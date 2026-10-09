@@ -60,18 +60,39 @@ func TestOperatorBridgeSQLiteDenyOneShotAndHiddenElevation(t *testing.T) {
  _,err=store.CreateRootApproval(ctx,"bob","/opt/other","read",time.Hour,10*time.Minute)
  if err!=nil {t.Fatal(err)}
  b:=&operatorBridge{broker:&broker.Broker{State:store,AdminToken:"admin-secret",ExpectedSubject:"alice"},token:"web-secret"}
- req:=wire.Request{ID:"list",Tool:"admin.approval.list",AdminToken:"web-secret"}
+ req:=wire.Request{ID:"list",Subject:"local-owner",Tool:"admin.approval.list",AdminToken:"web-secret"}
  list:=b.Handle(ctx,req)
  if !list.OK {t.Fatalf("list denied: %+v",list.Error)}
  var rows []state.Approval
  if err:=json.Unmarshal(list.Result,&rows);err!=nil{t.Fatal(err)}
  if len(rows)!=1||rows[0].ID!=approved.ID {t.Fatalf("web exposed ineligible requests: %+v",rows)}
- body,_:=json.Marshal(map[string]any{"request_id":approved.ID})
- decision:=wire.Request{ID:"deny",Tool:"admin.approval.deny",AdminToken:"web-secret",Args:body}
+ body,_:=json.Marshal(map[string]any{"request_id":approved.ID,"snapshot_hash":state.ApprovalFingerprint(approved,""),"node_id":""})
+ decision:=wire.Request{ID:"deny",Subject:"local-owner",Tool:"admin.approval.deny",AdminToken:"web-secret",Args:body}
  result:=b.Handle(ctx,decision)
  if !result.OK{t.Fatalf("denial rejected: %+v",result.Error)}
  dbrow,err:=store.GetApproval(ctx,approved.ID)
  if err!=nil||dbrow.Status!="denied"{t.Fatalf("state not denied: %+v %v",dbrow,err)}
  again:=b.Handle(ctx,decision)
  if again.OK {t.Fatal("second decision must be rejected")}
+}
+
+func TestOperatorBridgeBindsOwnerNodeScopeAndFreshVerification(t *testing.T){
+ ctx:=context.Background();store,err:=state.Open(":memory:");if err!=nil{t.Fatal(err)};defer store.Close()
+ t.Setenv("VPS_AGENT_OPERATOR_ID","owner-a")
+ a,err:=store.CreateRootApproval(ctx,"alice","/opt/project","work",time.Minute,time.Minute);if err!=nil{t.Fatal(err)}
+ bridge:=&operatorBridge{broker:&broker.Broker{State:store,AdminToken:"admin",ExpectedSubject:"alice",InstanceID:"node-a"},token:"scoped"}
+ cases:=[]struct{name,owner,node,fp string;stepped bool}{
+  {"owner-swap","owner-b","node-a",state.ApprovalFingerprint(a,"node-a"),true},
+  {"node-swap","owner-a","node-b",state.ApprovalFingerprint(a,"node-a"),true},
+  {"scope-swap","owner-a","node-a",state.ApprovalFingerprint(a,"node-b"),true},
+  {"missing-step-up","owner-a","node-a",state.ApprovalFingerprint(a,"node-a"),false},
+ }
+ for _,tc:=range cases{t.Run(tc.name,func(t *testing.T){
+  args,_:=json.Marshal(map[string]any{"request_id":a.ID,"node_id":tc.node,"snapshot_hash":tc.fp,"step_up":tc.stepped})
+  res:=bridge.Handle(ctx,wire.Request{ID:"attack",Tool:"admin.approval.approve",Subject:tc.owner,AdminToken:"scoped",Args:args})
+  if res.OK{t.Fatal("unbound decision accepted")}
+ })}
+ row,_:=store.GetApproval(ctx,a.ID);if row.Status!="pending"{t.Fatal("negative check mutated request")}
+ t.Setenv("VPS_AGENT_OPERATOR_ID","owner\u202ea")
+ if res:=bridge.Handle(ctx,wire.Request{Tool:"admin.approval.list",Subject:"local-owner",AdminToken:"scoped"});res.OK{t.Fatal("invalid configured identity silently fell back")}
 }

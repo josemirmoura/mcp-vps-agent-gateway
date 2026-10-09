@@ -78,7 +78,7 @@ func TestSensitiveEnvRequiresSeparateTemporaryApproval(t *testing.T) {
 		"request_id": pending.RequestID, "approval_token": pending.ApprovalToken, "decision": "approve",
 	})
 	approved := b.Handle(ctx, wire.Request{
-		ID: "secret-confirm", Subject: "alice", Tool: "permissions.confirm_sensitive_access", Args: confirmArgs,
+		ID: "secret-confirm", Subject: "alice", AdminToken:b.AdminToken, Tool: "permissions.confirm_sensitive_access", Args: confirmArgs,
 	})
 	if !approved.OK { t.Fatalf("sensitive approval failed: %+v", approved) }
 
@@ -176,7 +176,7 @@ func TestSensitiveApprovalFailsIfParentAuthorityDisappears(t *testing.T) {
 	})
 	confirm := b.Handle(ctx, wire.Request{
 		ID: "stale-secret-confirm", Subject: "alice",
-		Tool: "permissions.confirm_sensitive_access", Args: confirmArgs,
+		AdminToken:b.AdminToken, Tool: "permissions.confirm_sensitive_access", Args: confirmArgs,
 	})
 	if confirm.OK {
 		t.Fatal("protected-file approval survived removal of its parent root authority")
