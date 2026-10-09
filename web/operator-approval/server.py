@@ -124,6 +124,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
+    def host_ok(self):
+        allowed = os.environ.get("PORTICO_OPERATOR_PUBLIC_ORIGIN", "")
+        try:
+            u = urlsplit(allowed)
+            return bool(u.scheme == "https" and u.netloc and
+                        self.headers.get("Host", "").lower() == u.netloc.lower())
+        except ValueError:
+            return False
     def origin_ok(self):
         origin = self.headers.get("Origin")
         allowed = os.environ.get("PORTICO_OPERATOR_PUBLIC_ORIGIN", "")
@@ -139,6 +147,9 @@ class Handler(BaseHTTPRequestHandler):
     def session(self):
         return session_from_cookie(self.headers.get("Cookie", ""))
     def do_GET(self):
+        if not self.host_ok():
+            self.reply(421, {"error": "host denied"})
+            return
         path = urlsplit(self.path).path
         if path in ("/operator/app.js", "/operator/style.css"):
             filename = "app.js" if path.endswith(".js") else "style.css"
@@ -183,6 +194,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         self.reply(404, {"error": "not found"})
     def do_POST(self):
+        if not self.host_ok():
+            self.reply(421, {"error": "host denied"})
+            return
         if not self.origin_ok():
             self.reply(403, {"error": "origin denied"})
             return
