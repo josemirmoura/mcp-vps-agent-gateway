@@ -39,7 +39,7 @@ func toolSafetyFor(name string) (toolSafety, bool) {
 		"firewall.status",
 		"permissions.discover_scope",
 		"permissions.list_root_access", "permissions.list_sensitive_access",
-		"permissions.status":
+		"permissions.approval_status", "permissions.status":
 		return safety(true, false, true, false), true
 
 	// Read-only request that deliberately reaches an external destination.
@@ -94,7 +94,7 @@ func toolSafetyFor(name string) (toolSafety, bool) {
 	// Authority requests and revocations alter Portico authority, not user data.
 	// The Broker remains authoritative and approval requests still require a
 	// separate operator decision where applicable.
-	case "permissions.request_root_access",
+	case "permissions.cancel_approval", "permissions.request_root_access",
 		"permissions.revoke_root_access",
 		"permissions.request_sensitive_access",
 		"permissions.revoke_sensitive_access",

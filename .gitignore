@@ -24,7 +24,11 @@ bin/
 tmp/
 
 # Docker runtime state
-state/
+/state/
 config/policy.yaml
 diagnostics/
 backups/
+
+# Python verification caches
+__pycache__/
+*.pyc

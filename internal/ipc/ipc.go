@@ -26,6 +26,7 @@ type Server struct {
 	ln              net.Listener
 	wg              sync.WaitGroup
 	AllowedPeerUIDs map[uint32]struct{}
+	SocketGroupGID int // explicit group for a dedicated, minimal-privilege socket; 0 = preserve existing behavior
 }
 
 func NewServer(socket string, handler Handler) *Server {
@@ -82,6 +83,13 @@ func (s *Server) Serve(ctx context.Context) error {
 	if err := os.MkdirAll(filepath.Dir(s.socket), 0o750); err != nil {
 		return err
 	}
+	if s.SocketGroupGID > 0 {
+		// This is a dedicated mount owned by the privileged Broker. The portal
+		// gets only group traversal rights for its separate operator socket.
+		if err := os.Chown(filepath.Dir(s.socket), -1, s.SocketGroupGID); err != nil { return err }
+		// #nosec G302 -- dedicated operator socket directory is owned by Broker root, with group 65532 traverse-only access; no world permissions.
+		if err := os.Chmod(filepath.Dir(s.socket), 0o750); err != nil { return err }
+	}
 	_ = os.Remove(s.socket)
 	ln, err := net.Listen("unix", s.socket)
 	if err != nil {
@@ -94,6 +102,12 @@ func (s *Server) Serve(ctx context.Context) error {
 		return err
 	}
 
+	if s.SocketGroupGID > 0 {
+		if err := os.Chown(s.socket, -1, s.SocketGroupGID); err != nil {
+			_ = ln.Close()
+			return err
+		}
+	}
 	go func() {
 		<-ctx.Done()
 		_ = ln.Close()

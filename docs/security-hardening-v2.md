@@ -29,7 +29,7 @@ Active dynamic root delegations are Broker-owned state. They do not edit `policy
 
 Generic MCP tool annotations and host confirmation policy remain UX signals rather than the Broker security boundary.
 
-For clients that advertise standard MCP elicitation, root and protected-file delegation use the client's native confirmation surface. The Gateway returns a multi-round-trip elicitation request with opaque request state; the model receives neither a self-approval tool nor a usable approval token. After accept/decline/cancel, the Broker independently binds the decision to the pending request, authenticated subject, requested resource, access profile and approval expiry. Clients without elicitation leave the request pending for the separate operator fallback.
+The Gateway negotiates MCP Apps, native elicitation navigation, HTTPS and interactive SSH from capabilities actually announced. Elicitation accept/decline/cancel does not authenticate an operator or grant authority. Signed navigation state binds subject, target and expiry; the continuation can only consult Broker status. The independent operator-origin session authenticates the owner, requires explicit request-bound one-shot decisions and fresh verification for protected files/work/compose, and sends no credentials through the MCP bridge. The Broker revalidates destination, requester, scope, current policy and expiry, committing decision, grant and audit together. Missing or unverified client support leaves HTTPS/SSH available. See [adaptive approvals](adaptive-operator-approvals.md).
 
 ### Administrative elevation
 

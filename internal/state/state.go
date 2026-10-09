@@ -553,6 +553,9 @@ func (s *Store) RevokeAll(ctx context.Context) error {
 }
 
 type AuditEvent struct {
+	ApprovalID   string `json:"approval_id,omitempty"`
+	Requester    string `json:"requester,omitempty"`
+	GrantID      string `json:"grant_id,omitempty"`
 	Time         string `json:"time"`
 	InstanceID   string `json:"instance_id,omitempty"`
 	InstanceName string `json:"instance_name,omitempty"`
@@ -602,7 +605,6 @@ func (s *Store) AppendAudit(ctx context.Context, ev AuditEvent) (string, error) 
 	}
 	return digest, nil
 }
-
 
 type AuditRecord struct {
 	Seq      int64      `json:"seq"`
