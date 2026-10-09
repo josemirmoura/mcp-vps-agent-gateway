@@ -12,6 +12,8 @@ com `go:embed`, sem consultar versões informadas por clientes MCP ou Broker.
 | Log `portico_cloud_node_start` | `product_version` | binário compilado do conector |
 | Protocolo negociado MCP | versão de protocolo, separada | SDK MCP |
 
+Se o manifesto incorporado estiver vazio, a versão anunciada é explicitamente `dev` (nunca apenas `v` ou `v0.1.0`). O formato de release candidate, como `v0.1.0-rc.7`, é preservado.
+
 Uma tag estável **não** pode ser inferida apenas do handshake.
 O publicador de releases valida explicitamente que a tag solicitada é
 `v` + `VERSION` e que o artefato é construído do commit de release. Build
