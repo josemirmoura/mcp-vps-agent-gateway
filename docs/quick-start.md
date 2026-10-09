@@ -1,5 +1,7 @@
 # Portico MCP Quick Start
 
+[Português (Brasil)](quick-start.pt-BR.md) · [Installation contract](installation-contract.md)
+
 Portico MCP is installed from the terminal using the repository's transparent Docker Compose and shell scripts.
 
 ## Requirements
@@ -87,13 +89,28 @@ After ChatGPT is connected, a project is authorized dynamically:
 permissions.request_root_access
         |
         v
-native MCP client confirmation (elicitation)
+host-owned MCP elicitation when supported and verified
         |
         v
-Broker activates read / work / compose for that root
+Broker applies the policy and activates only an authorized delegation
 ~~~
 
+The native in-chat approval surface is not universally available in ChatGPT and has not completed desktop/mobile acceptance for the final Community candidate. If the client does not support that flow, the request stays pending and the operator must use only a separately deployed and authenticated approval channel supported by the exact installed runtime. A URL or request ID cannot authorize anything.
+
 The model cannot approve its own permission expansion. On elicitation-capable clients, opaque approval state travels only through the protocol round trip; the model does not receive a self-approval tool or usable approval token. The Broker binds the decision to the authenticated subject and pending request.
+
+## Scoped authorization when the chat has no elicitation UI
+
+If the tool reports `approval_method=operator_fallback` and a `request_id=apr_...`, the Broker request is **pending**, not approved. In a separate trusted SSH session on your Linux machine, from the Portico checkout, use the existing Community operator CLI:
+
+~~~bash
+python3 scripts/operator-approvals.py --list
+python3 scripts/operator-approvals.py
+~~~
+
+The first command lists pending, unexpired requests; the second opens an interactive review. Match the ID shown in your conversation to the displayed identity, project path, access profile and TTL. Only the authorized machine operator can type the exact `APROVAR apr_...` or `NEGAR apr_...` phrase to decide. Any mismatch, expiry or cancellation must fail closed. You can also use `python3 scripts/operator-approvals.py --request apr_YOUR_REQUEST_ID` with the **actual** request ID.
+
+The CLI requires a trusted operator account with Docker access, which is powerful host administration authority. Do **not** provide that access, the SSH login or operator tokens to the AI. A URL/ID alone is not approval; a chat login is not operator authentication. Recheck the resulting delegation with `permissions.list_root_access` after the decision. This method does not prove that ChatGPT's native buttons work. The detailed existing [operator fallback instructions](operator-approval-fallback.md) are currently written in Portuguese.
 
 ## Project-locked profile
 
@@ -218,15 +235,35 @@ bash scripts/remove.sh --purge --remove-source
 
 The purge never deletes arbitrary delegated project directories, third-party images, applications, databases or services. The legacy `/opt/vps-agent-sandbox` directory is removed only when it is empty.
 
-## Stable releases
+## Recovery from a failed installation step
 
-After `v0.1.0` is frozen, production-oriented installs should use a tagged Git checkout rather than `main`:
+**Local/runtime failure:** inspect the current Docker/services and rerun local checks; do not purge state simply because a check is red.
 
 ~~~bash
-git clone --branch v0.1.0 \
-  https://github.com/josemirmoura/mcp-vps-agent-gateway.git
-cd mcp-vps-agent-gateway
-bash scripts/install.sh
+bash scripts/diagnose.sh status
+bash scripts/diagnose.sh health
+bash scripts/verify.sh
 ~~~
 
-The Git checkout is intentional: the update mechanism preserves fast-forward verification, state migration checks, backup and automatic rollback.
+**DNS/HTTPS/OAuth failure:** make sure the DNS record points at the intended Linux host, verify that TCP 80/443 can reach the configured Traefik route, and recheck the public auth boundary after any safe configuration correction.
+
+~~~bash
+bash scripts/verify-public.sh
+~~~
+
+**No custom MCP app in ChatGPT:** first confirm account/workspace eligibility and the actual Developer Mode / Plugins feature surface. A healthy VPS does not enable missing ChatGPT capabilities.
+
+**MCP connected but no audited call:** confirm the exact `https://<domain>/mcp` endpoint, sign in using the **OAuth operator username** (normally `vps-operator`, not the Linux login), invoke `system.info`, return to the terminal, and press Enter to retry the fixed-baseline audit verification. No new event means installation is still incomplete.
+
+**Approval dialog unavailable or illegible:** do not infer consent or enable a self-approval tool. Only use a separately authenticated operator fallback that is actually shipped in the installed version; otherwise leave the access request pending. Record sanitized client/device evidence for the #65 acceptance gate.
+
+**Interrupted update, backup or migration:** do not run purge as a recovery tactic. Preserve operator state and consult the current lifecycle verification/rollback results; reliable recovery from every failure mode is a separate gate.
+
+
+## Release selection and installation safety
+
+The `v0.1.0` stable release is **not yet published**. Do not try to clone a nonexistent stable tag or treat a moving `main` checkout as a signed release.
+
+For engineering/preview inspection, use the clone command at the top of this guide. For a production-oriented installation **after an exact release is published and verified**, choose the published immutable tag and verify the matching source and image signatures/digests first. The installer uses a Git checkout because controlled updates need fast-forward checks, backup and rollback, subject to actual lifecycle acceptance.
+
+Until then, this is a pre-stable candidate, not a guarantee of successful recovery or completed mobile authorization UX. Final operator acceptance includes a clean Linux install, an authenticated real MCP client call and Broker audit proof.

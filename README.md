@@ -6,7 +6,7 @@ This repository contains the public Portico Community runtime.
 
 The current validated product path connects ChatGPT Web or another compatible MCP client to a single Linux host through an unprivileged Gateway and a privileged local Broker. The machine owner defines authority; the Broker enforces it.
 
-> **Status: pre-release Community candidate.** Ubuntu 24.04 workflows validate the package end to end. Stable release, long-running production reliability and future licensing are still gated.
+> **Status: pre-release Community candidate.** Ubuntu 24.04 workflows validate disposable runtime/package paths. A real user-facing ChatGPT Web/mobile acceptance, verified signed release assets, stable reliability and the final Community license are separate open gates.
 
 ## Community product boundary
 
@@ -79,10 +79,10 @@ The guided flow covers prerequisites, authority scope, containers, local verific
 
 See:
 
-- [Quick Start](docs/quick-start.md)
-- [Installation contract](docs/installation-contract.md)
-- [Installation flow](docs/installer-flow.md)
-- [ChatGPT integration](docs/chatgpt-integration.md)
+- [Quick Start](docs/quick-start.md) | [Português (Brasil)](docs/quick-start.pt-BR.md)
+- [Installation contract](docs/installation-contract.md) | [Português (Brasil)](docs/installation-contract.pt-BR.md)
+- [Installation flow](docs/installer-flow.md) | [Português (Brasil)](docs/installer-flow.pt-BR.md)
+- [ChatGPT integration](docs/chatgpt-integration.md) | [Português (Brasil)](docs/chatgpt-integration.pt-BR.md)
 
 ## Authority
 
