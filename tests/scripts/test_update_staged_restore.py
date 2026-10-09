@@ -229,5 +229,77 @@ class RollbackRecoveryTests(unittest.TestCase):
         self.assertEqual((self.root / "state/state.db").read_text(), "original-db\n")
 
 
+
+class VolumeArchivePreflightTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.tar = self.root / "identity.tar.gz"
+        self.checker = ROOT / "scripts/lib/verify-update-volume.py"
+
+    def create_tar(self, extra=None, root=True):
+        with tarfile.open(self.tar, mode="w:gz") as pack:
+            if root:
+                item = tarfile.TarInfo(".")
+                item.type = tarfile.DIRTYPE
+                pack.addfile(item)
+            for name, data, typ in [("./PG_VERSION", b"16\\n", None)] + (extra or []):
+                item = tarfile.TarInfo(name)
+                if typ:
+                    item.type = typ
+                    pack.addfile(item)
+                else:
+                    item.size = len(data)
+                    pack.addfile(item, io.BytesIO(data))
+
+    def run_check(self):
+        return subprocess.run(
+            [sys.executable, str(self.checker), str(self.tar)],
+            capture_output=True, text=True, timeout=12,
+        )
+
+    def test_valid_integrated_volume_archive(self):
+        self.create_tar(extra=[("./postgresql.auto.conf", b"ok", None)])
+        result = self.run_check()
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_absolute_path_rejected(self):
+        self.create_tar(extra=[("/etc/shadow", b"oops", None)])
+        result = self.run_check()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("non-relative", result.stderr)
+
+    def test_path_traversal_rejected(self):
+        self.create_tar(extra=[("./../../escape", b"oops", None)])
+        result = self.run_check()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsafe member", result.stderr)
+
+    def test_duplicate_member_rejected(self):
+        self.create_tar(extra=[("./PG_VERSION", b"bad", None)])
+        result = self.run_check()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("duplicate", result.stderr)
+
+    def test_symbolic_link_rejected(self):
+        self.create_tar(extra=[("./escape", b"", tarfile.SYMTYPE)])
+        result = self.run_check()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsafe link", result.stderr)
+
+    def test_missing_root_rejected(self):
+        self.create_tar(root=False)
+        result = self.run_check()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("no root", result.stderr)
+
+    def test_corrupted_volume_archive_rejected(self):
+        self.tar.write_bytes(b"not a valid archive")
+        result = self.run_check()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("IDENTITY SNAPSHOT INVALID", result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
