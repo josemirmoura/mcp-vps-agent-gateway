@@ -128,6 +128,6 @@ The Gateway authenticates. The Broker authorizes. The VPS owner chooses the poli
 
 A successful OAuth connection **does not authorize additional project roots**. The machine-local Broker is authoritative. MCP Apps and native elicitation are client-capability-dependent, not a guarantee for every ChatGPT plan/surface or device. In-chat approval UI alone is not proof of owner identity. Do not promise successful native desktop/mobile approval before the exact release is accepted on real client devices.
 
-If the installed version actually provides an authenticated HTTPS operator portal or an operator-only local CLI/SSH fallback, follow its verified instructions. A link or pending request ID conveys no permission. If the installed version lacks a compatible approval channel, the request remains pending, and the operator must not treat it as approved.
+The existing Community `scripts/operator-approvals.py` provides an SSH/operator fallback for pending root and sensitive-file requests without MCP elicitation; see the [Quick Start instructions](quick-start.md) and the [Portuguese fallback reference](operator-approval-fallback.md). An authenticated HTTPS operator portal is a separate implementation candidate and must actually be integrated, configured and validated before use. A link or pending request ID conveys no permission. If the installed version lacks a compatible approval channel, the request remains pending, and the operator must not treat it as approved.
 
 [Português (Brasil)](chatgpt-integration.pt-BR.md).
