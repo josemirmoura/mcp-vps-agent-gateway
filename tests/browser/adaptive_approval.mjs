@@ -46,14 +46,36 @@ const profiles = [
 
 async function run(profile, name, callback) {
   const context = await browser.newContext({ ...profile.context, ignoreHTTPSErrors: true });
+  // Report the failing action before node:test cancels the entire case. Keep
+  // the enclosing timeout for cleanup rather than increasing it to hide hangs.
+  context.setDefaultTimeout(8_000);
   const page = await context.newPage();
   await context.request.get(metadata.host + '/__fixture/reset');
   const uiErrors = [];
+  const consoleErrors = [];
   page.on('pageerror', error => uiErrors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
   page.on('dialog', dialog => dialog.accept());
   try {
     await callback({ page, context });
     assert.deepEqual(uiErrors, [], 'UI must not throw uncaught browser exceptions');
+  } catch (error) {
+    // Fixture-only, allowlisted fields. Never capture cookies, storage, input
+    // values, request headers/bodies or raw host messages in CI artifacts.
+    const frames = await Promise.all(page.frames().map(async frame => {
+      try {
+        return await frame.evaluate(() => ({
+          path: location.pathname,
+          status: document.getElementById('status')?.textContent,
+          loginVisible: !!document.getElementById('login-panel') && !document.getElementById('login-panel').hidden,
+          frameVisible: !!document.getElementById('frame') && !document.getElementById('frame').hidden,
+        }));
+      } catch { return { unavailable: true }; }
+    }));
+    const diagnostic = { profile: profile.name, case: name, frames, uiErrors, consoleErrors, fixture: await state(context) };
+    fs.writeFileSync(path.join(artifacts, profile.name + '-' + name + '-failure.json'), JSON.stringify(diagnostic, null, 2));
+    console.error(JSON.stringify(diagnostic));
+    throw error;
   } finally {
     await page.screenshot({ path: path.join(artifacts, profile.name + '-' + name + '.png'), fullPage: true });
     await context.close();
