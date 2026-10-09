@@ -34,6 +34,7 @@ class ReleaseWorkflowSecurityContract(unittest.TestCase):
         security = job("security", source)
         prepare = job("prepare-tag", source)
         self.assertIn("go test -race -count=1 ./...", validate)
+        self.assertIn("git diff --exit-code -- go.mod go.sum", validate)
         self.assertIn("needs: [validate, security, image-security]", prepare)
         self.assertIn("git merge-base --is-ancestor", validate)
         images = job("image-security", source)
@@ -49,6 +50,9 @@ class ReleaseWorkflowSecurityContract(unittest.TestCase):
     def test_release_outputs_cannot_skip_tag_gate(self):
         source = self.workflow
         self.assertIn("needs: prepare-tag", job("images", source))
+        self.assertIn("Scan exactly the published immutable image digest", job("images", source))
+        self.assertIn("image-ref: ghcr.io/", job("images", source))
+        self.assertIn("@${{ steps.build.outputs.digest }}", job("images", source))
         self.assertIn("needs: images", job("github-release", source))
         self.assertIn("needs: [validate, security, image-security]", job("prepare-tag", source))
 
