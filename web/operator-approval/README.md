@@ -1,6 +1,6 @@
 # Pórtico: Central de Autorizações (pré-release)
 
-**Estado: implementação em PR draft, sem deploy de produção.** As aprovações continuam exigindo confirmação do proprietário; o Broker continua autoritativo.
+**Estado: PR #88 em evolução; versão HTTPS do portal validada em implantação do proprietário, ainda pré-release para distribuição geral.** As aprovações continuam exigindo confirmação do proprietário; o Broker continua autoritativo.
 
 ## Arquitetura de menor privilégio
 - O Broker pode expor um **segundo socket Unix** em `/run/portico-operator/operator.sock`, montado no volume `operator-run`.
@@ -37,3 +37,7 @@ O perfil do portal é opcional e não integra o instalador padrão. Consulte o p
 6. MCP Apps exige validação própria; interface lateral do ChatGPT não é prometida.
 
 Não colocar em produção até que os gates sejam satisfeitos.
+
+
+## Evolução aprovada: Central dentro do chat
+O recurso MCP Apps integrado ao contexto da conversa é a próxima etapa da Community, **ainda não implementada nem validada**. A experiência desejada dispensa senha **repetitiva** apenas quando a identidade do operador estiver previamente autenticada e vinculada ao nó de forma verificável; o fato de estar dentro do ChatGPT não autoriza um grant. Manter fallback HTTPS e CLI. Requisitos públicos de implementação e testes: [docs/operator-mcp-apps-gate.md](../../docs/operator-mcp-apps-gate.md).
