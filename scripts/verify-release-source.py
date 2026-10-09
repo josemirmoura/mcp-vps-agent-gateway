@@ -28,6 +28,8 @@ TAG_RE = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?\Z")
 MAX_ARCHIVE_BYTES = 300 * 1024 * 1024
 MAX_CHECKSUM_BYTES = 512
 MAX_BUNDLE_BYTES = 3 * 1024 * 1024
+MAX_TAR_MEMBERS = 100_000
+MAX_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
 
 
 class VerificationFailure(RuntimeError):
@@ -75,15 +77,30 @@ def verify_sigstore(cosign: str, artifact: Path, bundle: Path) -> None:
 
 def archived_version(path: Path) -> str:
     version = None
+    members = 0
+    unpacked_bytes = 0
     try:
-        # Validate the *entire* signed archive. Reading just its first VERSION
-        # could miss a later duplicate entry that extraction would overwrite.
+        # Git archive --prefix=mcp-vps-agent/ encodes its root directory
+        # as "mcp-vps-agent" (no final slash). Accept only that root directory,
+        # then require all other members to stay under its prefix.
         with tarfile.open(path, mode="r|gz") as stream:
             for entry in stream:
+                members += 1
+                if members > MAX_TAR_MEMBERS:
+                    raise VerificationFailure("source archive exceeds member count limit")
+                if entry.name == "mcp-vps-agent":
+                    if not entry.isdir():
+                        raise VerificationFailure("source archive has invalid root directory")
+                    continue
                 parts = entry.name.split("/")
                 if (not entry.name.startswith("mcp-vps-agent/")
-                        or ".." in parts or chr(92) in entry.name):
+                        or any(part in ("", ".", "..") for part in parts)
+                        or chr(92) in entry.name):
                     raise VerificationFailure("source archive contains unexpected member path")
+                if entry.isfile():
+                    unpacked_bytes += entry.size
+                    if unpacked_bytes > MAX_UNCOMPRESSED_BYTES:
+                        raise VerificationFailure("source archive exceeds unpacked size limit")
                 if entry.name != "mcp-vps-agent/VERSION":
                     continue
                 if version is not None:
