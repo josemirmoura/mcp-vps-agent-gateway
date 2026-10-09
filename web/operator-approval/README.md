@@ -26,9 +26,9 @@ Por segurança, este comando **não** faz parte do instalador padrão.
 
 ## Fluxo e endpoints
 - `GET /operator?request=apr_...`: página do operador.
-- `POST /api/operator/login`: verifica senha, atribui cookie de sessão de 15 min (Secure, HttpOnly, SameSite Strict).
-- `GET /api/operator/approvals/:id`: apresenta dados de pedido pendente, exige sessão.
-- `POST /api/operator/approvals/:id/decision`: decisão approve/deny; exige sessão, cabeçalho CSRF e Origin idêntico à origem pública definida; usa somente IPC restrito ao Broker.
+- `POST /operator/api/login`: verifica senha, atribui cookie de sessão de 15 min (Secure, HttpOnly, SameSite Strict).
+- `GET /operator/api/approvals/:id`: apresenta dados de pedido pendente, exige sessão.
+- `POST /operator/api/approvals/:id/decision`: decisão approve/deny; exige sessão, cabeçalho CSRF e Origin idêntico à origem pública definida; usa somente IPC restrito ao Broker.
 - Id do pedido **não é segredo nem token de concessão**. A URL nunca autoriza sem autenticação e POST explícito.
 - `scripts/operator-approvals.py` por SSH permanece fallback.
 
