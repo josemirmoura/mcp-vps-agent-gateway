@@ -116,6 +116,9 @@ tar -tzf "$backup_dir/operator-state.tar.gz" >/dev/null
 if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ]; then
   tar -tzf "$backup_dir/zitadel-postgres-volume.tar.gz" >/dev/null
   tar -tzf "$backup_dir/zitadel-bootstrap-volume.tar.gz" >/dev/null
+  # A decompressible gzip must also have a safe volume member layout.
+  python3 scripts/lib/verify-update-volume.py "$backup_dir/zitadel-postgres-volume.tar.gz"
+  python3 scripts/lib/verify-update-volume.py "$backup_dir/zitadel-bootstrap-volume.tar.gz"
 fi
 printf '%s\n' "$current" >"$backup_dir/previous-commit"
 printf '%s\n' "$target_sha" >"$backup_dir/target-commit"
@@ -125,27 +128,102 @@ printf '%s\n' "$target_sha" >"$backup_dir/target-commit"
 trap - ERR INT TERM
 
 rollback() {
-  echo "$(vps_agent_text "Update failed; rolling back to $current..." "Atualização falhou; revertendo para $current...")" >&2
-  "${compose[@]}" stop >/dev/null 2>&1 || true
-  git reset --hard "$current"
-  rm -rf state
-  tar -xzf "$backup_dir/operator-state.tar.gz"
+  local failed_status="$?"
+  [ "$failed_status" -ne 0 ] || failed_status=1
+  # Never recurse into the rollback handler while recovering from a failure.
+  trap - ERR INT TERM
+  echo "$(vps_agent_text "Update failed; staging rollback from $current..." "Atualização falhou; preparando retorno para $current...")" >&2
 
-  if [ -f "$backup_dir/zitadel-postgres-volume.tar.gz" ]; then
-    echo "$(vps_agent_text 'Restoring integrated identity volumes...' 'Restaurando volumes de identidade integrada...')" >&2
-    docker run --rm       -v mcp-vps-agent_zitadel-postgres-data:/target       -v "$PWD/$backup_dir:/backup:ro"       alpine:3.22 sh -c 'find /target -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +; tar -xzf /backup/zitadel-postgres-volume.tar.gz -C /target'
-    docker run --rm       -v mcp-vps-agent_zitadel-bootstrap:/target       -v "$PWD/$backup_dir:/backup:ro"       alpine:3.22 sh -c 'find /target -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +; tar -xzf /backup/zitadel-bootstrap-volume.tar.gz -C /target'
+  local stage old_state helper_copy
+  stage="$(mktemp -d "$PWD/$backup_dir/rollback-stage.XXXXXXXX")" || exit "$failed_status"
+
+  # The original state stays untouched until the archive is read, validated
+  # and extracted successfully to a separate directory. Invalid, incomplete,
+  # or malicious archives must not trigger rm -rf state.
+  if ! python3 scripts/lib/update-snapshot.py \
+      --archive "$backup_dir/operator-state.tar.gz" --dest "$stage"; then
+    echo "ROLLBACK BLOCKED: unusable operator snapshot; live state unchanged. Recover manually using $backup_dir." >&2
+    exit "$failed_status"
   fi
 
-  "${compose[@]}" up -d --build
-  bash ./scripts/verify.sh
-  if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ]; then
-    bash ./scripts/verify-public.sh
+  # This helper must remain available after git reset returns to the old
+  # checkout, where it may not have existed yet.
+  helper_copy="$PWD/$backup_dir/restore-identity-volume.sh"
+  if ! cp scripts/lib/restore-identity-volume.sh "$helper_copy"; then
+    echo "ROLLBACK BLOCKED: could not preserve volume recovery helper." >&2
+    exit "$failed_status"
+  fi
+  chmod 700 "$helper_copy"
+
+  if ! "${compose[@]}" stop; then
+    echo "ROLLBACK BLOCKED: unable to stop upgraded services safely." >&2
+    exit "$failed_status"
+  fi
+  if ! git reset --hard "$current"; then
+    echo "ROLLBACK BLOCKED: unable to restore previous source revision." >&2
+    exit "$failed_status"
+  fi
+
+  # Stage each volume within its Docker volume BEFORE moving any live entry.
+  # On move errors, the isolated helper attempts to restore the previous
+  # entries, leaving its work directories for manual recovery if needed.
+  if [ -f "$backup_dir/zitadel-postgres-volume.tar.gz" ]; then
+    for spec in \
+      "mcp-vps-agent_zitadel-postgres-data:zitadel-postgres-volume.tar.gz" \
+      "mcp-vps-agent_zitadel-bootstrap:zitadel-bootstrap-volume.tar.gz"
+    do
+      local volume archive_name
+      volume="${spec%%:*}"
+      archive_name="${spec#*:}"
+      if ! docker run --rm --network none \
+          -v "$volume:/target" \
+          -v "$PWD/$backup_dir:/backup:ro" \
+          alpine:3.22 sh /backup/restore-identity-volume.sh "/backup/$archive_name"; then
+        echo "ROLLBACK BLOCKED: identity volume restore failed ($volume); snapshot retained." >&2
+        exit "$failed_status"
+      fi
+    done
+  fi
+
+  # Do not delete the upgraded state directory. Rename it into the retained
+  # backup first, then atomically place the prevalidated original state.
+  old_state="$PWD/$backup_dir/failed-target-state"
+  if [ -e "$old_state" ]; then
+    echo "ROLLBACK BLOCKED: displaced state backup already exists." >&2
+    exit "$failed_status"
+  fi
+  if [ -e state ] && ! mv state "$old_state"; then
+    echo "ROLLBACK BLOCKED: could not preserve upgraded state." >&2
+    exit "$failed_status"
+  fi
+  if ! mv "$stage/state" state; then
+    [ ! -e "$old_state" ] || mv "$old_state" state || true
+    echo "ROLLBACK BLOCKED: could not install staged original state." >&2
+    exit "$failed_status"
+  fi
+  # The source archive is retained; these same-filesystem renames avoid
+  # partially written .env/policy files during rollback.
+  if ! mv -f "$stage/.env" .env || \
+     ! mv -f "$stage/config/policy.yaml" config/policy.yaml; then
+    echo "ROLLBACK BLOCKED: operator configuration was not fully restored." >&2
+    exit "$failed_status"
+  fi
+
+  if ! "${compose[@]}" up -d --build || \
+     ! bash ./scripts/verify.sh; then
+    echo "ROLLBACK FAILED: original runtime did not pass health verification." >&2
+    exit "$failed_status"
+  fi
+  if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ] && ! bash ./scripts/verify-public.sh; then
+    echo "ROLLBACK FAILED: original public authentication did not pass verification." >&2
+    exit "$failed_status"
   fi
   printf '{"time":"%s","from":"%s","to":"%s","result":"rolled_back"}\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$current" "$target_sha" >> state/update.log
+  echo "ROLLBACK COMPLETE: original runtime recovered; upgrade remains failed." >&2
+  exit "$failed_status"
 }
-trap rollback ERR
+trap rollback ERR INT TERM
 
 git merge --ff-only "$target"
 if [ "$(git rev-parse HEAD)" != "$target_sha" ]; then
@@ -177,7 +255,7 @@ if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ]; then
   bash ./scripts/verify-public.sh
 fi
 
-trap - ERR
+trap - ERR INT TERM
 printf '{"time":"%s","from":"%s","to":"%s","result":"success"}\n' \
   "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$current" "$target_sha" >> state/update.log
 
