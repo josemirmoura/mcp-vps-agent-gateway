@@ -99,6 +99,19 @@ The native in-chat approval surface is not universally available in ChatGPT and 
 
 The model cannot approve its own permission expansion. On elicitation-capable clients, opaque approval state travels only through the protocol round trip; the model does not receive a self-approval tool or usable approval token. The Broker binds the decision to the authenticated subject and pending request.
 
+## Scoped authorization when the chat has no elicitation UI
+
+If the tool reports `approval_method=operator_fallback` and a `request_id=apr_...`, the Broker request is **pending**, not approved. In a separate trusted SSH session on your Linux machine, from the Portico checkout, use the existing Community operator CLI:
+
+~~~bash
+python3 scripts/operator-approvals.py --list
+python3 scripts/operator-approvals.py
+~~~
+
+The first command lists pending, unexpired requests; the second opens an interactive review. Match the ID shown in your conversation to the displayed identity, project path, access profile and TTL. Only the authorized machine operator can type the exact `APROVAR apr_...` or `NEGAR apr_...` phrase to decide. Any mismatch, expiry or cancellation must fail closed. You can also use `python3 scripts/operator-approvals.py --request apr_YOUR_REQUEST_ID` with the **actual** request ID.
+
+The CLI requires a trusted operator account with Docker access, which is powerful host administration authority. Do **not** provide that access, the SSH login or operator tokens to the AI. A URL/ID alone is not approval; a chat login is not operator authentication. Recheck the resulting delegation with `permissions.list_root_access` after the decision. This method does not prove that ChatGPT's native buttons work. The detailed existing [operator fallback instructions](operator-approval-fallback.md) are currently written in Portuguese.
+
 ## Project-locked profile
 
 Choose this when Portico MCP should never operate outside one project root.
