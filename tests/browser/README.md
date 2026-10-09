@@ -36,3 +36,16 @@ PORTICO_PLAYWRIGHT_MODULE=/tmp/portico-browser-tools/node_modules/playwright \
 The suite requires Python 3, OpenSSL and a Chromium binary. A missing browser fails visibly; no test is silently skipped. Screenshots contain only synthetic fixture data and go to `/tmp/portico-browser-artifacts` by default. Override with `PORTICO_BROWSER_ARTIFACT_DIR`. Certificates and the synthetic password verifier stay in a temporary directory and are deleted when the fixture exits.
 
 Real-client evidence must additionally record the actual client/account/version, capabilities from MCP initialize, the Apps handshake, observed sandbox ancestors, owner authentication, approve/deny/expiry/replay outcomes and audit evidence on an isolated staging node. A successful reference harness must not be recorded as a real-client pass.
+
+## Recorded regression
+
+The [pre-fix diagnostic run](https://github.com/josemirmoura/mcp-vps-agent-gateway/actions/runs/37911066069)
+on 2026-10-09 reproduced blocked native form submission in both Chromium
+profiles: the login panel remained visible, the initial protected GET returned
+401, and no login POST or Broker decision occurred. This is evidence of the
+failure and its cause, not successful acceptance of the repaired candidate.
+
+The repair uses the existing authenticated same-origin API through explicit
+button/keyboard actions. Validate the final PR head before recording browser
+acceptance. Preserve the minimum sandbox and do not add allow-forms to conceal
+this regression.
