@@ -80,9 +80,9 @@ O fluxo guiado cobre pré-requisitos, escopo de autoridade, containers, verifica
 Veja:
 
 - [Início rápido (PT-BR)](docs/quick-start.pt-BR.md) | [English](docs/quick-start.md)
-- [Contrato de instalação](docs/installation-contract.md)
-- [Fluxo de instalação](docs/installer-flow.md)
-- [Integração ChatGPT](docs/chatgpt-integration.md)
+- [Contrato de instalação (PT-BR)](docs/installation-contract.pt-BR.md) | [English](docs/installation-contract.md)
+- [Fluxo de instalação (PT-BR)](docs/installer-flow.pt-BR.md) | [English](docs/installer-flow.md)
+- [Integração ChatGPT (PT-BR)](docs/chatgpt-integration.pt-BR.md) | [English](docs/chatgpt-integration.md)
 
 ## Autoridade
 
@@ -124,7 +124,7 @@ Veja [Conector de nó do Portico Cloud](docs/cloud-node-connector.pt-BR.md).
 
 ## Documentação
 
-- [Mapa da documentação](docs/README.md)
+- [Mapa da documentação EN/PT-BR](docs/README.md)
 - [Modelo do produto](docs/product-model.md)
 - [Arquitetura](docs/architecture.md)
 - [Matriz de segurança](docs/security-release.md)
