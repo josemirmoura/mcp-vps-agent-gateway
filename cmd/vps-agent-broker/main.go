@@ -73,6 +73,7 @@ func main() {
 			os.Exit(1)
 		}
 		operatorServer := ipc.NewServer(operatorSocket, &operatorBridge{broker: b, token: operatorToken()})
+		operatorServer.SocketGroupGID = 65532
 		operatorServer.AllowPeerUIDs(0, 65532)
 		go func() {
 			if err := operatorServer.Serve(ctx); err != nil && ctx.Err() == nil {
