@@ -18,3 +18,17 @@ func TestOperatorApprovalURLRejectsUnsafeInputs(t *testing.T) {
  if got:=operatorApprovalURL("apr_12345678%0a");got!="" {t.Fatal("accepted unsafe request id")}
  if got:=operatorApprovalURL(strings.Repeat("a",300));got!="" {t.Fatal("accepted long request id")}
 }
+
+func TestOperatorWebApprovalLinkBounds(t *testing.T){
+ t.Setenv("VPS_AGENT_OPERATOR_PORTAL_URL","https://operator.example.test/operator")
+ base:=map[string]any{"request_id":"apr_12345678","delegation_ttl_seconds":float64(900)}
+ if got:=operatorWebApprovalLink(base); got=="" {t.Fatal("temporary web link rejected")}
+ for _,change:=range []map[string]any{
+  {"request_id":"apr_12345678","delegation_ttl_seconds":float64(0)},
+  {"request_id":"apr_12345678","delegation_ttl_seconds":float64(-1)},
+  {"request_id":"apr_12345678","delegation_ttl_seconds":float64(900),"ceiling_wide":true},
+  {"request_id":"apr_12345678","delegation_ttl_seconds":"invalid"},
+ } {
+  if got:=operatorWebApprovalLink(change);got!=""{t.Fatalf("unsafe web approval link offered: %s",got)}
+ }
+}
