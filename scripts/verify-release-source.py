@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import posixpath
 import re
 import shutil
 import subprocess
@@ -104,6 +105,20 @@ def archived_version(path: Path) -> str:
                         or any(part in ("", ".", "..") for part in parts)
                         or chr(92) in entry.name):
                     raise VerificationFailure("source archive contains unexpected member path")
+                if not (entry.isfile() or entry.isdir() or entry.issym() or entry.islnk()):
+                    raise VerificationFailure("source archive contains unsupported member type")
+                if entry.issym() or entry.islnk():
+                    target_name = entry.linkname
+                    if posixpath.isabs(target_name) or chr(92) in target_name:
+                        raise VerificationFailure("source archive contains unsafe link target")
+                    if entry.issym():
+                        # Symbolic links resolve relative to the parent directory.
+                        target_name = posixpath.join(posixpath.dirname(entry.name),
+                                                     target_name)
+                    # Hard links resolve relative to the tar archive root.
+                    target_name = posixpath.normpath(target_name)
+                    if not target_name.startswith("mcp-vps-agent/"):
+                        raise VerificationFailure("source archive contains unsafe link target")
                 if entry.isfile():
                     unpacked_bytes += entry.size
                     if unpacked_bytes > MAX_UNCOMPRESSED_BYTES:
