@@ -82,7 +82,7 @@ def archived_version(path: Path) -> str:
             for entry in stream:
                 parts = entry.name.split("/")
                 if (not entry.name.startswith("mcp-vps-agent/")
-                        or ".." in parts or "\\\\" in entry.name):
+                        or ".." in parts or chr(92) in entry.name):
                     raise VerificationFailure("source archive contains unexpected member path")
                 if entry.name != "mcp-vps-agent/VERSION":
                     continue
