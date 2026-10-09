@@ -87,6 +87,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		// This is a dedicated mount owned by the privileged Broker. The portal
 		// gets only group traversal rights for its separate operator socket.
 		if err := os.Chown(filepath.Dir(s.socket), -1, s.SocketGroupGID); err != nil { return err }
+		// #nosec G302 -- dedicated operator socket directory is owned by Broker root, with group 65532 traverse-only access; no world permissions.
 		if err := os.Chmod(filepath.Dir(s.socket), 0o750); err != nil { return err }
 	}
 	_ = os.Remove(s.socket)
