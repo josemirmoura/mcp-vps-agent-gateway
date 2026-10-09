@@ -20,9 +20,9 @@ ARCHIVE = "mcp-vps-agent-source-package.tar.gz"
 CHECKSUM = ARCHIVE + ".sha256"
 SUFFIX = ".sigstore.json"
 ISSUER = "https://token.actions.githubusercontent.com"
-IDENTITY = (
+IDENTITY_PREFIX = (
     r"^https://github\.com/josemirmoura/mcp-vps-agent-gateway/"
-    r"\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)$"
+    r"\.github/workflows/release\.yml@refs/"
 )
 TAG_RE = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?\Z")
 MAX_ARCHIVE_BYTES = 300 * 1024 * 1024
@@ -60,10 +60,17 @@ def signed_checksum(filename: Path) -> str:
     return match.group(1).lower()
 
 
-def verify_sigstore(cosign: str, artifact: Path, bundle: Path) -> None:
+def identity_for_tag(tag: str) -> str:
+    # Exact tag match for releases triggered from refs/tags; the manual
+    # workflow_dispatch release is authenticated by refs/heads/main.
+    return IDENTITY_PREFIX + r"(heads/main|tags/" + re.escape(tag) + r")$"
+
+
+def verify_sigstore(cosign: str, artifact: Path, bundle: Path,
+                    identity: str) -> None:
     command = [
         cosign, "verify-blob", str(artifact), "--bundle", str(bundle),
-        "--certificate-identity-regexp", IDENTITY,
+        "--certificate-identity-regexp", identity,
         "--certificate-oidc-issuer", ISSUER,
     ]
     try:
@@ -133,13 +140,14 @@ def verify(directory: Path, expected_tag: str) -> None:
     if not cosign:
         raise VerificationFailure("cosign is required; no unsigned fallback is allowed")
     # Verify the checksum material is signed before trusting its digest.
-    verify_sigstore(cosign, checksum, checksum_bundle)
+    identity = identity_for_tag(expected_tag)
+    verify_sigstore(cosign, checksum, checksum_bundle, identity)
     expected_digest = signed_checksum(checksum)
     with archive.open("rb") as stream:
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
     if digest != expected_digest:
         raise VerificationFailure("source archive differs from the signed SHA-256 checksum")
-    verify_sigstore(cosign, archive, archive_bundle)
+    verify_sigstore(cosign, archive, archive_bundle, identity)
     if archived_version(archive) != expected_tag.removeprefix("v"):
         raise VerificationFailure("signed source VERSION does not match the requested release tag")
 
