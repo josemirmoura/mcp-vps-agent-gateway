@@ -67,4 +67,27 @@ jobs:
           fi
           actual="$(docker run --rm -v "$volume:/target:ro" alpine:3.22 cat /target/marker)"
           test "$actual" = new-data
-          echo 'DOCKER VOLUME RESTORE: PASS (success + failed archive preserved)'
+          # Simulate a failure DURING the swap, after originals have moved
+          # to the volume's previous/ staging directory.
+          mkdir -p "$d/failbin"
+          cat > "$d/failbin/mv" <<'MOVESH'
+          #!/bin/sh
+          case "${1:-}" in
+            /target/.portico-restore-stage.*/*) exit 83 ;;
+          esac
+          exec /bin/mv "$@"
+          MOVESH
+          chmod 755 "$d/failbin/mv"
+          printf 'third-data\n' > "$d/source/marker"
+          tar -czf "$d/backup/identity.tar.gz" -C "$d/source" .
+          if docker run --rm --network none \
+             -e PATH=/fake:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+             -v "$volume:/target" -v "$d/failbin:/fake:ro" \
+             -v "$d/backup:/backup:ro" -v "$PWD/scripts/lib/restore-identity-volume.sh:/restore.sh:ro" \
+             alpine:3.22 sh /restore.sh /backup/identity.tar.gz; then
+            echo 'Injected swap failure unexpectedly succeeded' >&2
+            exit 1
+          fi
+          actual="$(docker run --rm -v "$volume:/target:ro" alpine:3.22 cat /target/marker)"
+          test "$actual" = new-data
+          echo 'DOCKER VOLUME RESTORE: PASS (success + corrupt tar + failed swap reverted)'
