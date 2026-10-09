@@ -30,8 +30,14 @@ git merge-base --is-ancestor "$CURRENT" "$CANDIDATE" || {
 }
 git worktree add --quiet --detach "$STAGE" "$CANDIDATE"
 python3 "$STAGE/scripts/operator-portal-snapshot.py" --output "$BACKUP"
-docker compose --env-file "$ROOT/.env" -f "$ROOT/compose.yaml" config --quiet
-docker compose --env-file "$ROOT/.env" -f "$STAGE/compose.yaml" --profile operator-portal config --quiet
+if docker info >/dev/null 2>&1; then
+ DOCKER=(docker)
+else
+ echo "Docker exige autenticação sudo apenas para validar a configuração."
+ DOCKER=(sudo docker)
+fi
+"${DOCKER[@]}" compose --env-file "$ROOT/.env" -f "$ROOT/compose.yaml" config --quiet
+"${DOCKER[@]}" compose --env-file "$ROOT/.env" -f "$STAGE/compose.yaml" --profile operator-portal config --quiet
 python3 -m unittest discover -s "$STAGE/web/operator-approval" -p 'test_*.py' -q
 echo "STAGING READY, NO DEPLOY"
 printf 'Installed SHA: %s\nCandidate SHA: %s\nStage: %s\nBackup: %s\n' "$CURRENT" "$CANDIDATE" "$STAGE" "$BACKUP"
