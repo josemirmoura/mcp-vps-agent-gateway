@@ -2,7 +2,7 @@
 
 ## Current stage
 
-**PRE-RELEASE PRODUCTIZATION / CHATGPT E2E GATE COMPLETE**
+**PRE-RELEASE PRODUCTIZATION / CORE CHATGPT E2E PROVED; OPERATOR APPROVAL UX NOT YET ACCEPTED**
 
 The Docker-first Go implementation now has repeatable clean-runner validation across the core Scoped runtime, package lifecycle and host-operation path.
 
@@ -10,7 +10,7 @@ There is still:
 
 - no stable production release
 - no production compatibility promise
-- no long-running real-VPS deployment history
+- no sufficiently long real-VPS reliability history for a production-maturity claim
 - no production claim for Full/admin shell
 
 Laboratory evidence covers the Docker package end-to-end on clean Ubuntu runners: filesystem CRUD, authorization denial, sandboxed shell/jobs, host systemd, host Docker/Compose, diagnostics, lifecycle and audit. On 2026-09-28 the supported integrated self-hosted OAuth path was also exercised against ChatGPT Web on a real target VPS through an authenticated `system.info` call observed by the Broker and recorded in the audit chain. This closes Gate 0A for the supported product path without creating a stable-production claim.
@@ -97,8 +97,8 @@ Prefer:
 
 The implementation has clean-runner evidence through the broad Scoped toolbox and Docker packaging, plus real ChatGPT Web/OAuth evidence and a real scoped write/read/delete proof in the operator environment.
 
-The immediate blocker before stable `v0.1.0` is the **future Community license gate**. RC6 is the validated technical baseline and was published under Apache-2.0. If the license/public notices change, the project must cut a new immutable RC, rerun the automated matrix and perform owner clean-install acceptance against that exact candidate.
+**There are several parallel stable blockers, not only licensing:** legal/license and authorship/IP (#57/#68), real desktop/mobile operator approval (#65), complete MCP conformance (#79), runtime-version consistency and patched-Go evidence (#81/#92), Portuguese quick-start parity (#84), signed immutable RC provenance and exact-candidate operator acceptance. RC6 was published under Apache-2.0; the RC7 source/runtime is not yet a published signed release (checked 2026-10-09). If license/public notices change, cut a new immutable RC, rerun the automated matrix and repeat acceptance.
 
-Owner acceptance remains the final technical gate before stable promotion and includes real OAuth/client connection, audit, native approval UX, scoped operations, protected-secret denial/temporary exception/revocation and lifecycle checks.
+Owner acceptance remains a required final technical gate. It includes real OAuth/client connection, audit, **native approval only when the client advertises elicitation, otherwise independent operator-authenticated approval UX**, scoped operations, protected-secret denial/temporary exception/revocation and lifecycle checks. The connected ChatGPT session returned `operator_fallback` and did not show a native confirmation; this must not be counted as approval success.
 
 Long-running reliability remains a later production-maturity requirement. See [operator-acceptance.md](operator-acceptance.md), [execution-plan.md](execution-plan.md) and [implementation-validation.md](implementation-validation.md).

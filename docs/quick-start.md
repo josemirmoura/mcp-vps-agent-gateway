@@ -86,14 +86,17 @@ After ChatGPT is connected, a project is authorized dynamically:
 ~~~text
 permissions.request_root_access
         |
-        v
-native MCP client confirmation (elicitation)
+        +--> native MCP confirmation (only when client advertises elicitation)
+        |
+        +--> otherwise PENDING (no grant): authorized operator fallback
         |
         v
-Broker activates read / work / compose for that root
+Broker validates operator decision and activates bounded root delegation
 ~~~
 
 The model cannot approve its own permission expansion. On elicitation-capable clients, opaque approval state travels only through the protocol round trip; the model does not receive a self-approval tool or usable approval token. The Broker binds the decision to the authenticated subject and pending request.
+
+**Known client limitation (2026-10-09):** a real ChatGPT connection to Gateway RC7 reported `approval_method=operator_fallback`, because that client session did not advertise native MCP elicitation. It is normal for **no native dialog to appear** in that case. The request remains pending and does not grant access. See [secure operator fallback](operator-approval-fallback.md); a separately authenticated operator can review pending requests via the documented SSH CLI, and the HTTPS/mobile workflow remains subject to its independent security and real-client acceptance gates. Do not approve a blank legacy card, submit operator credentials to an AI or assume OAuth chat login is itself operator approval.
 
 ## Project-locked profile
 
