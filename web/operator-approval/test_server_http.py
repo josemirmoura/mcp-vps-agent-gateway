@@ -44,6 +44,19 @@ class HttpContract(unittest.TestCase):
     def login(self):
         with patch.object(app,"verify_password",return_value=True):
             return self.client.open(self.req("/api/operator/login","POST",{"password":"valid"}))
+    def test_portal_static_assets_and_strict_csp(self):
+        html=self.client.open(self.req("/operator")).read().decode()
+        self.assertIn('/operator/app.js',html)
+        self.assertIn('/operator/style.css',html)
+        self.assertNotIn('<script>',html)
+        for path,typ in [("/operator/app.js","text/javascript"),("/operator/style.css","text/css")]:
+            resp=self.client.open(self.req(path))
+            self.assertIn(typ,resp.headers["Content-Type"])
+            csp=resp.headers["Content-Security-Policy"]
+            self.assertIn("script-src 'self'",csp)
+            self.assertIn("style-src 'self'",csp)
+            self.assertNotIn("unsafe-inline",csp)
+            self.assertGreater(len(resp.read()),50)
     def test_get_details_needs_login(self):
         with self.assertRaises(HTTPError) as c:
             self.client.open(self.req(f"/api/operator/approvals/{ID}"))
