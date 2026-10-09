@@ -65,6 +65,54 @@ class ConformanceMatrixTest(unittest.TestCase):
     def test_no_checks_is_not_tested(self):
         self.assertEqual(matrix.scenario_outcome([])[0], "NOT_TESTED")
 
+    def test_synthetic_test_tool_absence_is_not_tested(self):
+        self.assertEqual(matrix.scenario_outcome([
+            {"status": "SUCCESS"},
+            {"status": "FAILURE",
+             "errorMessage": 'JSON-RPC error: unknown tool "test_image_content"'},
+        ], "tools-call-image")[0], "NOT_TESTED")
+
+    def test_missing_reserved_prompt_is_not_tested(self):
+        self.assertEqual(matrix.scenario_outcome([
+            {"status": "FAILURE",
+             "errorMessage": 'Failed: unknown prompt "test_simple_prompt"'},
+        ], "prompts-get-simple")[0], "NOT_TESTED")
+
+    def test_resources_fixture_missing_is_not_tested(self):
+        self.assertEqual(matrix.scenario_outcome([
+            {"status": "FAILURE", "errorMessage": "Failed: Resource not found"},
+        ], "resources-read-text")[0], "NOT_TESTED")
+
+    def test_real_method_missing_remains_failure(self):
+        self.assertEqual(matrix.scenario_outcome([
+            {"status": "FAILURE",
+             "errorMessage": 'Failed: method not found: "completion/complete"'},
+        ], "completion-complete")[0], "FAIL")
+
+    def test_unexpected_tool_failure_is_not_excused(self):
+        self.assertEqual(matrix.scenario_outcome([
+            {"status": "FAILURE",
+             "errorMessage": 'JSON-RPC error: unknown tool "file.read"'},
+        ], "tools-call-simple-text")[0], "FAIL")
+
+    def test_sse_info_does_not_create_false_error(self):
+        self.assertEqual(matrix.scenario_outcome([
+            {"status": "SUCCESS"},
+            {"status": "INFO", "errorMessage": "SSE streams optional"},
+        ], "server-sse-multiple-streams")[0], "PASS")
+
+    def test_warning_does_not_count_as_pass(self):
+        self.assertEqual(matrix.scenario_outcome([
+            {"status": "SUCCESS"}, {"status": "WARNING"}
+        ])[0], "SKIPPED")
+
+    def test_mixed_real_failure_and_missing_fixture_remains_fail(self):
+        self.assertEqual(matrix.scenario_outcome([
+            {"status": "FAILURE",
+             "errorMessage": 'unknown tool "test_image_content"'},
+            {"status": "FAILURE", "errorMessage": "Invalid protocol version"},
+        ], "tools-call-image")[0], "FAIL")
+
     def test_invalid_or_duplicate_requirement_set_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             req = Path(tmp) / "requirements.yaml"
