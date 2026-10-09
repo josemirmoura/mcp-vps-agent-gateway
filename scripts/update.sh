@@ -116,6 +116,9 @@ tar -tzf "$backup_dir/operator-state.tar.gz" >/dev/null
 if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ]; then
   tar -tzf "$backup_dir/zitadel-postgres-volume.tar.gz" >/dev/null
   tar -tzf "$backup_dir/zitadel-bootstrap-volume.tar.gz" >/dev/null
+  # A decompressible gzip must also have a safe volume member layout.
+  python3 scripts/lib/verify-update-volume.py "$backup_dir/zitadel-postgres-volume.tar.gz"
+  python3 scripts/lib/verify-update-volume.py "$backup_dir/zitadel-bootstrap-volume.tar.gz"
 fi
 printf '%s\n' "$current" >"$backup_dir/previous-commit"
 printf '%s\n' "$target_sha" >"$backup_dir/target-commit"
