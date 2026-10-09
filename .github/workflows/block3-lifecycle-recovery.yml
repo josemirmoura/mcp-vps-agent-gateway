@@ -5,6 +5,7 @@ on:
     paths:
       - 'scripts/update.sh'
       - 'scripts/lib/update-snapshot.py'
+      - 'scripts/lib/verify-update-volume.py'
       - 'scripts/lib/restore-identity-volume.sh'
       - 'tests/scripts/test_update_staged_restore.py'
       - 'tests/scripts/test_update_prebackup_recovery.py'
@@ -27,7 +28,7 @@ jobs:
         run: |
           bash -n scripts/update.sh
           sh -n scripts/lib/restore-identity-volume.sh
-          python3 -m py_compile scripts/lib/update-snapshot.py tests/scripts/test_update_staged_restore.py
+          python3 -m py_compile scripts/lib/update-snapshot.py scripts/lib/verify-update-volume.py tests/scripts/test_update_staged_restore.py
       - name: Test staged archive and post-backup rollback
         run: python3 -m unittest discover -s tests/scripts -p 'test_update_staged_restore.py' -v
       - name: Test earlier pre-backup recovery
@@ -51,6 +52,7 @@ jobs:
           printf 'old-data\n' > "$d/old"
           printf 'new-data\n' > "$d/source/marker"
           tar -czf "$d/backup/identity.tar.gz" -C "$d/source" .
+          python3 scripts/lib/verify-update-volume.py "$d/backup/identity.tar.gz"
           docker run --rm -v "$volume:/target" -v "$d/old:/source/old:ro" alpine:3.22 sh -c 'cp /source/old /target/marker'
           docker run --rm --network none -v "$volume:/target" \
              -v "$d/backup:/backup:ro" -v "$PWD/scripts/lib/restore-identity-volume.sh:/restore.sh:ro" \
