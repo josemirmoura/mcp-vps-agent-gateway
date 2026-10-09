@@ -32,18 +32,22 @@ class HttpContract(unittest.TestCase):
         cls.server.server_close()
         cls.thread.join(timeout=5)
     def setUp(self):
+        self.env=patch.dict(os.environ,{"PORTICO_OPERATOR_PUBLIC_ORIGIN":"https://operator.example.test"})
+        self.env.start()
+        self.addCleanup(self.env.stop)
         app.LOGIN_FAILURES.clear()
         app.SESSIONS.clear()
         self.client=build_opener(HTTPCookieProcessor(http.cookiejar.CookieJar()))
     def req(self,path,method="GET",payload=None,headers=None):
-        h={"Origin":"https://operator.example.test"} if method=="POST" else {}
+        h={"Host":"operator.example.test"}
+        if method=="POST": h["Origin"]="https://operator.example.test"
         h.update(headers or {})
         data=json.dumps(payload).encode() if payload is not None else None
         if data is not None:h["Content-Type"]="application/json"
         return Request(self.base+path,method=method,data=data,headers=h)
     def login(self):
         with patch.object(app,"verify_password",return_value=True):
-            return self.client.open(self.req("/api/operator/login","POST",{"password":"valid"}))
+            return self.client.open(self.req("/operator/api/login","POST",{"password":"valid"}))
     def test_portal_static_assets_and_strict_csp(self):
         html=self.client.open(self.req("/operator")).read().decode()
         self.assertIn('/operator/app.js',html)
@@ -59,11 +63,11 @@ class HttpContract(unittest.TestCase):
             self.assertGreater(len(resp.read()),50)
     def test_get_details_needs_login(self):
         with self.assertRaises(HTTPError) as c:
-            self.client.open(self.req(f"/api/operator/approvals/{ID}"))
+            self.client.open(self.req(f"/operator/api/approvals/{ID}"))
         self.assertEqual(c.exception.code,401)
     def test_login_requires_matching_origin(self):
         with self.assertRaises(HTTPError) as c:
-            self.client.open(self.req("/api/operator/login","POST",{"password":"x"},{"Origin":"https://attacker.test"}))
+            self.client.open(self.req("/operator/api/login","POST",{"password":"x"},{"Origin":"https://attacker.test"}))
         self.assertEqual(c.exception.code,403)
     def test_login_and_read_details(self):
         item={"id":ID,"subject":"subject","target":"/opt/project","access":"work",
@@ -71,17 +75,18 @@ class HttpContract(unittest.TestCase):
         with patch.dict(os.environ,{"PORTICO_OPERATOR_PUBLIC_ORIGIN":"https://operator.example.test",
             "PORTICO_OPERATOR_PHYSICAL_CEILING":"/opt"}),patch.object(app.OperatorIPC,"list_requests",return_value=[item]):
             with patch.object(app,"verify_password",return_value=True):
-                login=self.client.open(self.req("/api/operator/login","POST",{"password":"valid"}))
+                login=self.client.open(self.req("/operator/api/login","POST",{"password":"valid"}))
+                self.assertIn("Path=/operator",login.headers["Set-Cookie"])
                 cookie=login.headers["Set-Cookie"].split(";",1)[0]
-            result=json.load(self.client.open(self.req(f"/api/operator/approvals/{ID}",headers={"Cookie":cookie})))
+            result=json.load(self.client.open(self.req(f"/operator/api/approvals/{ID}",headers={"Cookie":cookie})))
             self.assertEqual(result["resource"],"/opt/project")
             self.assertFalse(result["ceiling_wide"])
             self.assertTrue(result["csrf_token"])
             with self.assertRaises(HTTPError) as e:
-                self.client.open(self.req(f"/api/operator/approvals/{ID}/decision","POST",{"decision":"approve"},{"Cookie":cookie}))
+                self.client.open(self.req(f"/operator/api/approvals/{ID}/decision","POST",{"decision":"approve"},{"Cookie":cookie}))
             self.assertEqual(e.exception.code,403)
             with patch.object(app.OperatorIPC,"call",return_value={"status":"approved"}) as call:
-                response=json.load(self.client.open(self.req(f"/api/operator/approvals/{ID}/decision",
+                response=json.load(self.client.open(self.req(f"/operator/api/approvals/{ID}/decision",
                          "POST",{"decision":"approve"},{"X-CSRF-Token":result["csrf_token"],"Cookie":cookie})))
                 self.assertEqual(response["status"],"approved")
                 call.assert_called_once_with("approve",ID)
