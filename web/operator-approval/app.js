@@ -1,7 +1,7 @@
 'use strict';
-// Contract: GET /api/operator/approvals/:id returns authenticated JSON with
+// Contract: GET /operator/api/approvals/:id returns authenticated JSON with
 // request_id,node,subject,resource,access,ttl_label,expires_at,ceiling_wide,
-// status,csrf_token. POST /api/operator/approvals/:id/decision accepts decision
+// status,csrf_token. POST /operator/api/approvals/:id/decision accepts decision
 // ('approve'|'deny') plus CSRF header. Backend MUST enforce identity, CSRF,
 // policy, one-shot, expiry and audit. This UI grants no authority on its own.
 const $=id=>document.getElementById(id);
@@ -13,7 +13,7 @@ async function readJSON(response){if(!response.ok)throw Error(response.status===
 async function load(){
  if(!requestId||!validId.test(requestId)){status('Abra um pedido válido pelo link fornecido pelo Pórtico.');return}
  try{
-  const data=await readJSON(await fetch('/api/operator/approvals/'+encodeURIComponent(requestId),{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}}));
+  const data=await readJSON(await fetch('/operator/api/approvals/'+encodeURIComponent(requestId),{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}}));
   for(const k of ['request_id','node','subject','resource','access'])$(k).textContent=String(data[k]??'');
   $('ttl').textContent=String(data.ttl_label??'');
   $('expires').textContent=data.expires_at?new Date(data.expires_at).toLocaleString('pt-BR'):'';
@@ -28,10 +28,10 @@ async function load(){
 async function decide(decision){
  if(!csrf||!confirm(decision==='approve'?'Confirmar autorização exatamente como exibida?':'Negar esta solicitação?'))return;
  $('approve').disabled=true;$('deny').disabled=true;
- try{await readJSON(await fetch('/api/operator/approvals/'+encodeURIComponent(requestId)+'/decision',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({decision})}));status(decision==='approve'?'Decisão enviada e confirmada pelo servidor.':'Solicitação negada pelo servidor.');await load()}
+ try{await readJSON(await fetch('/operator/api/approvals/'+encodeURIComponent(requestId)+'/decision',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({decision})}));status(decision==='approve'?'Decisão enviada e confirmada pelo servidor.':'Solicitação negada pelo servidor.');await load()}
  catch(e){status(e.message+' Confira o estado antes de tentar novamente.')}
 }
 $('approve').addEventListener('click',()=>decide('approve'));
 $('deny').addEventListener('click',()=>decide('deny'));
-$('login-form').addEventListener('submit',async e=>{e.preventDefault();$('login-error').textContent='';try{const res=await fetch('/api/operator/login',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('password').value})});if(!res.ok)throw Error('Falha na autenticação.');$('password').value='';$('login-panel').hidden=true;await load()}catch(err){$('login-error').textContent=err.message}});
+$('login-form').addEventListener('submit',async e=>{e.preventDefault();$('login-error').textContent='';try{const res=await fetch('/operator/api/login',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('password').value})});if(!res.ok)throw Error('Falha na autenticação.');$('password').value='';$('login-panel').hidden=true;await load()}catch(err){$('login-error').textContent=err.message}});
 load();
