@@ -38,6 +38,13 @@ else
 fi
 "${DOCKER[@]}" compose --env-file "$ROOT/.env" -f "$ROOT/compose.yaml" config --quiet
 "${DOCKER[@]}" compose --env-file "$ROOT/.env" -f "$STAGE/compose.yaml" --profile operator-portal config --quiet
+if [[ -f "$STAGE/compose.operator-portal.edge.yaml" && -f "$STAGE/compose.integrated-auth.yaml" ]]; then
+ "${DOCKER[@]}" compose --env-file "$ROOT/.env" \
+  -f "$STAGE/compose.yaml" -f "$STAGE/compose.integrated-auth.yaml" \
+  -f "$STAGE/compose.operator-portal.edge.yaml" \
+  --profile operator-portal config --quiet
+ echo "TRAEFIK OPERATOR ROUTE MODEL: PASS (no deployment)"
+fi
 python3 -m unittest discover -s "$STAGE/web/operator-approval" -p 'test_*.py' -q
 echo "STAGING READY, NO DEPLOY"
 printf 'Installed SHA: %s\nCandidate SHA: %s\nStage: %s\nBackup: %s\n' "$CURRENT" "$CANDIDATE" "$STAGE" "$BACKUP"
