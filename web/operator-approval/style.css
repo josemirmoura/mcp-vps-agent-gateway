@@ -1,0 +1,12 @@
+:root{color-scheme:light dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+body{margin:0;background:Canvas;color:CanvasText} main{max-width:740px;margin:auto;padding:clamp(16px,4vw,40px)}
+header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid color-mix(in srgb,CanvasText 18%,transparent);padding-bottom:18px;gap:12px}
+h1{font-size:clamp(21px,4vw,29px);margin:0}h2{font-size:20px}
+small,.muted{color:GrayText}.card{border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:16px;padding:20px;margin-top:20px;overflow-wrap:anywhere}
+dl{display:grid;grid-template-columns:minmax(105px,32%) minmax(0,1fr);gap:12px}dt{color:GrayText}dd{margin:0;font-weight:600;white-space:pre-wrap;overflow-wrap:anywhere}
+.actions{display:flex;gap:12px;margin-top:22px;flex-wrap:wrap}button{font:inherit;padding:13px 19px;border-radius:9px;cursor:pointer;border:1px solid currentColor}button:disabled{opacity:.55;cursor:not-allowed}
+.approve{background:#117d5c;color:white;border-color:#117d5c}.deny{background:transparent}button:focus-visible{outline:3px solid #5799ff;outline-offset:3px}
+.notice{border-inline-start:4px solid #c98912;padding:10px 16px;background:color-mix(in srgb,#c98912 10%,Canvas);margin-top:16px}
+#status{min-height:26px} .badge{border:1px solid currentColor;border-radius:99px;padding:4px 9px;font-size:12px}
+@media(max-width:450px){dl{grid-template-columns:1fr;gap:3px}dd{margin-bottom:12px}.actions button{flex:1}header{align-items:flex-start}}
+input[type=password]{width:100%;padding:12px;box-sizing:border-box;font:inherit}
