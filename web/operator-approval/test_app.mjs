@@ -9,7 +9,7 @@ const source=readFileSync(new URL('./app.js',import.meta.url),'utf8');
 
 async function scenario(decision){
   const elements=new Map();
-  for(const id of ['status','details','login-panel','login-form','login-error',
+  for(const id of ['status','details','login-panel','login-form','login-button','login-error',
     'approve','deny','request_id','node','subject','resource','access','ttl',
     'expires','warning','password','operator','step-up-panel','step-up-password','refresh','logout']){
     elements.set(id,{hidden:id==='details'||id==='login-panel',disabled:false,
@@ -54,5 +54,47 @@ for(const decision of ['approve','deny']){
     const text=elements.get('status').textContent;
     assert.match(text,decision==='approve'?/Autorização aprovada com sucesso/:/Solicitação negada com sucesso/);
     assert.doesNotMatch(text,/indisponível|inválida|não está mais pendente/);
+  });
+}
+
+for (const action of ['click', 'Enter']) {
+  test('sandbox login via '+action+' validates, clears password and refuses duplicate submission',async()=>{
+    const elements=new Map();
+    const calls=[];
+    let valid=false,completeLogin;
+    const document={getElementById(id){
+      if(!elements.has(id))elements.set(id,{hidden:true,disabled:false,textContent:'',value:'',handlers:{},
+        reportValidity:()=>valid,addEventListener(event,handler){this.handlers[event]=handler;}});
+      return elements.get(id);
+    }};
+    const fetch=async(url,opts={})=>{
+      calls.push({url,opts});
+      if(url.endsWith('/login'))await new Promise(resolve=>{completeLogin=resolve});
+      return {ok:false,status:url.endsWith('/login')?403:401};
+    };
+    vm.runInNewContext(source,{document,fetch,URL,Date,encodeURIComponent,
+      location:{href:'https://operator.example.test/operator/embed?request=apr_12345678',pathname:'/operator/embed'}},{filename:'app.js'});
+    await new Promise(resolve=>setImmediate(resolve));
+    const trigger=()=>{
+      if(action==='click')return elements.get('login-button').handlers.click();
+      let prevented=false;
+      elements.get('password').handlers.keydown({key:'Enter',isComposing:false,repeat:false,preventDefault(){prevented=true}});
+      assert.equal(prevented,true,'Enter must not start native form navigation');
+    };
+    elements.get('password').value='synthetic-secret';
+    trigger();
+    assert.equal(calls.length,1,'Invalid input must not start authentication');
+    valid=true;
+    trigger();trigger();
+    assert.equal(calls.length,2,'Only one explicit login may be in flight');
+    assert.equal(calls[1].url,'/operator/embed/api/login');
+    assert.equal(JSON.parse(calls[1].opts.body).password,'synthetic-secret');
+    assert.equal(elements.get('password').value,'');
+    assert.equal(elements.get('login-button').disabled,true);
+    completeLogin();
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.match(elements.get('login-error').textContent,/verificação recusada/);
+    assert.equal(elements.get('login-button').disabled,false);
+    assert.equal(calls.filter(call=>call.url.endsWith('/decision')).length,0);
   });
 }

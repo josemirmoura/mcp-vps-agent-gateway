@@ -86,10 +86,11 @@ async function state(context) {
   return (await context.request.get(metadata.host + '/__fixture/state')).json();
 }
 
-async function login(scope) {
+async function login(scope, keyboard = false) {
   await scope.locator('#login-panel').waitFor({ state: 'visible' });
   await scope.locator('#password').fill(metadata.password);
-  await scope.locator('#login-form button').click();
+  if (keyboard) await scope.locator('#password').press('Enter');
+  else await scope.locator('#login-button').click();
   await scope.locator('#details').waitFor({ state: 'visible' });
   assert.equal(await scope.locator('#password').inputValue(), '', 'Password must clear after submit');
   assert.equal(await scope.locator('#operator').textContent(), 'browser-fixture-owner');
@@ -184,10 +185,11 @@ for (const profile of profiles) {
 
   test(profile.name + ': embedded origin isolation, explicit owner decision and Broker-confirmed final UI', { timeout: 30_000 }, () => run(profile, 'apps-embed', async ({ page, context }) => {
     await page.goto(metadata.host + '/host?request=' + metadata.read);
+    assert.equal(await page.locator('#app').getAttribute('sandbox'), 'allow-scripts allow-same-origin');
     const appFrame = page.frameLocator('#app');
     await appFrame.locator('#frame').waitFor({ state: 'visible' });
     const portalFrame = appFrame.frameLocator('#frame');
-    await login(portalFrame); await pending(portalFrame); await noHorizontalOverflow(portalFrame);
+    await login(portalFrame, profile.name === 'mobile-chromium'); await pending(portalFrame); await noHorizontalOverflow(portalFrame);
     // The outer AI host and resource cannot read the operator DOM/session.
     const isolation = await page.evaluate(() => {
       try { return document.getElementById('app').contentWindow.document.body.textContent; }

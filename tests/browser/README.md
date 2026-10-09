@@ -4,6 +4,20 @@
 
 The desktop and mobile Chromium profiles cover session reuse with explicit decisions, approve/deny final states, critical password step-up, logout, independent embedded cookies, browser same-origin isolation, host attempts to trigger approval, and portal fallback when framing is not confirmed. `web/operator-approval/test_bridge.mjs` separately tests malformed/spoofed bridge messages, origin/source binding and fallback timeouts without requiring a browser.
 
+The embedded host deliberately grants only `allow-scripts allow-same-origin`,
+without `allow-forms` or `allow-modals`. Operator login must work through an
+explicit button click or Enter key and same-origin fetch. Native form submission
+cannot be the trigger: the [HTML submission algorithm](https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#form-submission-algorithm)
+stops for the sandboxed forms flag **before dispatching the submit event**.
+The desktop embedded case exercises the button; the mobile profile exercises
+Enter. Neither action can approve a request without a separate owner decision.
+
+Locator waits expire before the enclosing test timeout. On failure the suite
+records only allowlisted synthetic frame status, browser errors and fixture
+call summaries. It never captures input values, cookies, storage, headers or
+request bodies. This preserves a useful failure location instead of a bare
+30-second cancellation, without skipping or relaxing any assertion.
+
 Run the lightweight bridge tests:
 
 ```sh
