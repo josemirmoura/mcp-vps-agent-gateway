@@ -61,6 +61,13 @@ class HttpContract(unittest.TestCase):
             self.assertIn("style-src 'self'",csp)
             self.assertNotIn("unsafe-inline",csp)
             self.assertGreater(len(resp.read()),50)
+    def test_reject_unexpected_host_and_legacy_api(self):
+        with self.assertRaises(HTTPError) as rejected:
+            self.client.open(self.req("/operator",headers={"Host":"attacker.example.test"}))
+        self.assertEqual(rejected.exception.code,421)
+        with self.assertRaises(HTTPError) as legacy:
+            self.client.open(self.req("/api/operator/login","POST",{"password":"whatever"}))
+        self.assertEqual(legacy.exception.code,404)
     def test_get_details_needs_login(self):
         with self.assertRaises(HTTPError) as c:
             self.client.open(self.req(f"/operator/api/approvals/{ID}"))
