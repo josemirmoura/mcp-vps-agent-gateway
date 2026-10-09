@@ -18,8 +18,11 @@ REQUIRED = {".env", "config/policy.yaml", "state/state.db"}
 
 def stage_snapshot(archive: pathlib.Path, destination: pathlib.Path) -> None:
     if destination.exists():
-        raise ValueError("rollback staging directory must be new")
-    destination.mkdir(mode=0o700, parents=False)
+        if not destination.is_dir() or any(destination.iterdir()):
+            raise ValueError("rollback staging directory must be empty")
+    else:
+        destination.mkdir(mode=0o700, parents=False)
+    os.chmod(destination, 0o700)
     seen: set[str] = set()
     size = 0
     with tarfile.open(archive, "r:gz") as pack:
