@@ -62,7 +62,12 @@ func registerAuthorityTools(server *mcp.Server, s *Server) {
 		}
 		if !supportsNativeElicitation(req) {
 			out["approval_method"] = "operator_fallback"
-			out["message"] = "Pórtico: pedido pendente. Acesse uma sessão SSH autenticada e use scripts/operator-approvals.py para decidir; nunca compartilhe credenciais com a IA."
+			if link := operatorWebApprovalLink(out); link != "" {
+				out["operator_approval_url"] = link
+				out["message"] = "Pórtico: pedido pendente. Abra operator_approval_url no navegador, entre com a conta do operador e confirme a decisão. O link não concede acesso."
+			} else {
+				out["message"] = "Pórtico: pedido pendente. Use uma sessão SSH autenticada e scripts/operator-approvals.py para decidir. Não compartilhe credenciais com a IA."
+			}
 			out["operator_approval_guide"] = "docs/operator-approval-fallback.md"
 			return nil, out, nil
 		}
