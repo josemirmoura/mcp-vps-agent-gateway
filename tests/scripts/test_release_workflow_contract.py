@@ -35,6 +35,7 @@ class ReleaseWorkflowSecurityContract(unittest.TestCase):
         prepare = job("prepare-tag", source)
         self.assertIn("go test -race -count=1 ./...", validate)
         self.assertIn("needs: [validate, security]", prepare)
+        self.assertIn("git merge-base --is-ancestor", validate)
         for expected in ("govulncheck", "gosec", "gitleaks"):
             self.assertIn(expected, security)
         for forbidden in ("continue-on-error:", "|| true", "exit 0"):
@@ -58,7 +59,8 @@ class ReleaseWorkflowSecurityContract(unittest.TestCase):
 
     def test_release_signature_identity_anchored(self):
         self.assertIn("--certificate-oidc-issuer", self.workflow)
-        self.assertIn("--certificate-identity-regexp", self.workflow)
+        self.assertIn('--certificate-identity "$identity"', self.workflow)
+        self.assertNotIn("--certificate-identity-regexp", self.workflow)
         self.assertIn("cosign sign --yes", self.workflow)
         self.assertIn("cosign verify-blob", self.workflow)
         self.assertIn("git archive --format=tar", self.workflow)
