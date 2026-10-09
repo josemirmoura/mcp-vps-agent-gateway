@@ -31,7 +31,7 @@ class ImageReleaseVerificationTests(unittest.TestCase):
             "assert args[0]=='digest' and len(args)==2\n"
             "with open(os.environ['VERIFICATION_TEST_LOG'],'a') as f: "
             "f.write('crane '+args[1]+'\\n')\n"
-            "if os.environ.get('FAIL_CRANE_ON','') in args[1]: sys.exit(3)\n"
+            "if os.environ.get('FAIL_CRANE_ON') and os.environ['FAIL_CRANE_ON'] in args[1]: sys.exit(3)\n"
             "print(os.environ.get('FAKE_DIGEST','sha256:'+'a'*64))\n"
         )
         crane.chmod(0o700)
@@ -49,7 +49,7 @@ class ImageReleaseVerificationTests(unittest.TestCase):
             "assert 'heads/main' in args[3]\n"
             "with open(os.environ['VERIFICATION_TEST_LOG'],'a') as f: "
             "f.write('cosign '+args[1]+'\\n')\n"
-            "if os.environ.get('FAIL_COSIGN_ON','') in args[1]: sys.exit(4)\n"
+            "if os.environ.get('FAIL_COSIGN_ON') and os.environ['FAIL_COSIGN_ON'] in args[1]: sys.exit(4)\n"
             "print('verified by fake cosign')\n"
         )
         cosign.chmod(0o700)
