@@ -2,6 +2,8 @@ package main
 
 import (
  "context"
+ "encoding/json"
+ "path/filepath"
  "testing"
  "time"
 
@@ -44,4 +46,32 @@ func TestWebApprovalEligibilityRejectsElevationAndExpired(t *testing.T) {
  if !eligibleWebApproval(sensitive,"alice") {t.Fatal("valid protected-file approval rejected")}
  bad:=sensitive;bad.Capabilities=[]string{"sensitive.read:616263"}
  if eligibleWebApproval(bad,"alice") {t.Fatal("relative protected path accepted")}
+}
+
+func TestOperatorBridgeSQLiteDenyOneShotAndHiddenElevation(t *testing.T) {
+ ctx:=context.Background()
+ store,err:=state.Open(filepath.Join(t.TempDir(),"operator.db"))
+ if err!=nil {t.Fatal(err)}
+ defer store.Close()
+ approved,err:=store.CreateRootApproval(ctx,"alice","/opt/test-project","work",time.Hour,10*time.Minute)
+ if err!=nil {t.Fatal(err)}
+ _,err=store.CreateApproval(ctx,"alice",[]string{"shell.admin"},time.Hour,10*time.Minute)
+ if err!=nil {t.Fatal(err)}
+ _,err=store.CreateRootApproval(ctx,"bob","/opt/other","read",time.Hour,10*time.Minute)
+ if err!=nil {t.Fatal(err)}
+ b:=&operatorBridge{broker:&broker.Broker{State:store,AdminToken:"admin-secret",ExpectedSubject:"alice"},token:"web-secret"}
+ req:=wire.Request{ID:"list",Tool:"admin.approval.list",AdminToken:"web-secret"}
+ list:=b.Handle(ctx,req)
+ if !list.OK {t.Fatalf("list denied: %+v",list.Error)}
+ var rows []state.Approval
+ if err:=json.Unmarshal(list.Result,&rows);err!=nil{t.Fatal(err)}
+ if len(rows)!=1||rows[0].ID!=approved.ID {t.Fatalf("web exposed ineligible requests: %+v",rows)}
+ body,_:=json.Marshal(map[string]any{"request_id":approved.ID})
+ decision:=wire.Request{ID:"deny",Tool:"admin.approval.deny",AdminToken:"web-secret",Args:body}
+ result:=b.Handle(ctx,decision)
+ if !result.OK{t.Fatalf("denial rejected: %+v",result.Error)}
+ dbrow,err:=store.GetApproval(ctx,approved.ID)
+ if err!=nil||dbrow.Status!="denied"{t.Fatalf("state not denied: %+v %v",dbrow,err)}
+ again:=b.Handle(ctx,decision)
+ if again.OK {t.Fatal("second decision must be rejected")}
 }
