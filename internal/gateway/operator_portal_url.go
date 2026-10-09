@@ -16,3 +16,11 @@ func operatorApprovalURL(requestID any) string {
  q:=u.Query();q.Set("request",id);u.RawQuery=q.Encode()
  return u.String()
 }
+
+// operatorWebApprovalLink refuses requests the browser channel is intentionally
+// unable to approve: permanent delegations and physical-ceiling-wide grants.
+func operatorWebApprovalLink(result map[string]any) string {
+ if wide, _ := result["ceiling_wide"].(bool); wide {return ""}
+ if int64Value(result["delegation_ttl_seconds"]) <= 0 {return ""}
+ return operatorApprovalURL(result["request_id"])
+}
