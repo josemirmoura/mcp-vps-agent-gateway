@@ -140,6 +140,16 @@ class Handler(BaseHTTPRequestHandler):
         return session_from_cookie(self.headers.get("Cookie", ""))
     def do_GET(self):
         path = urlsplit(self.path).path
+        if path in ("/operator/app.js", "/operator/style.css"):
+            filename = "app.js" if path.endswith(".js") else "style.css"
+            typ = "text/javascript; charset=utf-8" if filename.endswith(".js") else "text/css; charset=utf-8"
+            asset = (HERE / filename).read_bytes()
+            self.send_response(200)
+            self.headers_base(typ)
+            self.send_header("Content-Length", str(len(asset)))
+            self.end_headers()
+            self.wfile.write(asset)
+            return
         if path in ("/", "/operator", "/operator/"):
             page = UI_PATH.read_bytes()
             self.send_response(200)
