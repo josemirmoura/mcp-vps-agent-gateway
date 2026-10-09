@@ -218,6 +218,31 @@ bash scripts/remove.sh --purge --remove-source
 
 A limpeza não elimina pastas de projetos delegados, imagens de terceiros, aplicações, bancos de dados ou serviços não pertencentes ao Portico. A pasta antiga /opt/vps-agent-sandbox só é removida caso esteja vazia.
 
+## Recuperação quando uma etapa falha
+
+**Falha local/do runtime:** confira os serviços e execute novamente as verificações locais. Não faça purge apenas porque uma checagem falhou.
+
+~~~bash
+bash scripts/diagnose.sh status
+bash scripts/diagnose.sh health
+bash scripts/verify.sh
+~~~
+
+**Falha de DNS/HTTPS/OAuth:** verifique se o DNS aponta para o host Linux correto e se as portas TCP 80/443 alcançam o Traefik configurado. Após corrigir a configuração com segurança, reavalie a autenticação pública.
+
+~~~bash
+bash scripts/verify-public.sh
+~~~
+
+**A opção de aplicativo MCP não aparece no ChatGPT:** confira a conta/workspace e a disponibilidade efetiva de Developer Mode / Plugins. Uma VPS saudável não habilita recursos inexistentes na conta.
+
+**MCP conectado, mas nenhuma chamada auditada:** confirme o endpoint exato `https://<domain>/mcp`, entre com o **usuário de operador OAuth** (normalmente `vps-operator`, não o login Linux), chame `system.info`, volte ao terminal e pressione Enter para repetir a checagem da auditoria com baseline fixo. Sem novo evento, a instalação não está concluída.
+
+**Janela de aprovação ausente ou ilegível:** não presuma consentimento nem permita autoaprovação pela IA. Use somente alternativa de operador autenticada, realmente incluída na versão instalada; caso contrário, mantenha o pedido pendente. Registre evidência sanitizada de cliente/dispositivo para o gate #65.
+
+**Atualização, backup ou migração interrompidos:** não use purge como tentativa de recuperação. Preserve o estado e consulte as evidências do lifecycle/rollback da versão instalada; a recuperação de todos os modos de falha ainda exige aceite separado.
+
+
 ## Seleção da versão e segurança da instalação
 
 A release estável `v0.1.0` **ainda não foi publicada**. Não tente clonar uma tag estável inexistente nem trate a branch `main` mutável como release assinada.
