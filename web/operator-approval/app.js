@@ -57,7 +57,7 @@ $('deny').addEventListener('click',()=>decide('deny'));
 $('refresh').addEventListener('click',load);
 $('logout').addEventListener('click',async()=>{if(!sessionCsrf)return;try{await readJSON(await fetch(api+'/logout',{method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':sessionCsrf}}));sessionCsrf='';csrf='';nonce='';$('details').hidden=true;$('login-panel').hidden=false;status('Sessão encerrada.')}catch(e){status(e.message)}});
 async function login(){
- if(loggingIn)return;
+ if(loggingIn||!$('login-form').reportValidity())return;
  loggingIn=true;$('login').disabled=true;$('login-error').textContent='';
  const password=$('password').value;$('password').value='';
  try{await readJSON(await fetch(api+'/login',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})}));$('login-panel').hidden=true;await load()}catch(err){$('login-error').textContent=err.message}finally{loggingIn=false;$('login').disabled=false}
@@ -66,6 +66,6 @@ async function login(){
 // submit event. Explicit click/Enter fetches work without allow-forms.
 $('login-form').addEventListener('submit',e=>{e.preventDefault();void login()});
 $('login').addEventListener('click',login);
-$('password').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();void login()}});
+$('password').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();if(!e.repeat)void login()}});
 notify('ready');
 load();

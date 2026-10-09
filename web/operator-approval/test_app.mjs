@@ -56,3 +56,55 @@ for(const decision of ['approve','deny']){
     assert.doesNotMatch(text,/indisponível|inválida|não está mais pendente/);
   });
 }
+
+for (const action of ['click', 'Enter']) {
+  test('sandbox login via '+action+' validates, clears password and refuses duplicate submission',async()=>{
+    const elements=new Map();
+    const calls=[];
+    const messages=[];
+    let valid=false,completeLogin;
+    const document={getElementById(id){
+      if(!elements.has(id))elements.set(id,{hidden:true,disabled:false,textContent:'',value:'',handlers:{},
+        reportValidity:()=>valid,addEventListener(event,handler){this.handlers[event]=handler;}});
+      return elements.get(id);
+    }};
+    const fetch=async(url,opts={})=>{
+      calls.push({url,opts});
+      if(url.endsWith('/login'))await new Promise(resolve=>{completeLogin=resolve});
+      return {ok:false,status:url.endsWith('/login')?403:401};
+    };
+    const window={parent:{postMessage:message=>messages.push(message)}};
+    vm.runInNewContext(source,{document,fetch,URL,Date,encodeURIComponent,window,
+      location:{href:'https://operator.example.test/operator/embed?request=apr_12345678',pathname:'/operator/embed'}},{filename:'app.js'});
+    await new Promise(resolve=>setImmediate(resolve));
+    const trigger=()=>{
+      if(action==='click')return elements.get('login').handlers.click();
+      let prevented=false;
+      elements.get('password').handlers.keydown({key:'Enter',isComposing:false,repeat:false,preventDefault(){prevented=true}});
+      assert.equal(prevented,true,'Enter must not start native form navigation');
+    };
+    elements.get('password').value='synthetic-secret';
+    trigger();
+    assert.equal(calls.length,1,'Invalid input must not start authentication');
+    valid=true;
+    if(action==='Enter'){
+      let prevented=false;
+      elements.get('password').handlers.keydown({key:'Enter',isComposing:true,repeat:false,preventDefault(){prevented=true}});
+      assert.equal(prevented,false,'Input-method composition must not trigger login');
+      elements.get('password').handlers.keydown({key:'Enter',isComposing:false,repeat:true,preventDefault(){}});
+      assert.equal(calls.length,1,'Composition and autorepeat must not submit credentials');
+    }
+    trigger();trigger();
+    assert.equal(calls.length,2,'Only one explicit login may be in flight');
+    assert.equal(calls[1].url,'/operator/embed/api/login');
+    assert.equal(JSON.parse(calls[1].opts.body).password,'synthetic-secret');
+    assert.equal(elements.get('password').value,'');
+    assert.equal(elements.get('login').disabled,true);
+    completeLogin();
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.match(elements.get('login-error').textContent,/verificação recusada/);
+    assert.equal(elements.get('login').disabled,false);
+    assert.equal(calls.filter(call=>call.url.endsWith('/decision')).length,0);
+    assert.ok(messages.every(message=>!JSON.stringify(message).includes('synthetic-secret')));
+  });
+}
