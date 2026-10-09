@@ -25,47 +25,52 @@ def stage_snapshot(archive: pathlib.Path, destination: pathlib.Path) -> None:
     os.chmod(destination, 0o700)
     seen: set[str] = set()
     size = 0
-    with tarfile.open(archive, "r:gz") as pack:
-        members = pack.getmembers()
-        if len(members) > MAX_ENTRIES:
-            raise ValueError("too many operator snapshot entries")
-        for member in members:
-            name = member.name
-            normalized = name.rstrip("/")
-            segments = normalized.split("/")
-            if (not normalized or name.startswith("/") or
-                    any(seg in ("", ".", "..") for seg in segments) or
-                    chr(92) in name):
-                raise ValueError("unsafe operator snapshot path")
-            if (normalized not in (".env", "config", "config/policy.yaml", "state")
-                    and not normalized.startswith("state/")):
-                raise ValueError("unexpected operator snapshot member")
-            if normalized in seen:
-                raise ValueError("duplicate operator snapshot member")
-            seen.add(normalized)
-            if not (member.isfile() or member.isdir()):
-                raise ValueError("snapshot links or special files are forbidden")
-            if member.isfile():
-                size += member.size
-                if size > MAX_EXTRACTED_BYTES:
-                    raise ValueError("operator snapshot exceeds expanded size limit")
+    with archive.open("rb") as stream:
+        # First pass validates all members WITHOUT extracting anything.
+        with tarfile.open(fileobj=stream, mode="r:gz") as pack:
+            for index, member in enumerate(pack):
+                if index >= MAX_ENTRIES:
+                    raise ValueError("too many operator snapshot entries")
+                name = member.name
+                normalized = name.rstrip("/")
+                segments = normalized.split("/")
+                if (not normalized or name.startswith("/") or
+                        any(seg in ("", ".", "..") for seg in segments) or
+                        chr(92) in name):
+                    raise ValueError("unsafe operator snapshot path")
+                if (normalized not in (".env", "config", "config/policy.yaml", "state")
+                        and not normalized.startswith("state/")):
+                    raise ValueError("unexpected operator snapshot member")
+                if normalized in seen:
+                    raise ValueError("duplicate operator snapshot member")
+                seen.add(normalized)
+                if not (member.isfile() or member.isdir()):
+                    raise ValueError("snapshot links or special files are forbidden")
+                if member.isfile():
+                    size += member.size
+                    if size > MAX_EXTRACTED_BYTES:
+                        raise ValueError("operator snapshot exceeds expanded size limit")
         if not REQUIRED.issubset(seen):
             raise ValueError("snapshot missing .env, policy.yaml or state.db")
-        # Extract only validated regular files/directories. The destination
-        # is an operator-owned fresh directory, never the live state.
-        for member in members:
-            if member.isdir():
-                (destination / member.name).mkdir(parents=True, exist_ok=True)
-                continue
-            target = destination / member.name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            handle = pack.extractfile(member)
-            if handle is None:
-                raise ValueError("unreadable snapshot member")
-            with target.open("xb") as out:
-                while block := handle.read(1024 * 1024):
-                    out.write(block)
-            os.chmod(target, 0o600)
+
+        # Second pass uses the same opened file to avoid opening a swapped
+        # path between validation and extraction. Only regular files/dirs
+        # from the verified archive can enter the staging directory.
+        stream.seek(0)
+        with tarfile.open(fileobj=stream, mode="r:gz") as pack:
+            for member in pack:
+                if member.isdir():
+                    destination.joinpath(member.name).mkdir(parents=True, exist_ok=True)
+                    continue
+                target = destination / member.name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                handle = pack.extractfile(member)
+                if handle is None:
+                    raise ValueError("unreadable snapshot member")
+                with target.open("xb") as out:
+                    while block := handle.read(1024 * 1024):
+                        out.write(block)
+                os.chmod(target, 0o600)
 
 
 def main() -> None:
