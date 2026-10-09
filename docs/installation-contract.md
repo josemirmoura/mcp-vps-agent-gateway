@@ -21,7 +21,7 @@ The normal user installs and operates the package directly on the VPS. ChatGPT i
 
 ## Secrets and remote access
 
-The supported tutorial must **never instruct the user to give ChatGPT or a project maintainer**:
+The supported tutorial must **never solicit any of the following items for delivery to an AI assistant or the project's maintainers**:
 
 - the VPS password;
 - a private SSH key;
