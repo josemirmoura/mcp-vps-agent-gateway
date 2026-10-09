@@ -83,6 +83,7 @@ jobs:
           rc=0
           timeout 1200s node "$RUNNER_TEMP/mcp-conformance/dist/index.js" \
             server --url http://127.0.0.1:18994/mcp \
+            --output-dir results \
             --requirements 2026-07-28 \
             > evidence/requirements-stdout.log 2>&1 || rc=$?
           printf '%s\n' "$rc" > evidence/runner-exit.txt
