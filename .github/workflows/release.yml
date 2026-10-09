@@ -48,6 +48,11 @@ jobs:
               exit 1
             }
           fi
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main || {
+            echo "release source $GITHUB_SHA is not part of the reviewed main branch" >&2
+            exit 1
+          }
       - name: Validate source and installation contract
         run: |
           set -euo pipefail
@@ -182,11 +187,11 @@ jobs:
         run: |
           set -euo pipefail
           ref="$IMAGE@$DIGEST"
-          identity='^https://github\.com/${{ github.repository }}/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)$'
+          identity="https://github.com/${{ github.repository }}/.github/workflows/release.yml@$GITHUB_REF"
           issuer='https://token.actions.githubusercontent.com'
           cosign sign --yes "$ref"
           cosign verify "$ref" \
-            --certificate-identity-regexp "$identity" \
+            --certificate-identity "$identity" \
             --certificate-oidc-issuer "$issuer"
 
   github-release:
@@ -211,7 +216,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          identity='^https://github\.com/${{ github.repository }}/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)$'
+          identity="https://github.com/${{ github.repository }}/.github/workflows/release.yml@$GITHUB_REF"
           issuer='https://token.actions.githubusercontent.com'
 
           for artifact in \
@@ -222,7 +227,7 @@ jobs:
             cosign sign-blob "$artifact" --bundle "$bundle" --yes
             cosign verify-blob "$artifact" \
               --bundle "$bundle" \
-              --certificate-identity-regexp "$identity" \
+              --certificate-identity "$identity" \
               --certificate-oidc-issuer "$issuer"
           done
 
