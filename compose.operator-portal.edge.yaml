@@ -1,0 +1,32 @@
+# Optional HTTPS edge overlay; only use together with compose.integrated-auth.yaml.
+# No service is started or modified until explicitly enabled by operator.
+services:
+  operator-portal:
+    networks:
+      - default
+      - public-edge
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${VPS_AGENT_EDGE_NETWORK:?set VPS_AGENT_EDGE_NETWORK}
+      - traefik.http.services.vps-agent-operator.loadbalancer.server.port=8765
+      - traefik.http.routers.vps-agent-operator.rule=Host(`${VPS_AGENT_DOMAIN:?set VPS_AGENT_DOMAIN}`) && (Path(`/operator`) || PathPrefix(`/operator/`))
+      - traefik.http.routers.vps-agent-operator.entrypoints=websecure
+      - traefik.http.routers.vps-agent-operator.tls=true
+      - traefik.http.routers.vps-agent-operator.tls.certresolver=${VPS_AGENT_TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.vps-agent-operator.priority=1500
+      - traefik.http.routers.vps-agent-operator.service=vps-agent-operator
+      - traefik.http.routers.vps-agent-operator-login.rule=Host(`${VPS_AGENT_DOMAIN:?set VPS_AGENT_DOMAIN}`) && Path(`/operator/api/login`)
+      - traefik.http.routers.vps-agent-operator-login.entrypoints=websecure
+      - traefik.http.routers.vps-agent-operator-login.tls=true
+      - traefik.http.routers.vps-agent-operator-login.tls.certresolver=${VPS_AGENT_TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.vps-agent-operator-login.priority=1600
+      - traefik.http.routers.vps-agent-operator-login.service=vps-agent-operator
+      - traefik.http.routers.vps-agent-operator-login.middlewares=vps-agent-operator-login-limit
+      - traefik.http.middlewares.vps-agent-operator-login-limit.ratelimit.average=5
+      - traefik.http.middlewares.vps-agent-operator-login-limit.ratelimit.period=1m
+      - traefik.http.middlewares.vps-agent-operator-login-limit.ratelimit.burst=3
+
+networks:
+  public-edge:
+    external: true
+    name: ${VPS_AGENT_EDGE_NETWORK:?set VPS_AGENT_EDGE_NETWORK}

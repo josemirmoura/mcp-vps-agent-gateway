@@ -27,6 +27,36 @@ docker compose \
   -f compose.integrated-auth.proxy.yaml \
   config -q
 
+# Verify operator HTTPS router composes with the existing OAuth stack.
+docker compose \
+  -f compose.yaml \
+  -f compose.integrated-auth.yaml \
+  -f compose.operator-portal.edge.yaml \
+  --profile operator-portal config -q
+
+docker compose \
+  -f compose.yaml \
+  -f compose.integrated-auth.yaml \
+  -f compose.operator-portal.edge.yaml \
+  --profile operator-portal config --format json |
+python3 -c '
+import json,sys
+config=json.load(sys.stdin)
+gateway=config["services"]["gateway"]
+portal=config["services"]["operator-portal"]
+labels=portal["labels"]
+get=lambda key: labels[key] if isinstance(labels,dict) else next((v.split("=",1)[1] for v in labels if v.startswith(key+"=")),None)
+rule=get("traefik.http.routers.vps-agent-operator.rule")
+assert "PathPrefix(`/operator/`)" in rule and "Host(" in rule,rule
+assert get("traefik.http.routers.vps-agent-operator.priority") == "1500"
+assert get("traefik.http.routers.vps-agent-operator-login.priority") == "1600"
+assert get("traefik.http.routers.vps-agent-operator-login.middlewares") == "vps-agent-operator-login-limit"
+assert any(net in portal["networks"] for net in ("public-edge",)),portal["networks"]
+assert "traefik" not in str(gateway["labels"].get("traefik.http.routers.vps-agent-mcp.rule","")), "Unexpected MCP router format"
+assert "operator-run" in str(portal["volumes"]) and "broker-run" not in str(portal["volumes"]), portal["volumes"]
+print("OPERATOR HTTPS ROUTE: PASS")
+'
+
 docker compose \
   -f compose.yaml \
   -f compose.cloud.yaml \

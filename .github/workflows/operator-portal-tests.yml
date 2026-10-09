@@ -1,0 +1,44 @@
+name: Operator portal prototype tests
+on:
+  pull_request:
+    paths:
+      - 'web/operator-approval/**'
+      - '.github/workflows/operator-portal-tests.yml'
+      - 'cmd/vps-agent-broker/operator_bridge*'
+      - 'cmd/vps-agent-broker/main.go'
+      - 'compose.yaml'
+      - '.dockerignore'
+      - 'compose.operator-portal.edge.yaml'
+      - 'scripts/validate-compose-model.sh'
+  workflow_dispatch:
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Prove build context excludes local secrets and state
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'rm -f .env state/portico-ci-sentinel.db' EXIT
+          mkdir -p state
+          printf 'synthetic secret, must stay outside build context\\n' > .env
+          printf 'synthetic db, must stay outside build context\\n' > state/portico-ci-sentinel.db
+          docker build --progress=plain -f - . <<'DOCKERFILE'
+          FROM alpine:3.20
+          COPY . /src
+          RUN test ! -e /src/.env && test ! -e /src/state/portico-ci-sentinel.db && test -f /src/go.mod && test -f /src/.env.example
+          DOCKERFILE
+      - run: bash scripts/validate-compose-model.sh
+      - run: go test ./cmd/vps-agent-broker ./internal/broker ./internal/ipc
+      - run: python3 -m unittest discover -s web/operator-approval -p 'test_*.py' -v
+      - name: Verify browser decision flow cannot overwrite success with 404
+        run: node --test web/operator-approval/test_app.mjs

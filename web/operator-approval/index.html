@@ -3,23 +3,11 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pórtico | Central de Autorizações</title>
-<style>
-:root{color-scheme:light dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
-body{margin:0;background:Canvas;color:CanvasText} main{max-width:740px;margin:auto;padding:clamp(16px,4vw,40px)}
-header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid color-mix(in srgb,CanvasText 18%,transparent);padding-bottom:18px;gap:12px}
-h1{font-size:clamp(21px,4vw,29px);margin:0}h2{font-size:20px}
-small,.muted{color:GrayText}.card{border:1px solid color-mix(in srgb,CanvasText 18%,transparent);border-radius:16px;padding:20px;margin-top:20px;overflow-wrap:anywhere}
-dl{display:grid;grid-template-columns:minmax(105px,32%) minmax(0,1fr);gap:12px}dt{color:GrayText}dd{margin:0;font-weight:600;white-space:pre-wrap;overflow-wrap:anywhere}
-.actions{display:flex;gap:12px;margin-top:22px;flex-wrap:wrap}button{font:inherit;padding:13px 19px;border-radius:9px;cursor:pointer;border:1px solid currentColor}button:disabled{opacity:.55;cursor:not-allowed}
-.approve{background:#117d5c;color:white;border-color:#117d5c}.deny{background:transparent}button:focus-visible{outline:3px solid #5799ff;outline-offset:3px}
-.notice{border-inline-start:4px solid #c98912;padding:10px 16px;background:color-mix(in srgb,#c98912 10%,Canvas);margin-top:16px}
-#status{min-height:26px} .badge{border:1px solid currentColor;border-radius:99px;padding:4px 9px;font-size:12px}
-@media(max-width:450px){dl{grid-template-columns:1fr;gap:3px}dd{margin-bottom:12px}.actions button{flex:1}header{align-items:flex-start}}
-</style>
+<link rel="stylesheet" href="/operator/style.css">
 </head>
 <body><main>
 <header><div><h1>🛡️ Pórtico</h1><small>Central de Autorizações</small></div><span class="badge">Community</span></header>
-<section class="card" aria-labelledby="heading"><h2 id="heading">Autorização do operador</h2>
+<section class="card" id="login-panel" hidden><h2>Entrar como operador</h2><form id="login-form"><label for="password">Senha da Central</label><p><input id="password" type="password" autocomplete="current-password" required></p><button type="submit">Entrar</button></form><p id="login-error" role="alert"></p></section><section class="card" aria-labelledby="heading"><h2 id="heading">Autorização do operador</h2>
 <p id="status" role="status" aria-live="polite">Verificando a sessão segura…</p>
 <div id="details" hidden>
 <dl>
@@ -36,41 +24,4 @@ dl{display:grid;grid-template-columns:minmax(105px,32%) minmax(0,1fr);gap:12px}d
 </div></section>
 <p class="muted"><small>As autorizações são verificadas pelo Broker local. Abrir esta página ou receber uma confirmação do ChatGPT não concede acesso.</small></p>
 </main>
-<script>
-'use strict';
-// Contract: GET /api/operator/approvals/:id returns authenticated JSON with
-// request_id,node,subject,resource,access,ttl_label,expires_at,ceiling_wide,
-// status,csrf_token. POST /api/operator/approvals/:id/decision accepts decision
-// ('approve'|'deny') plus CSRF header. Backend MUST enforce identity, CSRF,
-// policy, one-shot, expiry and audit. This UI grants no authority on its own.
-const $=id=>document.getElementById(id);
-const requestId=new URL(location.href).searchParams.get('request');
-const validId=/^apr_[a-zA-Z0-9_-]{8,128}$/;
-let csrf='';
-function status(message){$('status').textContent=message}
-async function readJSON(response){if(!response.ok)throw Error(response.status===401?'Sessão não autenticada. Entre pelo portal seguro.':response.status===403?'Operador sem autorização para este pedido.':'Serviço indisponível ou solicitação inválida.');return response.json()}
-async function load(){
- if(!requestId||!validId.test(requestId)){status('Abra um pedido válido pelo link fornecido pelo Pórtico.');return}
- try{
-  const data=await readJSON(await fetch('/api/operator/approvals/'+encodeURIComponent(requestId),{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}}));
-  for(const k of ['request_id','node','subject','resource','access'])$(k).textContent=String(data[k]??'');
-  $('ttl').textContent=String(data.ttl_label??'');
-  $('expires').textContent=data.expires_at?new Date(data.expires_at).toLocaleString('pt-BR'):'';
-  $('warning').hidden=!data.ceiling_wide;
-  csrf=typeof data.csrf_token==='string'?data.csrf_token:'';
-  $('details').hidden=false;
-  const pending=data.status==='pending'&&!!csrf;
-  $('approve').disabled=!pending;$('deny').disabled=!pending;
-  status(pending?'Confira o recurso e o perfil antes de decidir.':'Este pedido não está disponível para decisão.');
- }catch(e){status(e.message);$('details').hidden=true}
-}
-async function decide(decision){
- if(!csrf||!confirm(decision==='approve'?'Confirmar autorização exatamente como exibida?':'Negar esta solicitação?'))return;
- $('approve').disabled=true;$('deny').disabled=true;
- try{await readJSON(await fetch('/api/operator/approvals/'+encodeURIComponent(requestId)+'/decision',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({decision})}));status(decision==='approve'?'Decisão enviada e confirmada pelo servidor.':'Solicitação negada pelo servidor.');await load()}
- catch(e){status(e.message+' Confira o estado antes de tentar novamente.')}
-}
-$('approve').addEventListener('click',()=>decide('approve'));
-$('deny').addEventListener('click',()=>decide('deny'));
-load();
-</script></body></html>
+<script src="/operator/app.js" defer></script></body></html>

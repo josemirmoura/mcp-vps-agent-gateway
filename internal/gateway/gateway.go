@@ -827,9 +827,20 @@ func newMCPServer(exec Executor, metrics *runtimeMetrics) *mcp.Server {
 			approvalToken, _ := out["approval_token"].(string)
 			delete(out, "approval_token")
 
+			if link := operatorWebApprovalLink(out); link != "" {
+				out["approval_method"] = "operator_web"
+				out["operator_approval_url"] = link
+				out["message"] = "Pórtico: solicitação pendente. Abra operator_approval_url em seu navegador, entre como operador e confirme ou negue. O link não concede acesso."
+				return nil, out, nil
+			}
 			if !supportsNativeElicitation(req) {
 				out["approval_method"] = "operator_fallback"
-				out["message"] = "This MCP client did not advertise native elicitation. No access was granted. In an authenticated SSH session on the VPS, run python3 scripts/operator-approvals.py from the Pórtico installation to review and explicitly approve or deny the pending request. Never share admin credentials with the AI."
+				if link := operatorWebApprovalLink(out); link != "" {
+					out["operator_approval_url"] = link
+					out["message"] = "Pórtico: pedido pendente. Abra operator_approval_url no navegador, entre com a conta do operador e confirme a decisão. O link não concede acesso."
+				} else {
+					out["message"] = "Pórtico: pedido pendente. Use uma sessão SSH autenticada e scripts/operator-approvals.py para decidir. Não compartilhe credenciais com a IA."
+				}
 				out["operator_approval_guide"] = "docs/operator-approval-fallback.md"
 				return nil, out, nil
 			}
