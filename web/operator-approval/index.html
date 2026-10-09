@@ -7,12 +7,13 @@
 </head>
 <body><main>
 <header><div><h1>🛡️ Pórtico</h1><small>Central de Autorizações</small></div><span class="badge">Community</span></header>
-<section class="card" id="login-panel" hidden><h2>Entrar como operador</h2><form id="login-form"><label for="password">Senha da Central</label><p><input id="password" type="password" autocomplete="current-password" required></p><button type="submit">Entrar</button></form><p id="login-error" role="alert"></p></section><section class="card" aria-labelledby="heading"><h2 id="heading">Autorização do operador</h2>
+<section class="card" id="login-panel" hidden><h2>Entrar como operador</h2><form id="login-form"><label for="password">Senha da Central</label><p><input id="password" type="password" autocomplete="current-password" required></p><button id="login" type="button">Entrar</button></form><p id="login-error" role="alert"></p></section><section class="card" aria-labelledby="heading"><h2 id="heading">Autorização do operador</h2>
 <p id="status" role="status" aria-live="polite">Verificando a sessão segura…</p>
 <div id="details" hidden>
 <dl>
 <dt>Solicitação</dt><dd id="request_id"></dd>
 <dt>Máquina</dt><dd id="node"></dd>
+<dt>Operador</dt><dd id="operator"></dd>
 <dt>Cliente MCP</dt><dd id="subject"></dd>
 <dt>Recurso</dt><dd id="resource"></dd>
 <dt>Permissão</dt><dd id="access"></dd>
@@ -20,8 +21,10 @@
 <dt>Expira em</dt><dd id="expires"></dd>
 </dl>
 <div class="notice" id="warning" hidden>ATENÇÃO: esta autorização abrange todo o limite físico indicado, incluindo subpastas futuras.</div>
+<section id="step-up-panel" class="notice" hidden><label for="step-up-password">Confirme sua senha da Central para autorizar esta operação</label><p><input id="step-up-password" type="password" autocomplete="current-password"></p><small>A verificação vale apenas para este pedido.</small></section>
 <div class="actions"><button id="deny" class="deny" disabled>Negar</button><button id="approve" class="approve" disabled>Autorizar</button></div>
 </div></section>
+<p><button id="refresh">Consultar estado</button><button id="logout">Encerrar sessão</button></p>
 <p class="muted"><small>As autorizações são verificadas pelo Broker local. Abrir esta página ou receber uma confirmação do ChatGPT não concede acesso.</small></p>
 </main>
 <script src="/operator/app.js" defer></script></body></html>

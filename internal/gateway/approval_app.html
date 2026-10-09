@@ -1,0 +1,80 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pórtico | Autorizações</title>
+<style>:root{font-family:system-ui;color-scheme:light dark}body{margin:0;padding:16px;background:var(--color-background-primary,Canvas);color:var(--color-text-primary,CanvasText)}h1{font-size:21px;margin:0 0 10px}p{overflow-wrap:anywhere;line-height:1.5}iframe{width:100%;height:720px;border:0;border-radius:12px}button,a{font:inherit;display:inline-block;margin:5px 8px 5px 0;padding:10px;border-radius:8px}button:focus-visible,a:focus-visible{outline:3px solid #5799ff}#status{min-height:24px}.muted{opacity:.75}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}#frame[hidden]{display:none}</style></head>
+<body><h1>🛡️ Pórtico · Autorizações</h1><p id="status" role="status" aria-live="polite">Conectando à Central…</p><iframe id="frame" title="Central HTTPS do operador" referrerpolicy="no-referrer" hidden></iframe>
+<a id="portal" target="_blank" rel="noopener noreferrer" hidden>Abrir Central no navegador</a><button id="refresh" disabled>Consultar decisão</button><p id="portal-url" class="muted"></p><p class="muted">A decisão fica sob controle do operador autenticado. O aceite do cliente de IA não concede acesso.</p><pre id="cli"></pre>
+<script>
+'use strict';
+const config=__PORTICO_CONFIG__;
+const el=id=>document.getElementById(id);
+let requestId='',hostOrigin='',hostReady=false,frameReady=false,seq=1,finished=false;
+const pending=new Map();
+function show(text){el('status').textContent=text}
+function hostTarget(){return hostOrigin&&hostOrigin!=='null'?hostOrigin:'*'}
+function notify(method,params){parent.postMessage({jsonrpc:'2.0',method,params},hostTarget())}
+function rpc(method,params){return new Promise((resolve,reject)=>{const id=++seq;const timer=setTimeout(()=>{pending.delete(id);reject(Error('Cliente sem resposta. Use o portal ou SSH.'))},8000);pending.set(id,{resolve,reject,timer});parent.postMessage({jsonrpc:'2.0',id,method,params},hostTarget())})}
+function render(data){
+ if(!data||typeof data!=='object'||!/^apr_[A-Za-z0-9_-]{8,100}$/.test(data.request_id||''))return;
+ let link;try{link=new URL(data.operator_approval_url)}catch{return}
+ if(link.origin!==config.operatorOrigin||link.pathname!=='/operator'||link.searchParams.get('request')!==data.request_id||link.username||link.password||link.hash)return;
+ if(requestId!==data.request_id){frameReady=false;finished=false;el('frame').hidden=true;el('frame').src='';}
+ requestId=data.request_id;el('portal').href=link.href;el('portal').hidden=false;el('portal-url').textContent=link.href;el('cli').textContent='SSH: python3 scripts/operator-approvals.py --request '+requestId;el('refresh').disabled=false;
+ const domains=window.porticoHostCapabilities?.sandbox?.csp?.frameDomains;
+ if(config.embedded&&hostReady&&Array.isArray(domains)&&domains.includes(config.operatorOrigin)){
+  const embedded=new URL('/operator/embed',config.operatorOrigin);embedded.searchParams.set('request',requestId);
+  el('frame').src=embedded.href;el('frame').hidden=false;
+  show('Autentique-se na Central segura abaixo. Se ela não carregar, abra no navegador.');
+  const framedRequest=requestId;
+  setTimeout(()=>{if(requestId===framedRequest&&!frameReady&&!finished)show('O cliente bloqueou a Central embutida ou ela está indisponível. Abra o portal no navegador.')},6000);
+ }else show('Este cliente não confirmou suporte ao enquadramento seguro. Abra a Central no navegador.');
+}
+window.addEventListener('message',event=>{
+ // The operator frame can report readiness/final public status only. It has no
+ // protocol path to inject a decision or credential into the model/host.
+ if(event.source===el('frame').contentWindow&&event.origin===config.operatorOrigin){
+  const value=event.data;if(value?.type==='portico-operator'&&value.request_id===requestId){frameReady=true;if(value.status==='ready')show('Central conectada. Autentique-se, confira o pedido e decida.');else if(['approved','denied'].includes(value.status))void refresh()}
+  return;
+ }
+ if(event.source!==parent||parent===window)return;
+ if(hostOrigin&&event.origin!==hostOrigin)return;
+ const value=event.data;if(!value||value.jsonrpc!=='2.0')return;
+ if(value.id&&pending.has(value.id)){
+  if(!hostOrigin)hostOrigin=event.origin;
+  const p=pending.get(value.id);pending.delete(value.id);clearTimeout(p.timer);
+  if(value.error)p.reject(Error('O cliente recusou a operação. Use o portal.'));else p.resolve(value.result);return;
+ }
+ if(value.method==='ui/notifications/tool-result')render(value.params?.structuredContent);
+ if(value.method==='ui/notifications/tool-cancelled'){finished=true;show('Chamada cancelada. Nenhuma decisão automática foi tomada. Use o portal para consultar o pedido.');}
+});
+async function refresh(){
+ if(!requestId||!hostReady)return;
+ const queriedRequest=requestId;
+ el('refresh').disabled=true;
+ try{
+  const result=await rpc('tools/call',{name:'permissions.approval_status',arguments:{request_id:queriedRequest}});
+  if(requestId!==queriedRequest)return;
+  const data=result?.structuredContent;
+  if(result?.isError||data?.request_id!==queriedRequest)throw Error('O Broker não confirmou o estado.');
+  const states={pending:'Aguardando decisão do operador.',approved:'Broker confirmou a autorização.',denied:'Broker confirmou a negação. Nenhuma permissão concedida.',cancelled:'Solicitação cancelada.',expired:'Pedido ou permissão expirou.',revoked:'Permissão revogada.'};
+  if(!states[data.status])throw Error('Estado não reconhecido. Consulte o portal.');
+  show(states[data.status]);finished=data.status!=='pending';
+ }catch(e){if(requestId===queriedRequest)show(e.message)}finally{el('refresh').disabled=!requestId}
+}
+el('refresh').addEventListener('click',refresh);
+el('portal').addEventListener('click',async event=>{
+ // Opening a link is an owner click, never a decision. A minimum sandbox
+ // cannot create a popup itself, so ask a verified capable host to open it.
+ if(!hostReady||!window.porticoHostCapabilities?.openLinks)return;
+ event.preventDefault();
+ try{await rpc('ui/open-link',{url:el('portal').href})}catch{show('Copie o link da Central exibido abaixo e abra no navegador.');}
+});
+if(parent!==window){
+ const id=++seq;const timer=setTimeout(()=>{pending.delete(id);show('Bridge MCP Apps indisponível. Use o link HTTPS fornecido pela ferramenta.')},8000);
+ pending.set(id,{timer,reject:()=>show('Bridge recusado. Use HTTPS ou SSH.'),resolve:result=>{
+  if(result?.protocolVersion!=='2026-01-26'){show('Versão do bridge não verificada. Use HTTPS ou SSH.');return}
+  hostReady=true;window.porticoHostCapabilities=result.hostCapabilities||{};
+  notify('ui/notifications/initialized',{});
+  // Credentials are never requested or accepted through this bridge.
+ }});
+ parent.postMessage({jsonrpc:'2.0',id,method:'ui/initialize',params:{protocolVersion:'2026-01-26',appInfo:{name:'portico-authorizations',version:'1.0.0'},appCapabilities:{availableDisplayModes:['inline','fullscreen']}}},'*');
+}else show('Esta interface é um recurso MCP Apps. Use a Central HTTPS para decisões.');
+</script></body></html>

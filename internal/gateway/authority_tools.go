@@ -29,55 +29,17 @@ func registerAuthorityTools(server *mcp.Server, s *Server) {
 		return nil, out, nil
 	})
 
-	mcp.AddTool(server, annotatedTool("permissions.request_sensitive_access", "Request temporary operator-approved access to one protected secret file such as .env inside an already-authorized root. Normal root delegation never unlocks protected secrets. On clients with MCP elicitation support, the host renders its native confirmation UI."), func(ctx context.Context, req *mcp.CallToolRequest, in sensitiveAccessRequestInput) (*mcp.CallToolResult, any, error) {
-		if state, decision, handled, err := nativeApprovalDecision(req, "sensitive"); handled {
-			if err != nil {
-				return nil, nil, err
-			}
-			var out map[string]any
-			args, _ := json.Marshal(map[string]any{
-				"request_id": state.RequestID,
-				"approval_token": state.ApprovalToken,
-				"decision": decision,
-			})
-			if err := s.call(ctx, "permissions.confirm_sensitive_access", state.RequestID, decision, args, &out, true, state.RequestID+":"+decision); err != nil {
-				return nil, out, err
-			}
-			return nil, out, nil
+	mcp.AddTool(server, approvalTool("permissions.request_sensitive_access", "Request temporary access to one protected file. Operator session and request-bound step-up are required; client acceptance alone never grants access."), func(ctx context.Context, req *mcp.CallToolRequest, in sensitiveAccessRequestInput) (*mcp.CallToolResult, any, error) {
+		if out, handled, err := s.navigationContinuation(ctx, req, "sensitive", in.Path); handled {
+			return nil, out, err
 		}
-
 		var out map[string]any
 		args, _ := json.Marshal(in)
 		if err := s.call(ctx, "permissions.request_sensitive_access", in.Path, "request", args, &out, true, in.OperationID); err != nil {
 			return nil, out, err
 		}
-		approvalToken, _ := out["approval_token"].(string)
-		delete(out, "approval_token")
-
-		if link := operatorWebApprovalLink(out); link != "" {
-			out["approval_method"] = "operator_web"
-			out["operator_approval_url"] = link
-			out["message"] = "Pórtico: solicitação pendente. Abra operator_approval_url em seu navegador, entre como operador e confirme ou negue. O link não concede acesso."
-			return nil, out, nil
-		}
-		if !supportsNativeElicitation(req) {
-			out["approval_method"] = "operator_fallback"
-			if link := operatorWebApprovalLink(out); link != "" {
-				out["operator_approval_url"] = link
-				out["message"] = "Pórtico: pedido pendente. Abra operator_approval_url no navegador, entre com a conta do operador e confirme a decisão. O link não concede acesso."
-			} else {
-				out["message"] = "Pórtico: pedido pendente. Use uma sessão SSH autenticada e scripts/operator-approvals.py para decidir. Não compartilhe credenciais com a IA."
-			}
-			out["operator_approval_guide"] = "docs/operator-approval-fallback.md"
-			return nil, out, nil
-		}
-		approval, err := nativeApprovalResult("sensitive", out, approvalToken)
-		if err != nil {
-			return nil, nil, err
-		}
-		return approval, nil, nil
+		return s.presentApproval(ctx, req, "sensitive", out)
 	})
-
 
 	mcp.AddTool(server, annotatedTool("permissions.list_sensitive_access", "List this authenticated subject's active temporary protected-file grants."), func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, map[string]any, error) {
 		var out map[string]any

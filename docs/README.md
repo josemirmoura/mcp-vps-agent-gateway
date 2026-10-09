@@ -24,6 +24,8 @@ Start here:
 14. [operator-acceptance.md](operator-acceptance.md) - owner-operated final acceptance gate.
 15. [vision.md](vision.md) - public product principles.
 16. [roadmap-multinode-control-plane.md](roadmap-multinode-control-plane.md) - intentionally high-level public roadmap.
+17. [operator-approval-fallback.md](operator-approval-fallback.md) - authenticated HTTPS and interactive SSH decisions.
+18. [approval-compatibility.md](approval-compatibility.md) - adaptive authorization modes and evidence per client.
 
 ## Developer / security
 
@@ -39,6 +41,9 @@ Start here:
 - [tool-trust-and-confused-deputy.md](tool-trust-and-confused-deputy.md) - downstream/tool trust.
 - [transport-and-aggregation.md](transport-and-aggregation.md) - transport constraints.
 - [implementation-validation.md](implementation-validation.md) - executable evidence.
+- [adaptive-operator-approvals.md](adaptive-operator-approvals.md) - capability selection, verified operator sessions and Broker authority.
+- [operator-mcp-apps-gate.md](operator-mcp-apps-gate.md) - implementation and real-client acceptance gate.
+- [adaptive-approvals-rollout.md](adaptive-approvals-rollout.md) - isolated staging, activation and rollback.
 
 ## Precedence
 

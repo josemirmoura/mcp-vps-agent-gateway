@@ -202,12 +202,6 @@ ux_requirements = {
         "Ainda não detectamos a chamada system.info",
     ],
     "internal/gateway/native_approval.go": [
-        "mcp.InputRequestMap",
-        "mcp.ElicitParams",
-        "RequestState",
-        "ClientCapabilities",
-        "decline",
-        "cancel",
         "ATENÇÃO",
         "Autorizar Pórtico?",
         "Autorizar arquivo protegido?",
@@ -217,13 +211,13 @@ ux_requirements = {
     ],
     "internal/gateway/gateway.go": [
         '"permissions.request_root_access"',
-        'nativeApprovalDecision(req, "root")',
-        'nativeApprovalResult("root"',
+        's.navigationContinuation',
+        's.presentApproval',
     ],
     "internal/gateway/authority_tools.go": [
         '"permissions.request_sensitive_access"',
-        'nativeApprovalDecision(req, "sensitive")',
-        'nativeApprovalResult("sensitive"',
+        's.navigationContinuation',
+        's.presentApproval',
         'annotatedTool(',
     ],
     "internal/gateway/tool_annotations.go": [
@@ -233,6 +227,12 @@ ux_requirements = {
         "DestructiveHint",
         "IdempotentHint",
         "OpenWorldHint",
+    ],
+    "internal/gateway/adaptive_approval.go": [
+        "mcp.InputRequestMap", "mcp.ElicitParams", "RequestState",
+        "ClientCapabilities", '"decline"', '"cancel"',
+        '"approval_token"', '"io.modelcontextprotocol/ui"',
+        '"permissions.approval_status"', '"permissions.cancel_approval"',
     ],
     "internal/broker/broker.go": [
         '"ceiling_wide": root == physical',
@@ -251,12 +251,13 @@ ux_sources = {
     "internal/gateway/gateway.go": gateway_text,
     "internal/gateway/authority_tools.go": authority_tools_text,
     "internal/gateway/tool_annotations.go": tool_annotations_text,
+    "internal/gateway/adaptive_approval.go": (ROOT / "internal/gateway/adaptive_approval.go").read_text(),
     "internal/broker/broker.go": broker_text,
 }
 for rel, markers in ux_requirements.items():
     source = ux_sources[rel]
     for required in markers:
-        if required not in source:
+        if required not in source and re.sub(r"\s+", " ", required) not in re.sub(r"\s+", " ", source):
             errors.append(f"{rel}: clean-E2E invariant missing: {required}")
 
 if "dynamic delegation of the entire physical ceiling is not allowed" in broker_text:

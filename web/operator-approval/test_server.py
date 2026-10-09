@@ -31,7 +31,7 @@ class PortalSecurityTests(unittest.TestCase):
         self.assertIsNone(app.session_from_cookie("portico_operator=expired"))
     def test_session_with_csrf(self):
         with app.LOCK:
-            app.SESSIONS["valid"] = (float("inf"), "csrf")
+            app.SESSIONS["valid"] = (float("inf"), "csrf", app.binding())
         self.assertEqual(app.session_from_cookie("portico_operator=valid"), ("valid", "csrf"))
     def test_request_id_rejects_special_characters(self):
         self.assertIsNone(app.API_RE.fullmatch("/operator/api/approvals/apr_12345678/../../deny"))
