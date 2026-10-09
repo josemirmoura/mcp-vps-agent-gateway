@@ -82,6 +82,29 @@ This signing model avoids a long-lived project private key in GitHub Secrets. Tr
 
 Already-published release candidates created before this control remain historical unsigned artifacts. Do not infer a signature retroactively from documentation.
 
+## Runtime build identity versus wire protocol
+
+The packaged Go binary embeds the repository `VERSION` manifest at build time. Its
+product identity is displayed as `vX.Y.Z-rc.N` for a release candidate, or
+`vX.Y.Z` for a valid stable manifest. Empty or invalid manifest metadata
+fails closed to `dev` (never a fabricated stable version).
+
+- MCP `initialize.serverInfo.version` uses that packaged product version;
+  `system.info.gateway_version` reports the same value.
+- The Gateway writes the product version in the `gateway_start` JSON log.
+- The optional outbound Cloud node connector writes its **own packaged runtime
+  version** in `portico_cloud_node_start` logs. Its `protocol_version: "1"`
+  remains the distinct Cloud node wire-contract revision, not a product version.
+- `scripts/version.sh` and the installer read the source checkout manifest,
+  which can identify an unreleased development candidate. That alone does not
+  prove the running image was built from the corresponding immutable tag.
+- The release workflow must validate the exact tag against `VERSION`; only
+  completed tagged release builds establish a published release. A client
+  cannot supply or override the server's product version.
+
+The MCP protocol date/revision (for example `2025-11-25`) is negotiated
+separately. It must never be confused with the Pórtico product SemVer.
+
 ## Update behavior
 
 By default, `scripts/update.sh` selects the newest stable SemVer tag available from `origin`.
