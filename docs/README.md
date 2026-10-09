@@ -6,13 +6,15 @@ It is not the canonical location for confidential commercial strategy, private S
 
 ## Operator / user
 
+Each installation document below has an EN and PT-BR version. The command and authority contracts are checked for parity in CI. Other reference pages may remain English-only; the complete guided-install path is available in both languages.
+
 Start here:
 
-1. [quick-start.md](quick-start.md) - shortest supported path into the guided terminal flow.
-2. [installation-contract.md](installation-contract.md) - normative user-installation boundary.
-3. [installer-flow.md](installer-flow.md) - complete installation phases.
+1. [quick-start.md](quick-start.md) · [PT-BR](quick-start.pt-BR.md) - shortest supported path into the guided terminal flow.
+2. [installation-contract.md](installation-contract.md) · [PT-BR](installation-contract.pt-BR.md) - normative user-installation boundary.
+3. [installer-flow.md](installer-flow.md) · [PT-BR](installer-flow.pt-BR.md) - complete installation phases.
 4. [product-model.md](product-model.md) - authority and capability model.
-5. [chatgpt-integration.md](chatgpt-integration.md) - ChatGPT/MCP connection path.
+5. [chatgpt-integration.md](chatgpt-integration.md) · [PT-BR](chatgpt-integration.pt-BR.md) - ChatGPT/MCP connection path.
 6. [authentication.md](authentication.md) - OAuth/OIDC path.
 7. [operations.md](operations.md) - status, health, logs, audit, update, rollback and removal.
 8. [troubleshooting.md](troubleshooting.md) - common failure paths.
@@ -41,10 +43,10 @@ Start here:
 - [tool-trust-and-confused-deputy.md](tool-trust-and-confused-deputy.md) - downstream/tool trust.
 - [transport-and-aggregation.md](transport-and-aggregation.md) - transport constraints.
 - [implementation-validation.md](implementation-validation.md) - executable evidence.
-- [runtime-version-identity.md](runtime-version-identity.md) - product version in MCP initialize, diagnostics and service logs.
-- [adaptive-operator-approvals.md](adaptive-operator-approvals.md) - capability selection, verified operator sessions and Broker authority.
-- [operator-mcp-apps-gate.md](operator-mcp-apps-gate.md) - implementation and real-client acceptance gate.
-- [adaptive-approvals-rollout.md](adaptive-approvals-rollout.md) - isolated staging, activation and rollback.
+- [runtime-version-identity.md](runtime-version-identity.md) - product release version in MCP initialize and diagnostics.
+- [adaptive-operator-approvals.md](adaptive-operator-approvals.md) - explicit authenticated operator sessions and Broker authority.
+- [operator-mcp-apps-gate.md](operator-mcp-apps-gate.md) - MCP Apps support and real-client acceptance gate.
+- [adaptive-approvals-rollout.md](adaptive-approvals-rollout.md) - isolated staging and rollback.
 
 ## Precedence
 
