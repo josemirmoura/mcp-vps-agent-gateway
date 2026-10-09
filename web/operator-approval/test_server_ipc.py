@@ -1,5 +1,6 @@
 """Direct Unix IPC boundary regression test with a fake Broker."""
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -7,13 +8,30 @@ import socket
 import tempfile
 import threading
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 SPEC=importlib.util.spec_from_file_location("portico_operator_ipc",Path(__file__).with_name("server.py"))
 app=importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(app)
 
 class IPCTests(unittest.TestCase):
+    def test_rejects_crossed_invalid_and_incomplete_replies(self):
+        replies = [
+            b'{"id":"another-call","ok":true,"result":{}}\n',
+            b'{"id":"fixture-id","ok":1,"result":{}}\n',
+            b'{"id":"fixture-id","ok":true,"result":{}}',
+        ]
+        for reply in replies:
+            with self.subTest(reply=reply):
+                client = MagicMock()
+                client.__enter__.return_value = client
+                client.makefile.return_value = io.BytesIO(reply)
+                with patch.object(app.socket, 'socket', return_value=client), \
+                        patch.object(app.secrets, 'token_urlsafe', return_value='fixture-id'), \
+                        patch.dict(os.environ, {'PORTICO_OPERATOR_APPROVAL_TOKEN':'t'*48}):
+                    with self.assertRaises(RuntimeError):
+                        app.OperatorIPC.call('approvals')
+
     def test_newline_framed_broker_call(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=str(Path(tmp)/"bridge.sock")
@@ -27,7 +45,7 @@ class IPCTests(unittest.TestCase):
                     with conn.makefile("rb") as stream:
                         frame=stream.readline(8192)
                     captured.append(frame)
-                    conn.sendall(json.dumps({"id":"test","ok":True,"result":[]}).encode()+bytes([10]))
+                    conn.sendall(json.dumps({"id":json.loads(frame)["id"],"ok":True,"result":[]}).encode()+bytes([10]))
             thread=threading.Thread(target=accept_once,daemon=True)
             thread.start()
             with patch.dict(os.environ,{"PORTICO_OPERATOR_SOCKET":path,

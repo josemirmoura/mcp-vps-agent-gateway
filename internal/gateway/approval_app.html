@@ -9,6 +9,7 @@ const el=id=>document.getElementById(id);
 let requestId='',hostOrigin='',hostReady=false,frameReady=false,seq=1,finished=false;
 const pending=new Map();
 function show(text){el('status').textContent=text}
+function capability(name){const value=window.porticoHostCapabilities?.[name];return !!value&&typeof value==='object'&&!Array.isArray(value)}
 function hostTarget(){return hostOrigin&&hostOrigin!=='null'?hostOrigin:'*'}
 function notify(method,params){parent.postMessage({jsonrpc:'2.0',method,params},hostTarget())}
 function rpc(method,params){return new Promise((resolve,reject)=>{const id=++seq;const timer=setTimeout(()=>{pending.delete(id);reject(Error('Cliente sem resposta. Use o portal ou SSH.'))},8000);pending.set(id,{resolve,reject,timer});parent.postMessage({jsonrpc:'2.0',id,method,params},hostTarget())})}
@@ -17,7 +18,7 @@ function render(data){
  let link;try{link=new URL(data.operator_approval_url)}catch{return}
  if(link.origin!==config.operatorOrigin||link.pathname!=='/operator'||link.searchParams.get('request')!==data.request_id||link.username||link.password||link.hash)return;
  if(requestId!==data.request_id){frameReady=false;finished=false;el('frame').hidden=true;el('frame').src='';}
- requestId=data.request_id;el('portal').href=link.href;el('portal').hidden=false;el('portal-url').textContent=link.href;el('cli').textContent='SSH: python3 scripts/operator-approvals.py --request '+requestId;el('refresh').disabled=false;
+ requestId=data.request_id;el('portal').href=link.href;el('portal').hidden=false;el('portal-url').textContent=link.href;el('cli').textContent='SSH: python3 scripts/operator-approvals.py --request '+requestId;el('refresh').disabled=!hostReady||!capability('serverTools');
  const domains=window.porticoHostCapabilities?.sandbox?.csp?.frameDomains;
  if(config.embedded&&hostReady&&Array.isArray(domains)&&domains.includes(config.operatorOrigin)){
   const embedded=new URL('/operator/embed',config.operatorOrigin);embedded.searchParams.set('request',requestId);
@@ -47,6 +48,7 @@ window.addEventListener('message',event=>{
 });
 async function refresh(){
  if(!requestId||!hostReady)return;
+ if(!capability('serverTools')){show('Este cliente não anunciou consulta ao Broker. Consulte a decisão na Central HTTPS ou por SSH.');return}
  const queriedRequest=requestId;
  el('refresh').disabled=true;
  try{
@@ -57,13 +59,13 @@ async function refresh(){
   const states={pending:'Aguardando decisão do operador.',approved:'Broker confirmou a autorização.',denied:'Broker confirmou a negação. Nenhuma permissão concedida.',cancelled:'Solicitação cancelada.',expired:'Pedido ou permissão expirou.',revoked:'Permissão revogada.'};
   if(!states[data.status])throw Error('Estado não reconhecido. Consulte o portal.');
   show(states[data.status]);finished=data.status!=='pending';
- }catch(e){if(requestId===queriedRequest)show(e.message)}finally{el('refresh').disabled=!requestId}
+ }catch(e){if(requestId===queriedRequest)show(e.message)}finally{el('refresh').disabled=!requestId||!capability('serverTools')}
 }
 el('refresh').addEventListener('click',refresh);
 el('portal').addEventListener('click',async event=>{
  // Opening a link is an owner click, never a decision. A minimum sandbox
  // cannot create a popup itself, so ask a verified capable host to open it.
- if(!hostReady||!window.porticoHostCapabilities?.openLinks)return;
+ if(!hostReady||!capability('openLinks'))return;
  event.preventDefault();
  try{await rpc('ui/open-link',{url:el('portal').href})}catch{show('Copie o link da Central exibido abaixo e abra no navegador.');}
 });

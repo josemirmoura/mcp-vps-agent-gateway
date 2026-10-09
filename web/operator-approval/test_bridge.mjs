@@ -32,7 +32,7 @@ function harness({ embedded = true } = {}) {
   function message(value, { origin = hostOrigin, source = parent } = {}) {
     listeners.message({ data: value, origin, source });
   }
-  function initialize(caps = { sandbox: { csp: { frameDomains: [operatorOrigin] } } }, version = '2026-01-26') {
+  function initialize(caps = { serverTools: {}, sandbox: { csp: { frameDomains: [operatorOrigin] } } }, version = '2026-01-26') {
     const id = sent.find(x => x.value.method === 'ui/initialize').value.id;
     message({ jsonrpc: '2.0', id, result: { protocolVersion: version, hostCapabilities: caps } });
   }
@@ -206,4 +206,27 @@ test('a late status response cannot overwrite a different request in a reused ap
   await promise;
   assert.equal(h.elements.get('status').textContent, before);
   assert.equal(h.elements.get('portal').href, operatorOrigin + '/operator?request=' + second);
+});
+
+test('missing or malformed serverTools leaves HTTPS/SSH without a tool call', async () => {
+  for(const serverTools of [undefined,null,false,true,[], 'enabled']){
+    const h=harness();h.initialize({serverTools,sandbox:{csp:{frameDomains:[operatorOrigin]}}});h.toolResult();
+    assert.equal(h.elements.get('refresh').disabled,true);
+    assert.equal(h.elements.get('portal').hidden,false);
+    const count=h.sent.length;
+    h.message({type:'portico-operator',request_id:requestId,status:'approved'},
+      {origin:operatorOrigin,source:h.elements.get('frame').contentWindow});
+    await h.elements.get('refresh').handlers.click();
+    assert.equal(h.sent.length,count,'No unadvertised Broker proxy calls');
+    assert.match(h.elements.get('status').textContent,/Central HTTPS ou por SSH/);
+    assert.doesNotMatch(h.elements.get('status').textContent,/confirmou a autorização/);
+  }
+});
+
+test('malformed openLinks never activates a host RPC', async () => {
+  for(const openLinks of [true,[], 'enabled']){
+    const h=harness();h.initialize({openLinks});h.toolResult();const count=h.sent.length;
+    await h.elements.get('portal').handlers.click({preventDefault(){throw Error('Keep the visible URL fallback')}});
+    assert.equal(h.sent.length,count);
+  }
 });
