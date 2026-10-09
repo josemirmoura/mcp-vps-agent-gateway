@@ -74,22 +74,31 @@ def verify_sigstore(cosign: str, artifact: Path, bundle: Path) -> None:
 
 
 def archived_version(path: Path) -> str:
+    version = None
     try:
-        # Streaming scan reads no extracted filesystem paths. Archive contents
-        # are inspected only AFTER both signatures and SHA-256 have passed.
+        # Validate the *entire* signed archive. Reading just its first VERSION
+        # could miss a later duplicate entry that extraction would overwrite.
         with tarfile.open(path, mode="r|gz") as stream:
             for entry in stream:
-                if entry.name == "mcp-vps-agent/VERSION":
-                    if not entry.isfile() or entry.size < 1 or entry.size > 128:
-                        raise VerificationFailure("invalid VERSION entry in source archive")
-                    handle = stream.extractfile(entry)
-                    if handle is None:
-                        raise VerificationFailure("unreadable VERSION entry")
-                    raw = handle.read(129).decode("ascii")
-                    return raw.strip()
+                parts = entry.name.split("/")
+                if (not entry.name.startswith("mcp-vps-agent/")
+                        or ".." in parts or "\\\\" in entry.name):
+                    raise VerificationFailure("source archive contains unexpected member path")
+                if entry.name != "mcp-vps-agent/VERSION":
+                    continue
+                if version is not None:
+                    raise VerificationFailure("source archive contains duplicate VERSION entries")
+                if not entry.isfile() or entry.size < 1 or entry.size > 128:
+                    raise VerificationFailure("invalid VERSION entry in source archive")
+                handle = stream.extractfile(entry)
+                if handle is None:
+                    raise VerificationFailure("unreadable VERSION entry")
+                version = handle.read(129).decode("ascii").strip()
     except (tarfile.TarError, UnicodeError, OSError) as exc:
         raise VerificationFailure("invalid signed source archive") from exc
-    raise VerificationFailure("source archive is missing mcp-vps-agent/VERSION")
+    if version is None:
+        raise VerificationFailure("source archive is missing mcp-vps-agent/VERSION")
+    return version
 
 
 def verify(directory: Path, expected_tag: str) -> None:
