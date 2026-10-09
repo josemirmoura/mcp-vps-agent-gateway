@@ -35,7 +35,12 @@ else
     echo "$(vps_agent_text 'No stable SemVer release tag is available yet.' 'Ainda não há uma tag SemVer estável disponível.')" >&2
     echo "$(vps_agent_text 'main is intentionally not an automatic production update channel.' 'A branch main não é, intencionalmente, um canal automático de atualização de produção.')" >&2
     echo "$(vps_agent_text 'For release-candidate testing, select a target explicitly, for example:' 'Para testar release candidates, selecione explicitamente um alvo, por exemplo:')" >&2
-    echo "  VPS_AGENT_UPDATE_REF=v0.1.0-rc.3 bash scripts/update.sh" >&2
+    latest_rc="$(git tag -l 'v[0-9]*-rc.[0-9]*' --sort=-v:refname | head -n 1 || true)"
+    if [ -n "$latest_rc" ]; then
+      echo "  VPS_AGENT_UPDATE_REF=$latest_rc bash scripts/update.sh" >&2
+    else
+      echo "  VPS_AGENT_UPDATE_REF=<published-rc-tag> bash scripts/update.sh" >&2
+    fi
     exit 2
   fi
 fi
@@ -78,6 +83,22 @@ if ! git merge-base --is-ancestor "$current" "$target_sha"; then
   exit 1
 fi
 
+# At this point the live package has not been modified. An offline backup
+# requires stopping the services, but backup creation can fail (full disk,
+# missing volume, interrupted shell). Never leave the original package down
+# merely because its backup could not be completed. Do not restore partial
+# archives or reset Git while the original runtime and state are unchanged.
+resume_after_backup_failure() {
+  local failed_status="$?"
+  trap - ERR INT TERM
+  echo "$(vps_agent_text 'Backup interrupted or failed; restarting the unchanged package...' 'Backup interrompido ou com falha; reiniciando o pacote original sem alterações...')" >&2
+  if ! "${compose[@]}" up -d; then
+    echo "$(vps_agent_text 'Automatic restart failed. Use the existing Compose configuration for operator recovery.' 'Falha ao reiniciar automaticamente. Use a configuração Compose existente para recuperação pelo operador.')" >&2
+  fi
+  exit "$(( failed_status == 0 ? 1 : failed_status ))"
+}
+
+trap resume_after_backup_failure ERR INT TERM
 echo "$(vps_agent_text 'Stopping package for a consistent state backup...' 'Parando o pacote para criar um backup consistente do estado...')"
 "${compose[@]}" stop
 
@@ -90,6 +111,10 @@ if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ]; then
 fi
 printf '%s\n' "$current" >"$backup_dir/previous-commit"
 printf '%s\n' "$target_sha" >"$backup_dir/target-commit"
+
+# Full, usable backup now exists. From this point on, migration/rollout
+# errors follow the normal state-restoring rollback path below.
+trap - ERR INT TERM
 
 rollback() {
   echo "$(vps_agent_text "Update failed; rolling back to $current..." "Atualização falhou; revertendo para $current...")" >&2
