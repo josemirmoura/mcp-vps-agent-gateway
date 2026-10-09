@@ -109,6 +109,14 @@ if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ]; then
   docker run --rm     -v mcp-vps-agent_zitadel-postgres-data:/source:ro     -v "$PWD/$backup_dir:/backup"     alpine:3.22 sh -c 'cd /source && tar -czf /backup/zitadel-postgres-volume.tar.gz .'
   docker run --rm     -v mcp-vps-agent_zitadel-bootstrap:/source:ro     -v "$PWD/$backup_dir:/backup"     alpine:3.22 sh -c 'cd /source && tar -czf /backup/zitadel-bootstrap-volume.tar.gz .'
 fi
+# Refuse to leave the pre-backup recovery window until all archives are
+# readable. A successful tar/docker exit alone does not prove the snapshot
+# file was actually created or can be decompressed.
+tar -tzf "$backup_dir/operator-state.tar.gz" >/dev/null
+if [ "${VPS_AGENT_AUTH_MODE:-}" = "integrated" ]; then
+  tar -tzf "$backup_dir/zitadel-postgres-volume.tar.gz" >/dev/null
+  tar -tzf "$backup_dir/zitadel-bootstrap-volume.tar.gz" >/dev/null
+fi
 printf '%s\n' "$current" >"$backup_dir/previous-commit"
 printf '%s\n' "$target_sha" >"$backup_dir/target-commit"
 
