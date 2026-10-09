@@ -114,8 +114,39 @@ jobs:
           go install github.com/zricethezav/gitleaks/v8@v8.24.3
           "$(go env GOPATH)/bin/gitleaks" dir . --redact --exit-code=2 --report-format=json --report-path=results.json
 
+  image-security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [gateway, broker, cloud-node]
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build publish-equivalent target and architecture without pushing
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform "linux/${{ matrix.arch }}" \
+            --target "${{ matrix.target }}" \
+            --load \
+            --tag "portico-release-preflight:${{ matrix.target }}-${{ matrix.arch }}" .
+      - name: Fail closed on critical image vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: portico-release-preflight:${{ matrix.target }}-${{ matrix.arch }}
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
   prepare-tag:
-    needs: [validate, security]
+    needs: [validate, security, image-security]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
