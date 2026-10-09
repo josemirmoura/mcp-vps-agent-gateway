@@ -12,5 +12,15 @@ var manifestVersion string
 
 // Version reports the actual packaged Portico release (including -rc.N).
 func Version() string {
-	return "v" + strings.TrimSpace(manifestVersion)
+	return versionFromManifest(manifestVersion)
+}
+
+// versionFromManifest fails clearly to a development identity when package
+// metadata is empty, rather than falsely advertising a stable "v" release.
+func versionFromManifest(raw string) string {
+	version := strings.TrimSpace(raw)
+	if version == "" {
+		return "dev"
+	}
+	return "v" + version
 }
