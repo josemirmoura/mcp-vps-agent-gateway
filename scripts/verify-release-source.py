@@ -109,7 +109,8 @@ def verify(directory: Path, expected_tag: str) -> None:
     # Verify the checksum material is signed before trusting its digest.
     verify_sigstore(cosign, checksum, checksum_bundle)
     expected_digest = signed_checksum(checksum)
-    digest = hashlib.file_digest(archive.open("rb"), "sha256").hexdigest()
+    with archive.open("rb") as stream:
+        digest = hashlib.file_digest(stream, "sha256").hexdigest()
     if digest != expected_digest:
         raise VerificationFailure("source archive differs from the signed SHA-256 checksum")
     verify_sigstore(cosign, archive, archive_bundle)
