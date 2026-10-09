@@ -91,3 +91,66 @@ jobs:
           actual="$(docker run --rm -v "$volume:/target:ro" alpine:3.22 cat /target/marker)"
           test "$actual" = new-data
           echo 'DOCKER VOLUME RESTORE: PASS (success + corrupt tar + failed swap reverted)'
+
+  migration-fault-with-real-broker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Boot real disposable Broker and fail copied-state migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          scope="/opt/portico-block3-${GITHUB_RUN_ID}"
+          d="$(mktemp -d)"
+          cleanup() {
+            docker compose down -v --remove-orphans >/dev/null 2>&1 || true
+            sudo rm -rf "$scope"
+            rm -rf "$d"
+          }
+          trap cleanup EXIT
+          sudo install -d -o "$USER" -g "$USER" -m 0750 "$scope"
+          bash scripts/init.sh --scope "$scope"
+          docker compose up -d --build
+          bash scripts/verify.sh
+          cp config/policy.yaml "$d/policy.before"
+          git config user.name portico-block3-test
+          git config user.email block3@example.invalid
+          current="$(git rev-parse HEAD)"
+          git switch -c block3-current "$current"
+          git switch -c block3-target
+          printf 'migration-target\n' > .block3-migration-target
+          git add .block3-migration-target
+          git commit -m 'test: migration fault target fixture'
+          git switch block3-current
+
+          mkdir -p "$d/fakebin"
+          cat > "$d/fakebin/docker" <<'SHIM'
+          #!/bin/bash
+          if [[ "$*" == *"state-check --db"* ]]; then
+            printf 'Injected copied-state migration fault\n' >&2
+            exit 87
+          fi
+          exec /usr/bin/docker "$@"
+          SHIM
+          chmod 755 "$d/fakebin/docker"
+          if VPS_AGENT_UPDATE_REF=block3-target PATH="$d/fakebin:$PATH" bash scripts/update.sh; then
+            echo 'Injected migration failure unexpectedly succeeded' >&2
+            exit 1
+          fi
+
+          test "$(git rev-parse HEAD)" = "$current"
+          cmp "$d/policy.before" config/policy.yaml
+          test -f state/state.db
+          test -d backups
+          grep -q '"result":"rolled_back"' state/update.log
+          bash scripts/verify.sh
+          docker compose exec -T broker /usr/local/bin/vps-agent audit-status > "$d/audit.json"
+          python3 - "$d/audit.json" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1]))
+          assert data['ok'] and data['result']['valid'],data
+          PY
+          echo 'REAL BROKER MIGRATION FAILURE AND ROLLBACK: PASS'
