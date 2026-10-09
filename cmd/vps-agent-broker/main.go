@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"syscall"
 
+	portico "github.com/josemirmoura/mcp-vps-agent-gateway"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/broker"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/ipc"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/jobs"
@@ -61,7 +62,7 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-	slog.Info("broker_start", "socket", socket, "instance_id", b.InstanceID, "instance_name", b.InstanceName, "policy", policyFile)
+	slog.Info("broker_start", "product_version", portico.Version(), "socket", socket, "instance_id", b.InstanceID, "instance_name", b.InstanceName, "policy", policyFile)
 	// Isolate web approvals on a distinct Unix socket and dedicated volume.
 	operatorSocket := os.Getenv("VPS_AGENT_OPERATOR_APPROVAL_SOCKET")
 	if operatorSocket == "" && operatorToken() != "" {
