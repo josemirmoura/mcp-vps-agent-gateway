@@ -105,7 +105,7 @@ Before a release is declared ready:
 4. remove development-only hostnames, IPs, branch names, runner names and ad-hoc diagnostics;
 5. verify the tutorial never asks the user to share VPS credentials or private keys;
 6. verify every unavoidable manual action has a reason and a validation step;
-7. run the installation-document contract check in CI;
+7. run `python3 scripts/check-installation-contract.py` in CI;
 8. run the full installation from a clean supported VPS state;
 9. finish with a real ChatGPT Web MCP call and Broker audit evidence.
 
