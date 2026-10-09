@@ -11,15 +11,17 @@ WORKFLOW = Path(__file__).resolve().parents[2] / ".github/workflows/release.yml"
 
 
 def job(name: str, contents: str) -> str:
-    match = re.search(
-        rf"^  {re.escape(name)}:\\n(?:(?!^  [a-zA-Z0-9_-]+:).*(?:\\n|\\Z))*",
-        contents,
-        flags=re.MULTILINE,
-    )
-    if match is None:
+    lines = contents.splitlines(keepends=True)
+    expected = f"  {name}:"
+    start = next((i for i, line in enumerate(lines) if line.strip("\r\n") == expected), None)
+    if start is None:
         raise AssertionError(f"missing required release job: {name}")
-    return match.group(0)
-
+    end = next(
+        (i for i in range(start + 1, len(lines))
+         if re.fullmatch(r"  [a-zA-Z0-9_-]+:", lines[i].strip("\r\n"))),
+        len(lines),
+    )
+    return "".join(lines[start:end])
 
 class ReleaseWorkflowSecurityContract(unittest.TestCase):
     @classmethod
