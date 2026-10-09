@@ -169,6 +169,18 @@ class OperatorSecurity(unittest.TestCase):
                 self.assertNotIn("Set-Cookie", headers)
                 self.assertEqual(app.SESSIONS, {})
 
+    def test_terminal_status_keeps_logout_available_without_issuing_a_decision_nonce(self):
+        cookie, _ = self.login()
+        with patch.object(app.OperatorIPC, "request", return_value=None), \
+                patch.object(app.OperatorIPC, "call", return_value={"request_id": ID, "status": "approved"}):
+            code, _, terminal = self.req("/operator/api/approvals/" + ID, cookie=cookie)
+        self.assertEqual(code, 200)
+        self.assertNotIn("decision_nonce", terminal)
+        self.assertTrue(terminal["csrf_token"])
+        self.assertEqual(app.NONCES, {})
+        self.assertEqual(self.req("/operator/api/logout", {}, cookie, terminal["csrf_token"])[0], 200)
+        self.assertIsNone(app.session_from_cookie(cookie))
+
     def test_one_shot_nonce_bound_to_session_request_and_broker_snapshot(self):
         cookie, _ = self.login(); details = self.details(cookie)
         other, _ = self.login(); other_details = self.details(other)

@@ -165,6 +165,8 @@ for (const profile of profiles) {
     assert.ok(cookie?.secure && cookie?.httpOnly);
     assert.equal(cookie.sameSite, 'Strict');
     assert.equal(cookie.path, '/operator');
+    await page.reload();
+    await page.locator('#status').filter({ hasText: 'Solicitação negada. Nenhuma permissão concedida' }).waitFor();
     await page.locator('#logout').click();
     await page.locator('#login-panel').waitFor({ state: 'visible' });
     await page.reload();

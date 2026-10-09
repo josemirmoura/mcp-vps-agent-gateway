@@ -289,7 +289,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(data, dict) or data.get("status") not in ("approved", "denied", "expired", "cancelled", "revoked"):
                     self.reply(404, {"error": "request unavailable"}); return
                 data.update(node=os.environ.get("PORTICO_OPERATOR_NODE_LABEL", "Local"), operator=identity(),
-                            ttl_label=f'{data.get("delegation_ttl_seconds", 0)} segundos', expires_at=data.get("approval_expires_at"), ceiling_wide=False)
+                            ttl_label=f'{data.get("delegation_ttl_seconds", 0)} segundos', expires_at=data.get("approval_expires_at"), ceiling_wide=False,
+                            csrf_token=session[1])
             self.reply(200, data)
         except (RuntimeError, OSError, ValueError):
             self.reply(503, {"error": "broker unavailable"})
