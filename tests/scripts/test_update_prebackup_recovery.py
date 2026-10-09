@@ -51,6 +51,7 @@ class PrebackupRecoveryTest(unittest.TestCase):
                 'tar() {\n'
                 '  printf "tar %s\\n" "$*" >> "$TEST_LOG"\n'
                 '  if [[ "$FAIL_AT" == "tar" || "$FAIL_AT" == "restart" ]]; then return 42; fi\n'
+                '  if [[ "$FAIL_AT" == "integrity" && "$1" == "-tzf" ]]; then return 48; fi\n'
                 '  printf "partial-synthetic-backup" > "$backup_dir/operator-state.tar.gz"\n'
                 '  return 0\n'
                 '}\n'
@@ -86,6 +87,9 @@ class PrebackupRecoveryTest(unittest.TestCase):
 
     def test_identity_volume_failure_restarts_original(self) -> None:
         self.assert_restart_attempted("volume", 47)
+
+    def test_archive_integrity_failure_restarts_original(self) -> None:
+        self.assert_restart_attempted("integrity", 48)
 
     def test_partial_stop_failure_attempts_recovery(self) -> None:
         self.assert_restart_attempted("stop", 39)
