@@ -121,6 +121,36 @@ class ReleaseSourceVerifierTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Sigstore rejected", result.stderr)
 
+    def test_duplicate_version_entry_is_rejected(self):
+        with tarfile.open(self.archive, "w:gz") as pack:
+            for version in ["0.1.0-rc.7", "0.1.0-evil"]:
+                payload = (version + "\\n").encode()
+                item = tarfile.TarInfo("mcp-vps-agent/VERSION")
+                item.size = len(payload)
+                pack.addfile(item, io.BytesIO(payload))
+        self.resign_fixture_checksum()
+        result = self.execute()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("duplicate VERSION", result.stderr)
+
+    def test_archive_with_escaping_member_is_rejected(self):
+        with tarfile.open(self.archive, "w:gz") as pack:
+            payload = b"0.1.0-rc.7\\n"
+            item = tarfile.TarInfo("mcp-vps-agent/VERSION")
+            item.size = len(payload)
+            pack.addfile(item, io.BytesIO(payload))
+            dangerous = tarfile.TarInfo("mcp-vps-agent/../../override")
+            dangerous.size = 1
+            pack.addfile(dangerous, io.BytesIO(b"x"))
+        self.resign_fixture_checksum()
+        result = self.execute()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unexpected member path", result.stderr)
+
+    def resign_fixture_checksum(self):
+        digest = hashlib.sha256(self.archive.read_bytes()).hexdigest()
+        (self.dist / SHA).write_text(f"{digest}  dist/{ARCHIVE}\\n")
+
     def test_untrusted_tag_format_fails_before_cosign(self):
         result = self.execute(tag="v0.1.0;echo injected")
         self.assertNotEqual(result.returncode, 0)
