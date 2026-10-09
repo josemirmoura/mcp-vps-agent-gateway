@@ -21,18 +21,28 @@ func TestVersionMatchesCanonicalManifest(t *testing.T) {
 	}
 }
 
-func TestVersionManifestFallbackAndPrerelease(t *testing.T) {
-    for _, tc := range []struct{
-        raw string
-        want string
-    }{
-        {"", "dev"},
-        {"  \n  ", "dev"},
-        {"0.1.0-rc.7\n", "v0.1.0-rc.7"},
-        {"0.1.0", "v0.1.0"},
-    } {
-        if got:=versionFromManifest(tc.raw);got!=tc.want {
-            t.Errorf("versionFromManifest(%q)=%q; want %q",tc.raw,got,tc.want)
-        }
-    }
+func TestVersionFromManifestFailsClosed(t *testing.T) {
+	for _, tt := range []struct {
+		manifest string
+		want     string
+	}{
+		{"0.1.0-rc.7\n", "v0.1.0-rc.7"},
+		{"2.4.1", "v2.4.1"},
+		{"1.2.3-beta.2+build.5", "v1.2.3-beta.2+build.5"},
+		{"", "dev"},
+		{"\n \t", "dev"},
+		{"v0.1.0", "dev"},
+		{"0.1", "dev"},
+		{"01.2.3", "dev"},
+		{"0.1.0-rc.07", "dev"},
+		{"0.1.0-", "dev"},
+		{"0.1.0+bad..metadata", "dev"},
+		{"0.1.0\nUNTRUSTED", "dev"},
+	} {
+		t.Run(strings.ReplaceAll(tt.manifest, "\n", "_newline_"), func(t *testing.T) {
+			if got := versionFromManifest(tt.manifest); got != tt.want {
+				t.Fatalf("versionFromManifest(%q)=%q; want %q", tt.manifest, got, tt.want)
+			}
+		})
+	}
 }
