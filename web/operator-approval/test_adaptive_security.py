@@ -61,10 +61,63 @@ class OperatorSecurity(unittest.TestCase):
 
     def details(self, cookie, embedded=False):
         prefix = "/operator/embed/api" if embedded else "/operator/api"
-        with patch.object(app.OperatorIPC, "list_requests", return_value=[self.item]):
+        with patch.object(app.OperatorIPC, "request", return_value=self.item):
             code, _, result = self.req(prefix + "/approvals/" + ID, cookie=cookie)
         self.assertEqual(code, 200)
         return result
+
+    def broker_row(self):
+        return {
+            "ID": self.item["id"], "Subject": self.item["subject"],
+            "Resource": self.item["target"], "Access": self.item["access"],
+            "TTL": self.item["ttl_ns"], "Kind": self.item["kind"],
+            "ExpiresAt": self.item["expires"].isoformat(), "Status": "pending",
+            "Fingerprint": self.item["fingerprint"], "NodeID": self.item["node_id"],
+        }
+
+    def assert_step_up_rejects_change(self, change, decision_code):
+        """An in-flight password check cannot outlive its request/session binding."""
+        self.item["access"] = "work"
+        cookie, _ = self.login()
+        details = self.details(cookie)
+        nonce = details["decision_nonce"]
+        path = "/operator/api/approvals/" + ID
+        entered, release = threading.Event(), threading.Event()
+        results, failures = [], []
+
+        def blocked_verifier(password):
+            entered.set()
+            if not release.wait(5):
+                raise AssertionError("test did not release password verification")
+            return True
+
+        def verify_request():
+            try:
+                results.append(self.req(
+                    path + "/step-up", {"decision_nonce": nonce, "password": "synthetic"},
+                    cookie, details["csrf_token"]))
+            except Exception as error:
+                failures.append(error)
+
+        with patch.object(app, "verify_password", side_effect=blocked_verifier), \
+                patch.object(app.OperatorIPC, "call") as call:
+            worker = threading.Thread(target=verify_request, daemon=True)
+            worker.start()
+            try:
+                self.assertTrue(entered.wait(5), "password verification was not reached")
+                change(cookie, details)
+            finally:
+                release.set()
+                worker.join(5)
+            self.assertFalse(worker.is_alive(), "verification request did not finish")
+            self.assertFalse(failures)
+            self.assertEqual(len(results), 1)
+            self.assertEqual(results[0][0], 409)
+            self.assertNotIn(nonce, app.STEPUPS)
+            self.assertEqual(self.req(
+                path + "/decision", {"decision_nonce": nonce, "decision": "approve"},
+                cookie, details["csrf_token"])[0], decision_code)
+            call.assert_not_called()
 
     def test_top_level_remains_unframeable_and_embed_exact_allowlist(self):
         for path in ("/operator", "/operator/embed"):
@@ -143,6 +196,75 @@ class OperatorSecurity(unittest.TestCase):
             self.assertEqual(self.req(path, body, cookie, details["csrf_token"])[0], 503)
             self.assertEqual(self.req(path, body, cookie, details["csrf_token"])[0], 409)
             self.assertEqual(call.call_count, 1)
+
+    def test_nonce_expiring_during_password_verification_cannot_authorize(self):
+        def expire(cookie, details):
+            with app.LOCK:
+                app.NONCES[details["decision_nonce"]]["expires"] = 0
+
+        self.assert_step_up_rejects_change(expire, 409)
+
+    def test_logout_during_password_verification_cannot_authorize(self):
+        def logout(cookie, details):
+            code, _, _ = self.req(
+                "/operator/api/logout", {}, cookie, details["csrf_token"])
+            self.assertEqual(code, 200)
+            self.assertIsNone(app.session_from_cookie(cookie))
+
+        self.assert_step_up_rejects_change(logout, 401)
+
+    def test_replaced_nonce_during_password_verification_has_no_fresh_proof(self):
+        def replace(cookie, details):
+            with app.LOCK:
+                nonce = details["decision_nonce"]
+                app.NONCES[nonce] = dict(app.NONCES[nonce])
+
+        self.assert_step_up_rejects_change(replace, 428)
+
+    def test_detail_uses_one_bound_broker_row_and_no_queue_listing(self):
+        with patch.object(app.OperatorIPC, "call", return_value=self.broker_row()) as call:
+            item = app.OperatorIPC.request(ID)
+            call.assert_called_once_with("detail", ID)
+        self.assertEqual(item["id"], ID)
+        self.assertEqual(item["fingerprint"], "a" * 64)
+        self.assertEqual(item["node_id"], "node-a")
+        with patch.object(app.OperatorIPC, "call", return_value=None) as call:
+            self.assertIsNone(app.OperatorIPC.request(ID))
+            call.assert_called_once_with("detail", ID)
+
+    def test_detail_rejects_invalid_fingerprint_node_and_swapped_request(self):
+        cookie, _ = self.login()
+        cases = (
+            {"Fingerprint": None}, {"Fingerprint": "a" * 63},
+            {"Fingerprint": "g" * 64}, {"Fingerprint": "A" * 64},
+            {"NodeID": ""}, {"NodeID": "node-b"},
+            {"ID": "apr_another1234"},
+        )
+        for changed in cases:
+            with self.subTest(changed=changed):
+                row = {**self.broker_row(), **changed}
+                with patch.object(app.OperatorIPC, "call", return_value=row) as call:
+                    code, _, response = self.req(
+                        "/operator/api/approvals/" + ID, cookie=cookie)
+                    self.assertEqual(code, 503)
+                    self.assertEqual(response, {"error": "broker unavailable"})
+                    call.assert_called_once_with("detail", ID)
+                self.assertFalse(app.NONCES)
+
+    def test_detail_and_startup_require_configured_destination_node(self):
+        with patch.dict(os.environ, {"PORTICO_OPERATOR_NODE_ID": ""}), \
+                patch.object(app.OperatorIPC, "call", return_value=self.broker_row()):
+            with self.assertRaisesRegex(RuntimeError, "node mismatch"):
+                app.OperatorIPC.request(ID)
+        with patch.dict(os.environ, {
+                "PORTICO_OPERATOR_NODE_ID": "",
+                "PORTICO_OPERATOR_PASSWORD_SCRYPT": "synthetic-verifier",
+                "PORTICO_OPERATOR_APPROVAL_TOKEN": "t" * 32,
+                "PORTICO_OPERATOR_PHYSICAL_CEILING": "/opt"}), \
+                patch.object(app, "ThreadingHTTPServer") as server:
+            with self.assertRaisesRegex(SystemExit, "node ID"):
+                app.main()
+            server.assert_not_called()
 
     def test_repeat_low_risk_requests_reuse_authenticated_session(self):
         cookie, _ = self.login()

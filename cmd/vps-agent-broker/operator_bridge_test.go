@@ -59,14 +59,14 @@ func TestOperatorBridgeSQLiteDenyOneShotAndHiddenElevation(t *testing.T) {
  if err!=nil {t.Fatal(err)}
  _,err=store.CreateRootApproval(ctx,"bob","/opt/other","read",time.Hour,10*time.Minute)
  if err!=nil {t.Fatal(err)}
- b:=&operatorBridge{broker:&broker.Broker{State:store,AdminToken:"admin-secret",ExpectedSubject:"alice"},token:"web-secret"}
+ b:=&operatorBridge{broker:&broker.Broker{State:store,AdminToken:"admin-secret",ExpectedSubject:"alice",InstanceID:"node-a"},token:"web-secret"}
  req:=wire.Request{ID:"list",Subject:"local-owner",Tool:"admin.approval.list",AdminToken:"web-secret"}
  list:=b.Handle(ctx,req)
  if !list.OK {t.Fatalf("list denied: %+v",list.Error)}
  var rows []state.Approval
  if err:=json.Unmarshal(list.Result,&rows);err!=nil{t.Fatal(err)}
  if len(rows)!=1||rows[0].ID!=approved.ID {t.Fatalf("web exposed ineligible requests: %+v",rows)}
- body,_:=json.Marshal(map[string]any{"request_id":approved.ID,"snapshot_hash":state.ApprovalFingerprint(approved,""),"node_id":""})
+ body,_:=json.Marshal(map[string]any{"request_id":approved.ID,"snapshot_hash":state.ApprovalFingerprint(approved,"node-a"),"node_id":"node-a"})
  decision:=wire.Request{ID:"deny",Subject:"local-owner",Tool:"admin.approval.deny",AdminToken:"web-secret",Args:body}
  result:=b.Handle(ctx,decision)
  if !result.OK{t.Fatalf("denial rejected: %+v",result.Error)}

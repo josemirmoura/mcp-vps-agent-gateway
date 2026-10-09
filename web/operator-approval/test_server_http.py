@@ -80,7 +80,7 @@ class HttpContract(unittest.TestCase):
         item={"id":ID,"subject":"subject","target":"/opt/project","access":"work",
               "ttl_ns":900000000000,"expires":app.dt.datetime.now(app.dt.timezone.utc)+app.dt.timedelta(minutes=8),"kind":"root", "fingerprint":"a"*64, "node_id":""}
         with patch.dict(os.environ,{"PORTICO_OPERATOR_PUBLIC_ORIGIN":"https://operator.example.test",
-            "PORTICO_OPERATOR_PHYSICAL_CEILING":"/opt"}),patch.object(app.OperatorIPC,"list_requests",return_value=[item]):
+            "PORTICO_OPERATOR_PHYSICAL_CEILING":"/opt"}),patch.object(app.OperatorIPC,"request",return_value=item):
             with patch.object(app,"verify_password",return_value=True):
                 login=self.client.open(self.req("/operator/api/login","POST",{"password":"valid"}))
                 self.assertIn("Path=/operator",login.headers["Set-Cookie"])

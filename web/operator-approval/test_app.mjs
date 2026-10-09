@@ -9,7 +9,7 @@ const source=readFileSync(new URL('./app.js',import.meta.url),'utf8');
 
 async function scenario(decision){
   const elements=new Map();
-  for(const id of ['status','details','login-panel','login-form','login-error',
+  for(const id of ['status','details','login-panel','login-form','login','login-error',
     'approve','deny','request_id','node','subject','resource','access','ttl',
     'expires','warning','password','operator','step-up-panel','step-up-password','refresh','logout']){
     elements.set(id,{hidden:id==='details'||id==='login-panel',disabled:false,

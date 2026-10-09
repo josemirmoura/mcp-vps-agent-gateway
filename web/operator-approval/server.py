@@ -73,7 +73,7 @@ class OperatorIPC:
         if len(token) < 32 or not path.startswith("/"):
             raise RuntimeError("operator IPC unconfigured")
         tools = {"approvals": "admin.approval.list", "approve": "admin.approval.approve",
-                 "deny": "admin.approval.deny", "status": "admin.approval.status"}
+                 "deny": "admin.approval.deny", "status": "admin.approval.status", "detail": "admin.approval.get"}
         if action not in tools:
             raise RuntimeError("unsupported operator operation")
         payload = {"id": secrets.token_urlsafe(12), "tool": tools[action],
@@ -98,22 +98,22 @@ class OperatorIPC:
         return reply.get("result")
 
     @staticmethod
-    def list_requests():
-        rows = OperatorIPC.call("approvals") or []
-        if not isinstance(rows, list):
-            raise RuntimeError("invalid approval response")
-        result = []
-        for row in rows:
-            item = operator.request_detail(row)
-            if item:
-                fp, node = row.get("Fingerprint"), row.get("NodeID", "")
-                if not isinstance(fp, str) or not re.fullmatch(r"[a-f0-9]{64}", fp):
-                    raise RuntimeError("Broker missing immutable request binding")
-                if node != os.environ.get("PORTICO_OPERATOR_NODE_ID", ""):
-                    raise RuntimeError("destination node mismatch")
-                item.update(fingerprint=fp, node_id=node)
-                result.append(item)
-        return result
+    def request(request_id):
+        # A queue of unrelated requests must never truncate this IPC frame.
+        row = OperatorIPC.call("detail", request_id)
+        if row is None:
+            return None
+        item = operator.request_detail(row)
+        if item:
+            if item["id"] != request_id:
+                raise RuntimeError("request identity mismatch")
+            fp, node = row.get("Fingerprint"), row.get("NodeID", "")
+            if not isinstance(fp, str) or not re.fullmatch(r"[a-f0-9]{64}", fp):
+                raise RuntimeError("Broker missing immutable request binding")
+            if not node or node != os.environ.get("PORTICO_OPERATOR_NODE_ID", ""):
+                raise RuntimeError("destination node mismatch")
+            item.update(fingerprint=fp, node_id=node)
+        return item
 
 
 def verify_password(password):
@@ -280,7 +280,7 @@ class Handler(BaseHTTPRequestHandler):
         if session is None:
             self.reply(401, {"error": "login required"}); return
         try:
-            item = next((x for x in OperatorIPC.list_requests() if x["id"] == match["id"]), None)
+            item = OperatorIPC.request(match["id"])
             if item:
                 data = pending_details(item)
                 data.update(csrf_token=session[1], decision_nonce=create_nonce(session, item))
@@ -350,6 +350,9 @@ class Handler(BaseHTTPRequestHandler):
                 if code != 200:
                     self.reply(code, {"error": "verification failed or rate limit"}); return
                 with LOCK:
+                    if (NONCES.get(nonce) is not record or record["expires"] <= time.monotonic()
+                            or not self.session_valid(session)):
+                        self.reply(409, {"error": "decision or session expired during verification"}); return
                     STEPUPS[nonce] = (time.monotonic() + 60, session[0])
                 self.reply(200, {"ok": True}); return
             decision = request.get("decision")
@@ -360,7 +363,7 @@ class Handler(BaseHTTPRequestHandler):
                 stepped = bool(proof and proof[0] > time.monotonic() and proof[1] == session[0])
                 if decision == "approve" and record["step_up"] and not stepped:
                     self.reply(428, {"error": "step_up_required"}); return
-                if NONCES.get(nonce) is not record or not self.session_valid(session):
+                if NONCES.get(nonce) is not record or record["expires"] <= time.monotonic() or not self.session_valid(session):
                     self.reply(409, {"error": "decision already used or session expired"}); return
                 NONCES.pop(nonce, None); STEPUPS.pop(nonce, None)
             result = OperatorIPC.call(decision, record["request_id"], snapshot_hash=record["fingerprint"], node_id=record["node_id"], step_up=stepped)
@@ -385,6 +388,8 @@ def main():
             or not os.environ.get("PORTICO_OPERATOR_PHYSICAL_CEILING", "").startswith("/")):
         raise SystemExit("Operator verifier, HTTPS origin and scoped IPC credentials must be configured")
     identity(); frame_ancestors()
+    if not os.environ.get("PORTICO_OPERATOR_NODE_ID"):
+        raise SystemExit("A stable destination node ID is required")
     address = ("0.0.0.0" if os.environ.get("PORTICO_OPERATOR_CONTAINER") == "1" else "127.0.0.1", 8765)
     print("Portico operator service ready behind loopback-published TLS proxy", flush=True)
     ThreadingHTTPServer(address, Handler).serve_forever()

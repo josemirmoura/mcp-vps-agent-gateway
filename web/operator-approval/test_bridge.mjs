@@ -13,7 +13,7 @@ const hostOrigin = 'https://host.test';
 function harness({ embedded = true } = {}) {
   const sent = [], listeners = {}, timers = new Map(), elements = new Map();
   let timerID = 0;
-  for (const id of ['status', 'frame', 'portal', 'refresh', 'cli']) {
+  for (const id of ['status', 'frame', 'portal', 'portal-url', 'refresh', 'cli']) {
     elements.set(id, {
       hidden: ['frame', 'portal'].includes(id), disabled: id === 'refresh',
       textContent: '', src: '', href: '', contentWindow: {}, handlers: {},
@@ -175,4 +175,35 @@ test('cancellation cannot produce an approval and reports no automatic decision'
   h.message({ jsonrpc: '2.0', method: 'ui/notifications/tool-cancelled' });
   assert.match(h.elements.get('status').textContent, /Nenhuma decisão automática/);
   assert.ok(h.sent.every(x => !x.value.params?.name?.includes('approve')));
+});
+
+test('an explicit owner link click uses verified host openLinks capability only', async () => {
+  const h = harness(); h.initialize({ openLinks: {} }); h.toolResult();
+  assert.equal(h.sent.some(x => x.value.method === 'ui/open-link'), false);
+  let prevented = false;
+  const promise = h.elements.get('portal').handlers.click({ preventDefault() { prevented = true; } });
+  const call = h.sent.at(-1).value;
+  assert.equal(prevented, true);
+  assert.equal(call.method, 'ui/open-link');
+  assert.deepEqual(call.params, { url: operatorOrigin + '/operator?request=' + requestId });
+  h.message({ jsonrpc: '2.0', id: call.id, result: {} });
+  await promise;
+  const unsupported = harness(); unsupported.initialize({}); unsupported.toolResult();
+  const count = unsupported.sent.length;
+  await unsupported.elements.get('portal').handlers.click({ preventDefault() { throw Error('Do not suppress the raw fallback'); } });
+  assert.equal(unsupported.sent.length, count);
+  assert.equal(unsupported.elements.get('portal-url').textContent, operatorOrigin + '/operator?request=' + requestId);
+});
+
+test('a late status response cannot overwrite a different request in a reused app', async () => {
+  const h = harness(); h.initialize(); h.toolResult();
+  const promise = h.elements.get('refresh').handlers.click();
+  const call = h.sent.at(-1).value;
+  const second = 'apr_different1234';
+  h.toolResult({ request_id: second, operator_approval_url: operatorOrigin + '/operator?request=' + second });
+  const before = h.elements.get('status').textContent;
+  h.message({ jsonrpc: '2.0', id: call.id, result: { structuredContent: { request_id: requestId, status: 'approved' } } });
+  await promise;
+  assert.equal(h.elements.get('status').textContent, before);
+  assert.equal(h.elements.get('portal').href, operatorOrigin + '/operator?request=' + second);
 });

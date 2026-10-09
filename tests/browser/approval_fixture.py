@@ -79,7 +79,7 @@ def broker_call(action, request_id=None, *, snapshot_hash=None, node_id=None, st
         return {"request_id": request_id, "status": item["status"]}
 
 
-app.OperatorIPC.list_requests = staticmethod(list_requests)
+app.OperatorIPC.request = staticmethod(lambda rid: next((item for item in list_requests() if item["id"] == rid), None))
 app.OperatorIPC.call = staticmethod(broker_call)
 
 
@@ -136,13 +136,19 @@ window.addEventListener('message', async event=>{
  if(event.source!==frame.contentWindow||event.origin!==config.appOrigin)return;
  const value=event.data;window.bridgeMessages.push(value);
  if(value?.method==='ui/initialize'){
-  send({jsonrpc:'2.0',id:value.id,result:{protocolVersion:'2026-01-26',hostCapabilities:{sandbox:{csp:{frameDomains:config.frame==='allowed'?[config.operatorOrigin]:[]}}}}});
+  send({jsonrpc:'2.0',id:value.id,result:{protocolVersion:'2026-01-26',hostCapabilities:{openLinks:{},sandbox:{csp:{frameDomains:config.frame==='allowed'?[config.operatorOrigin]:[]}}}}});
  }
  if(value?.method==='ui/notifications/initialized')send({jsonrpc:'2.0',method:'ui/notifications/tool-result',params:{structuredContent:{request_id:config.requestID,operator_approval_url:config.operatorOrigin+'/operator?request='+config.requestID}}});
  if(value?.method==='tools/call'){
   if(value.params?.name!=='permissions.approval_status'){send({jsonrpc:'2.0',id:value.id,error:{code:-32601,message:'No approval tool'}});return}
   const state=await (await fetch('/__fixture/state')).json();
   send({jsonrpc:'2.0',id:value.id,result:{structuredContent:{request_id:config.requestID,status:state.statuses[config.requestID]}}});
+ }
+ if(value?.method==='ui/open-link'){
+  const expected=config.operatorOrigin+'/operator?request='+config.requestID;
+  if(value.params?.url!==expected){send({jsonrpc:'2.0',id:value.id,error:{code:-32602,message:'Unexpected portal URL'}});return}
+  window.open(expected,'_blank','noopener,noreferrer');
+  send({jsonrpc:'2.0',id:value.id,result:{}});
  }
 });
 </script></html>"""
@@ -161,15 +167,18 @@ def main():
         cert, key = Path(temp) / "cert.pem", Path(temp) / "key.pem"
         subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
                         "-keyout", str(key), "-out", str(cert), "-days", "1",
-                        "-subj", "/CN=localhost", "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1"],
+                        "-subj", "/CN=localhost", "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1,DNS:operator.portico.test,DNS:host.aiclient.test,DNS:host.secondclient.test,DNS:app.mcpapps.test"],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         tls.load_cert_chain(cert, key)
         portal = https_server(PortalHandler, tls)
         host = https_server(HarnessHandler, tls)
         resource = https_server(HarnessHandler, tls)
-        origin = lambda server: f"https://127.0.0.1:{server.server_port}"
-        operator_origin, host_origin, app_origin = origin(portal), origin(host), origin(resource)
+        operator_origin = f"https://operator.portico.test:{portal.server_port}"
+        host_origin = f"https://host.aiclient.test:{host.server_port}"
+        other_host_origin = f"https://host.secondclient.test:{host.server_port}"
+        app_origin = f"https://app.mcpapps.test:{resource.server_port}"
+        control_origin = f"https://127.0.0.1:{host.server_port}"
         salt = b"portico-test-salt-only-1234"
         digest = hashlib.scrypt(PASSWORD.encode(), salt=salt, n=2**14, r=8, p=1, dklen=32)
         os.environ.update({"PORTICO_OPERATOR_PUBLIC_ORIGIN": operator_origin,
@@ -177,13 +186,13 @@ def main():
                            "PORTICO_OPERATOR_APPROVAL_TOKEN": "browser-fixture-scoped-token-synthetic",
                            "PORTICO_OPERATOR_ID": "browser-fixture-owner", "PORTICO_OPERATOR_NODE_ID": NODE,
                            "PORTICO_OPERATOR_NODE_LABEL": "Browser fixture node",
-                           "PORTICO_OPERATOR_FRAME_ANCESTORS": host_origin + " " + app_origin})
+                           "PORTICO_OPERATOR_FRAME_ANCESTORS": host_origin + " " + other_host_origin + " " + app_origin})
         for server in (host, resource):
             server.operator_origin, server.app_origin = operator_origin, app_origin
         reset()
         for server in (portal, host, resource):
             threading.Thread(target=server.serve_forever, daemon=True).start()
-        print(json.dumps({"operator": operator_origin, "host": host_origin, "app": app_origin,
+        print(json.dumps({"operator": operator_origin, "host": host_origin, "otherHost": other_host_origin, "app": app_origin, "control": control_origin,
                           "read": READ, "other": READ_TWO, "critical": CRITICAL, "sensitive": SENSITIVE,
                           "password": PASSWORD}), flush=True)
         done = threading.Event()
