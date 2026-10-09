@@ -1,0 +1,114 @@
+name: block2-mcp-2026-requirements-evidence
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/block2-mcp-requirements.yml'
+      - 'scripts/mcp_conformance_matrix.py'
+      - 'tests/scripts/test_mcp_conformance_matrix.py'
+      - 'internal/gateway/oauth_resource_smoke_test.go'
+      - 'internal/gateway/version_protocol_test.go'
+      - 'version.go'
+      - 'go.mod'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mcp-requirements-evidence-not-release-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run matrix parser regressions
+        run: |
+          python3 -m unittest discover -s tests/scripts -p 'test_mcp_conformance_matrix.py' -v
+          python3 -m py_compile scripts/mcp_conformance_matrix.py
+      - name: Build pinned upstream MCP conformance requirements
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --quiet --filter=blob:none https://github.com/modelcontextprotocol/conformance.git "$RUNNER_TEMP/mcp-conformance"
+          git -C "$RUNNER_TEMP/mcp-conformance" checkout --quiet --detach c37eec888e1c6ff140af79987a40008548b7cc5f
+          test "$(git -C "$RUNNER_TEMP/mcp-conformance" rev-parse HEAD)" = c37eec888e1c6ff140af79987a40008548b7cc5f
+          cd "$RUNNER_TEMP/mcp-conformance"
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Build real disposable Gateway and check OAuth boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./internal/gateway -run 'TestIntegratedOAuthResourceServerBoundaryE2E|TestMCPInitializeAdvertisesPackagedVersion|TestMCPInitializeAndSystemInfoAdvertiseSamePackagedRelease' -count=1 -v
+          go build -trimpath -o "$RUNNER_TEMP/portico-requirements-gateway" ./cmd/vps-agent-gateway
+      - name: Run frozen 2026-07-28 required server scenarios and classify evidence
+        shell: bash
+        env:
+          VPS_AGENT_AUTH_MODE: none
+          VPS_AGENT_LISTEN: 127.0.0.1:18994
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          export VPS_AGENT_POC_ROOT="$RUNNER_TEMP/portico-requirements-safe-root"
+          "$RUNNER_TEMP/portico-requirements-gateway" > evidence/disposable-gateway.log 2>&1 &
+          gateway_pid=$!
+          trap 'kill "$gateway_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for _ in $(seq 1 60); do
+            if curl --fail --silent --show-error http://127.0.0.1:18994/healthz >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$gateway_pid" 2>/dev/null; then
+              break
+            fi
+            sleep 0.2
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Disposable Gateway failed startup" >&2
+            tail -60 evidence/disposable-gateway.log >&2
+            exit 1
+          fi
+          rc=0
+          timeout 1200s node "$RUNNER_TEMP/mcp-conformance/dist/index.js" \
+            server --url http://127.0.0.1:18994/mcp \
+            --requirements 2026-07-28 \
+            > evidence/requirements-stdout.log 2>&1 || rc=$?
+          printf '%s\n' "$rc" > evidence/runner-exit.txt
+          python3 scripts/mcp_conformance_matrix.py \
+            --requirements "$RUNNER_TEMP/mcp-conformance/requirements/2026-07-28.yaml" \
+            --results results --runner-exit "$rc" \
+            --output evidence/requirements-matrix.json
+          # Conformance evidence success does NOT close the stable gate.
+          # Required missing scenarios remain BLOCKED in evidence.
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path("evidence/requirements-matrix.json").read_text())
+          measured=report["score"]["PASS"]+report["score"]["FAIL"]+report["score"]["SKIPPED"]
+          if measured == 0:
+              raise SystemExit("No requirements measured: upstream harness failure")
+          print("RELEASE_GATE:", "PASS" if report["release_gate_passed"] else "BLOCKED")
+          print("Evidence job success does not mean MCP release certification.")
+          PY
+      - name: Preserve official requirements and Gateway test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: block2-mcp-2026-requirements-${{ github.run_id }}
+          path: |
+            evidence/
+            results/
+          if-no-files-found: warn
+          retention-days: 30
