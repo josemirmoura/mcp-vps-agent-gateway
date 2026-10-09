@@ -7,6 +7,8 @@ on:
       - 'cmd/vps-agent-broker/operator_bridge*'
       - 'cmd/vps-agent-broker/main.go'
       - 'compose.yaml'
+      - 'compose.operator-portal.edge.yaml'
+      - 'scripts/validate-compose-model.sh'
   workflow_dispatch:
 jobs:
   tests:
@@ -21,5 +23,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - run: bash scripts/validate-compose-model.sh
       - run: go test ./cmd/vps-agent-broker ./internal/broker ./internal/ipc
       - run: python3 -m unittest discover -s web/operator-approval -p 'test_*.py' -v
