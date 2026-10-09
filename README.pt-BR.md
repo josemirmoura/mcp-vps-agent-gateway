@@ -6,7 +6,7 @@ Este repositório contém o runtime público do Portico Community.
 
 O caminho validado atualmente conecta o ChatGPT Web ou outro cliente MCP compatível a um único host Linux por meio de um Gateway sem privilégios e de um Broker local privilegiado. O proprietário da máquina define a autoridade; o Broker aplica essa autoridade.
 
-> **Status: candidato Community em pré-release.** Os workflows em Ubuntu 24.04 validam o pacote de ponta a ponta. A release estável, a confiabilidade prolongada em produção e o licenciamento futuro ainda dependem de gates específicos.
+> **Status: candidato Community em pré-release.** Os workflows em Ubuntu 24.04 exercitam o runtime/pacote em ambientes descartáveis. O aceite real no ChatGPT Web/celular, a verificação de artefatos assinados, a confiabilidade e a licença final da Community dependem de gates separados.
 
 ## Limite do produto Community
 
