@@ -27,13 +27,26 @@ Do not record passwords, tokens, private keys or .env contents.
 
 ## 1. Clean installation
 
-Clone the exact RC tag and enter the guided flow.
+Use the **exact immutable, published RC tag** approved for acceptance, not merely the development `VERSION` value. As of 2026-10-09, source identifies as RC7 while the latest published release is RC6; **`git clone --branch v0.1.0-rc.7` is not a valid published-RC procedure yet**.
+
+Only after the final candidate has actually been released and its signatures verified:
 
 ~~~bash
-git clone --branch v0.1.0-rc.7 https://github.com/josemirmoura/mcp-vps-agent-gateway.git
+# Supply the exact immutable tag recorded in the acceptance ticket.
+PORTICO_ACCEPTANCE_RC=v0.1.0-rc.X
+
+git ls-remote --exit-code --tags \
+  https://github.com/josemirmoura/mcp-vps-agent-gateway.git \
+  "refs/tags/$PORTICO_ACCEPTANCE_RC"
+
+git clone --branch "$PORTICO_ACCEPTANCE_RC" \
+  https://github.com/josemirmoura/mcp-vps-agent-gateway.git
 cd mcp-vps-agent-gateway
+test "$(git describe --tags --exact-match)" = "$PORTICO_ACCEPTANCE_RC"
 bash scripts/install.sh
 ~~~
+
+Replace the placeholder with the **real, verified release tag**; never run acceptance against an invented tag or floating `main`.
 
 Confirm:
 
@@ -82,7 +95,7 @@ Before granting a project root:
 
 Request access to one disposable project root:
 
-- confirm ChatGPT/MCP client renders its **native elicitation/confirmation UI**, not the old custom inline iframe;
+- record whether the connected client actually advertises MCP elicitation. If it does, verify its **native confirmation UI** (not the legacy iframe); if it does not, verify pending/fail-closed status and the **separately authenticated operator approval fallback** supported by that released candidate. Do not assume the current ChatGPT host supplies native elicitation;
 - verify path, access profile, duration and physical ceiling are all visible for both narrow and ceiling-wide root requests;
 - confirm that requests containing invisible Unicode formatting characters (bidirectional overrides, isolate marks, zero-width joiners), Unicode line/paragraph separators or invalid UTF-8 are rejected before the native approval dialog, with no delegated access granted;
 - confirm a request covering the full physical ceiling cannot proceed without the stronger current-and-future-descendants disclosure;
@@ -102,7 +115,7 @@ Then validate the nested secret boundary:
 - create a disposable `.env.example` and confirm it remains readable;
 - create a disposable `.env` and confirm normal file read/hash and confined shell access are denied despite the parent project being authorized;
 - request temporary protected-file access to that exact `.env`;
-- confirm the MCP client renders native confirmation and clearly identifies the protected file, access profile and expiration;
+- confirm the supported client or independent operator approval surface clearly identifies the protected file, access profile and expiration, with approve/deny both usable on desktop and mobile;
 - approve the temporary exception, perform only the intended test, then revoke it;
 - confirm the `.env` becomes inaccessible again immediately;
 - confirm no secret content appears in audit/log output.
