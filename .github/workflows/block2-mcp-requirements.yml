@@ -86,6 +86,9 @@ jobs:
             --requirements 2026-07-28 \
             > evidence/requirements-stdout.log 2>&1 || rc=$?
           printf '%s\n' "$rc" > evidence/runner-exit.txt
+          echo "Official upstream runner exit code: $rc"
+          echo "Bounded official-runner diagnostics (disposable localhost only):"
+          sed -n '1,90p' evidence/requirements-stdout.log
           python3 scripts/mcp_conformance_matrix.py \
             --requirements "$RUNNER_TEMP/mcp-conformance/requirements/2026-07-28.yaml" \
             --results results --runner-exit "$rc" \
