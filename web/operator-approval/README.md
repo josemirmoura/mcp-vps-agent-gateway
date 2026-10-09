@@ -7,7 +7,7 @@
 - O handler desse socket aceita **somente** `admin.approval.list`, `admin.approval.approve` e `admin.approval.deny`, autenticados por um token randômico independente com no mínimo 32 caracteres. O token do operador web jamais é o token administrativo integral do Broker.
 - O contêiner `operator-portal` tem exclusivamente esse volume (sem o socket MCP geral e sem Docker socket), filesystem read-only, UID não privilegiado, capacidades Linux removidas.
 - O Broker ainda verifica os pedidos, identidade MCP, estado/expiração e grava audit trail. O frontend não amplia TTL/perfil.
-- O portal publica `8765` apenas no **loopback do host**, e só funciona externamente depois de configurar HTTPS em um reverse proxy confiável.
+- O portal publica `8765` apenas no **loopback do host** e utiliza um router Traefik TLS opt-in na rede edge. A API e o cookie de sessão ficam restritos ao prefixo `/operator/`, isolados das rotas `/mcp` e OAuth.
 
 ## Configuração opt-in
 Antes de ativar o profile do portal, configurar em `.env`:
@@ -16,13 +16,9 @@ Antes de ativar o profile do portal, configurar em `.env`:
 - `PORTICO_OPERATOR_PUBLIC_ORIGIN`: origem HTTPS exata, por exemplo `https://exemplo-do-operador.invalid` (placeholder, não um endereço real).
 - `VPS_AGENT_SCOPE_ROOT`: raiz física, exibida pelo portal para alertas de autorização ampla.
 
-Ativação **somente após revisão de segurança e provisionamento HTTPS**:
+Ativação **somente após aprovação do gate de segurança, backup e provisionamento HTTPS**. A VPS atual usa o overlay de OAuth integrado. A publicação exige compor explicitamente `compose.yaml`, `compose.integrated-auth.yaml` e `compose.operator-portal.edge.yaml`. **Não execute `docker compose up` apenas com `compose.yaml`**, pois isso pode alterar a implantação OAuth atual.
 
-```bash
-docker compose --profile operator-portal up -d --build
-```
-
-Por segurança, este comando **não** faz parte do instalador padrão.
+O perfil do portal é opcional e não integra o instalador padrão. Consulte o procedimento completo e o rollback em `docs/operator-portal-rollout.md`.
 
 ## Fluxo e endpoints
 - `GET /operator?request=apr_...`: página do operador.
