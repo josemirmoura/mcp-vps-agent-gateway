@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode"
 
+	portico "github.com/josemirmoura/mcp-vps-agent-gateway"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/gateway"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/ipc"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/securefs"
@@ -101,7 +102,7 @@ func main() {
 		WriteTimeout:      0, // Streamable HTTP may legitimately outlive a normal request timeout.
 		IdleTimeout:       2 * time.Minute,
 	}
-	slog.Info("gateway_start", "listen", listen, "auth_mode", authCfg.Mode, "instance_id", authCfg.InstanceID, "instance_name", authCfg.InstanceName)
+	slog.Info("gateway_start", "product_version", portico.Version(), "listen", listen, "auth_mode", authCfg.Mode, "instance_id", authCfg.InstanceID, "instance_name", authCfg.InstanceName)
 	if err := srv.ListenAndServe(); err != nil { slog.Error("gateway_exit", "error", err); os.Exit(1) }
 }
 

@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	portico "github.com/josemirmoura/mcp-vps-agent-gateway"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/cloudnode"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/ipc"
 )
@@ -82,7 +83,7 @@ func main() {
 	brokerTimeout := durationEnv("PORTICO_CLOUD_BROKER_TIMEOUT", 15*time.Minute)
 	brokerDrainTimeout := durationEnv("PORTICO_CLOUD_BROKER_DRAIN_TIMEOUT", 5*time.Second)
 
-	slog.Info("portico_cloud_node_start",
+	slog.Info("portico_cloud_node_start", "product_version", portico.Version(),
 		"node_id", identity.NodeID,
 		"workspace_id", identity.WorkspaceID,
 		"node_name", nodeName,

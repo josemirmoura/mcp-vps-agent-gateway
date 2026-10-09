@@ -39,6 +39,7 @@ Start here:
 - [tool-trust-and-confused-deputy.md](tool-trust-and-confused-deputy.md) - downstream/tool trust.
 - [transport-and-aggregation.md](transport-and-aggregation.md) - transport constraints.
 - [implementation-validation.md](implementation-validation.md) - executable evidence.
+- [runtime-version-identity.md](runtime-version-identity.md) - product release version in MCP handshake, diagnostics and startup logs.
 
 ## Precedence
 
