@@ -57,6 +57,8 @@ jobs:
         run: |
           set -euo pipefail
           go mod tidy
+          # Avoid testing a dependency graph that differs from the tagged archive.
+          git diff --exit-code -- go.mod go.sum
           go test -race -count=1 ./...
           bash -n scripts/*.sh
           bash -n scripts/lib/*.sh
@@ -209,6 +211,15 @@ jobs:
           sbom: true
           provenance: mode=max
           tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ env.RELEASE_TAG }}
+      - name: Scan exactly the published immutable image digest
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
       - uses: sigstore/cosign-installer@v4.1.2
       - name: Keyless-sign and verify release image
         shell: bash
