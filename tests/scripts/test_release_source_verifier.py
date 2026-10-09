@@ -6,8 +6,10 @@ cryptographic trust. Real Sigstore acceptance remains a separate release gate.
 """
 import gzip
 import hashlib
+import importlib.util
 import io
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -81,6 +83,20 @@ class ReleaseSourceVerifierTests(unittest.TestCase):
         self.assertEqual(len(checked), 2)
         self.assertTrue(checked[0].endswith(SHA))
         self.assertTrue(checked[1].endswith(ARCHIVE))
+
+    def test_signer_identity_is_bound_to_expected_tag(self):
+        spec = importlib.util.spec_from_file_location("portico_source_verifier", SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        identity = module.identity_for_tag("v0.1.0-rc.7")
+        base = ("https://github.com/josemirmoura/mcp-vps-agent-gateway/"
+                ".github/workflows/release.yml@refs/")
+        self.assertIsNotNone(re.fullmatch(identity, base+"tags/v0.1.0-rc.7"))
+        self.assertIsNotNone(re.fullmatch(identity, base+"heads/main"))
+        self.assertIsNone(re.fullmatch(identity, base+"tags/v0.1.0-rc.8"))
+        self.assertIsNone(re.fullmatch(identity, base+"heads/feature"))
+        self.assertIsNone(re.fullmatch(identity, base.replace("josemirmoura", "other-owner", 1)
+                                       +"tags/v0.1.0-rc.7"))
 
     def test_actual_git_archive_root_entry_is_accepted(self):
         # An actual git archive --prefix writes a root directory named
