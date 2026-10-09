@@ -222,6 +222,31 @@ bash scripts/remove.sh --purge --remove-source
 
 The purge never deletes arbitrary delegated project directories, third-party images, applications, databases or services. The legacy `/opt/vps-agent-sandbox` directory is removed only when it is empty.
 
+## Recovery from a failed installation step
+
+**Local/runtime failure:** inspect the current Docker/services and rerun local checks; do not purge state simply because a check is red.
+
+~~~bash
+bash scripts/diagnose.sh status
+bash scripts/diagnose.sh health
+bash scripts/verify.sh
+~~~
+
+**DNS/HTTPS/OAuth failure:** make sure the DNS record points at the intended Linux host, verify that TCP 80/443 can reach the configured Traefik route, and recheck the public auth boundary after any safe configuration correction.
+
+~~~bash
+bash scripts/verify-public.sh
+~~~
+
+**No custom MCP app in ChatGPT:** first confirm account/workspace eligibility and the actual Developer Mode / Plugins feature surface. A healthy VPS does not enable missing ChatGPT capabilities.
+
+**MCP connected but no audited call:** confirm the exact `https://<domain>/mcp` endpoint, sign in using the **OAuth operator username** (normally `vps-operator`, not the Linux login), invoke `system.info`, return to the terminal, and press Enter to retry the fixed-baseline audit verification. No new event means installation is still incomplete.
+
+**Approval dialog unavailable or illegible:** do not infer consent or enable a self-approval tool. Only use a separately authenticated operator fallback that is actually shipped in the installed version; otherwise leave the access request pending. Record sanitized client/device evidence for the #65 acceptance gate.
+
+**Interrupted update, backup or migration:** do not run purge as a recovery tactic. Preserve operator state and consult the current lifecycle verification/rollback results; reliable recovery from every failure mode is a separate gate.
+
+
 ## Release selection and installation safety
 
 The `v0.1.0` stable release is **not yet published**. Do not try to clone a nonexistent stable tag or treat a moving `main` checkout as a signed release.
