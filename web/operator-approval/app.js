@@ -9,7 +9,7 @@ const requestId=new URL(location.href).searchParams.get('request');
 const validId=/^apr_[a-zA-Z0-9_-]{8,128}$/;
 let csrf='';
 function status(message){$('status').textContent=message}
-async function readJSON(response){if(!response.ok)throw Error(response.status===401?'Sessão não autenticada. Entre pelo portal seguro.':response.status===403?'Operador sem autorização para este pedido.':'Serviço indisponível ou solicitação inválida.');return response.json()}
+async function readJSON(response){if(!response.ok){const errors={401:'Sessão não autenticada. Entre pelo portal seguro.',403:'Operador sem autorização para este pedido.',404:'Pedido não está mais pendente: pode ter sido concluído ou expirado.',409:'Pedido expirado ou já decidido. Confira o estado antes de tentar novamente.',503:'Broker temporariamente indisponível.'};throw Error(errors[response.status]||'Não foi possível confirmar a solicitação.')}return response.json()}
 async function load(){
  if(!requestId||!validId.test(requestId)){status('Abra um pedido válido pelo link fornecido pelo Pórtico.');return}
  try{
@@ -28,8 +28,19 @@ async function load(){
 async function decide(decision){
  if(!csrf||!confirm(decision==='approve'?'Confirmar autorização exatamente como exibida?':'Negar esta solicitação?'))return;
  $('approve').disabled=true;$('deny').disabled=true;
- try{await readJSON(await fetch('/operator/api/approvals/'+encodeURIComponent(requestId)+'/decision',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({decision})}));status(decision==='approve'?'Decisão enviada e confirmada pelo servidor.':'Solicitação negada pelo servidor.');await load()}
- catch(e){status(e.message+' Confira o estado antes de tentar novamente.')}
+ try{
+  const result=await readJSON(await fetch('/operator/api/approvals/'+encodeURIComponent(requestId)+'/decision',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({decision})}));
+  if(result.status!==(decision==='approve'?'approved':'denied'))throw Error('O Broker não confirmou a decisão.');
+  csrf='';
+  $('login-panel').hidden=true;
+  $('details').hidden=false;
+  status(decision==='approve'?'Autorização aprovada com sucesso. Permissão concedida conforme prazo exibido.':'Solicitação negada com sucesso. Nenhuma permissão foi concedida.');
+  // A decisão remove o pedido da fila pendente. NÃO recarregar os detalhes:
+  // GET retornaria 404 e substituiria a confirmação por um falso erro.
+ }catch(e){
+  csrf='';
+  status(e.message+' Confira o estado do pedido antes de tentar novamente.');
+ }
 }
 $('approve').addEventListener('click',()=>decide('approve'));
 $('deny').addEventListener('click',()=>decide('deny'));
