@@ -965,7 +965,7 @@ func Handler(exec Executor, auth AuthConfig) http.Handler {
 	if metadataHandler := auth.ProtectedResourceMetadataHandler(); metadataHandler != nil {
 		mux.Handle("/.well-known/oauth-protected-resource", metadataHandler)
 	}
-	mux.Handle("/mcp", metrics.wrapHTTP(auth.InstanceID, auth.InstanceName, limitConcurrent(auth.MaxConcurrentRequests, auth.Wrap(mcpHandler))))
+	mux.Handle("/mcp", metrics.wrapHTTP(auth.InstanceID, auth.InstanceName, guardMCPOrigin(auth.ResourceIdentifier, limitConcurrent(auth.MaxConcurrentRequests, auth.Wrap(mcpHandler)))))
 	mux.Handle("/metrics", auth.Wrap(metrics.handler(auth.InstanceID, auth.InstanceName)))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
