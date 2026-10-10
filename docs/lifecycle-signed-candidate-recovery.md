@@ -10,7 +10,8 @@ Before any lifecycle test, verify both artifact classes for the SAME explicit ta
 
 ```sh
 # Set only after confirming a published candidate in GitHub Releases.
-RELEASE_TAG=<published-rc-tag>
+: "${RELEASE_TAG:?first export the exact published, signed RC tag}"
+mkdir -p "./release-assets/$RELEASE_TAG"
 gh release download "$RELEASE_TAG" \
   --repo josemirmoura/mcp-vps-agent-gateway \
   --dir "./release-assets/$RELEASE_TAG" \
