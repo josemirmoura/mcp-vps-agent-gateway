@@ -189,28 +189,28 @@ print("sha256:"+"a"*64)
         (self.repo / "scripts/lib").mkdir(parents=True)
         shutil.copyfile(ROOT / "scripts/update.sh", self.repo / "scripts/update.sh")
         (self.repo / "scripts/lib/product.sh").write_text(
-            'vps_agent_init_language() { :; }\\n'
-            'vps_agent_text() { printf "%s" "$1"; }\\n'
-            'vps_agent_banner() { :; }\\n'
-            'vps_agent_version() { printf "0.1.0-rc.7"; }\\n'
+            'vps_agent_init_language() { :; }\n'
+            'vps_agent_text() { printf "%s" "$1"; }\n'
+            'vps_agent_banner() { :; }\n'
+            'vps_agent_version() { printf "0.1.0-rc.7"; }\n'
         )
         self.commit_change()
         installed = run("git", "rev-parse", "HEAD", cwd=self.repo).stdout.strip()
-        (self.repo / "RELEASE-MARKER").write_text("candidate\\n")
+        (self.repo / "RELEASE-MARKER").write_text("candidate\n")
         self.commit_change()
         candidate = run("git", "rev-parse", "HEAD", cwd=self.repo).stdout.strip()
         run("git", "tag", "-f", TAG, cwd=self.repo)
         run("git", "push", "-q", "--force", "origin",
             "refs/tags/" + TAG, cwd=self.repo)
         run("git", "reset", "--hard", installed, cwd=self.repo)
-        (self.repo / ".env").write_text("PORTICO_TEST_ONLY=1\\n")
+        (self.repo / ".env").write_text("PORTICO_TEST_ONLY=1\n")
         (self.repo / "config").mkdir()
-        (self.repo / "config/policy.yaml").write_text("{}\\n")
+        (self.repo / "config/policy.yaml").write_text("{}\n")
         docker_log = self.base / "docker.log"
         self.make_command("docker", """
 import os,sys
 with open(os.environ["MOCK_DOCKER_LOG"],"a") as handle:
-    handle.write(" ".join(sys.argv[1:])+"\\n")
+    handle.write(" ".join(sys.argv[1:])+"\n")
 sys.exit(83)
 """)
         env = dict(self.env, VPS_AGENT_UPDATE_REF=TAG, MOCK_GH_DENY="1",
