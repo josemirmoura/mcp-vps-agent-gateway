@@ -94,6 +94,19 @@ echo "$(vps_agent_text 'Target commit' 'Commit alvo'):   $target_sha"
 echo
 echo "$(vps_agent_text 'Changes:' 'Alterações:')"
 git log --oneline --no-decorate "$current..$target_sha" | head -n 12 || true
+# Release authenticity is a PRECONDITION for any operational change:
+# do not stop services, mutate backups or reset Git based on tags alone.
+# No bypass is provided for explicit refs, hashes or a moving branch.
+if [[ ! "$target" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+  echo "UPDATE BLOCKED: target must be an exact published SemVer release tag." >&2
+  exit 1
+fi
+if ! python3 scripts/lib/verify-published-update.py \
+    --tag "$target" --expected-sha "$target_sha"; then
+  echo "UPDATE BLOCKED: source, identity and image signatures must be verified before stopping services." >&2
+  exit 1
+fi
+
 if [ "$current" = "$target_sha" ]; then
   echo "$(vps_agent_text 'Already at target version.' 'Já está na versão alvo.')"
   exit 0
