@@ -41,6 +41,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          go test -tags=portico_conformance_fixture ./cmd/portico-mcp-conformance-fixture -count=1 -v
           go build -tags=portico_conformance_fixture -trimpath \
             -o "$RUNNER_TEMP/portico-conformance-fixture" ./cmd/portico-mcp-conformance-fixture
       - name: Build immutable official conformance runner
