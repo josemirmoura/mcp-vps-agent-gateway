@@ -61,6 +61,14 @@ Source baseline: Community PR #99, commit `835d9a0a486e35775543b53523ef4640b4d66
 
 **`caching`, `missing-input-response`, `ignore-extra-params`:** production raw statuses contain SKIPPED/WARNING because the expected synthetic resource or tool behavior is absent; lab covers these with fixture-specific results. No conversion to PASS.
 
+## Real protocol defect found by direct negative testing
+
+The normal Gateway's initial `Handler` accepted `Origin: https://attacker.invalid` over `POST /mcp` with **HTTP 200**, actually invoking `system.info`; the new test [Gate C first run 38013189063](https://github.com/josemirmoura/mcp-vps-agent-gateway/actions/runs/38013189063) caught this. This is a **genuine production transport defect**: MCP 2026-07-28 [Streamable HTTP security](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http) states that invalid present `Origin` MUST receive 403.
+
+The fix implements `guardMCPOrigin` before authentication and before the tool executor, solely on the MCP endpoint. Security constraints: the configured OAuth resource origin is the public trust anchor, never the untrusted `Host` header; without a configured public resource, a supplied Origin must be same-authority **loopback only**. Requests without an Origin continue to work for headless clients. Invalid, malformed, multi-valued, cross-scheme and DNS-rebinding-style origins return 403 before any executor call; redacted status has no untrusted Origin string. Tests use disposable localhost HTTP, no secrets or production Broker. Bloco 5 must review the single `gateway.go` wrapper-line alteration and integration consequences.
+
+This fix was discovered **after** the original official artifact, so those original scores are immutable history. Re-run both frozen suites on this PR SHA and archive their new original artifacts; do not claim earlier runs demonstrate the correction.
+
 ## Production OAuth Resource Server and what is *not* tested
 
 The separate `TestIntegratedOAuthResourceServerBoundaryE2E` exercises a real `Handler` with a disposable introspection server. It verifies protected resource metadata, Bearer 401 challenge including `resource_metadata`, positive active introspection and subject propagation, and negative cases for inactive, expired, missing/altered issuer or audience, missing expiration/subject, missing/prefix-confused scopes. This is **OAuth resource-server evidence**, separate from the normal conformance run's `VPS_AGENT_AUTH_MODE=none`.
@@ -81,4 +89,4 @@ To close issue #79 for release purposes, engineering must approve this exact **n
 
 The `scripts/mcp_gate_c_diagnostic.py` companion verifies **every original check** against the frozen matrix and records source SHA, check ID/status and SHA-256/error-category only. Original error messages remain preserved in the GitHub Actions artifact but are never printed in the new public summary, preventing accidental leaking of future tokens/cookies. It rejects check-status drift, removed evidence and manipulated status counts. It does not waive failed scenarios or claim conformance.
 
-This PR is scoped to **tests, original-evidence diagnostics and Gate C documentation**. Gateway/Broker behavior, staged integration, `main`, production, VPS, credentials, release and signature workflows are untouched.
+This PR includes a narrowly scoped **MCP HTTP Origin transport correction** (one `gateway.go` wrapper line and an isolated helper), negative regressions, original-evidence diagnostics and Gate C documentation. Broker privileges, staged integration, `main`, production, VPS, credentials, release and signature workflows are untouched.
