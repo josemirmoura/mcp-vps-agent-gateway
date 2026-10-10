@@ -4,6 +4,16 @@
 
 **Round-two integration snapshot (2026-10-09, 23:59 UTC onward):** public `main` = `4212f30f7c145c8bbd0043b42bdc7dd95e466cd5`; **staging PR #99** = `9da45838517d6e4baa5e63236027f6a7471c66cb`. The second-round code changes from Blocks 1–4 are already combined in staging; `main` and owner VPS remain unchanged. Final exact-SHA recheck: **18/18 GitHub Actions workflows completed with SUCCESS** for `9da45838517d6e4baa5e63236027f6a7471c66cb`, including `docker-package-acceptance` run `38009010754`. These are automated staging results, not owner acceptance or a release signature. The newest verified published release remains `v0.1.0-rc.6`, and `VERSION=0.1.0-rc.7` alone is not a published signed RC7. Staging CI does not certify official MCP conformance, real client UX, legal rights or release signatures.
 
+## Third-round independent integration checkpoint (2026-10-10)
+
+The round-two SHA `9da45838517d6e4baa5e63236027f6a7471c66cb` remains a historical baseline. The newer staging commit **`7426484bd690b072b8efcaa8728bf67194657de5`** incorporates Block 1 (#114 and #116), Block 3 (#117), Block 5 release-documentation (#115), and Block 2 MCP capability/OAuth evidence (#118). At this exact staging SHA **18/18 GitHub Actions workflows completed SUCCESS**. Each input PR was independently checked before integration, including #118 **11/11 SUCCESS** at `2b2db1a3ea0a917a61dc94dbc52e471cc984916c`.
+
+Block 4's guided installer authority-decline fix is in **PR #119**, branch `fix/community-block4-r3-confirmation-failclosed-20261009`. Its CI and subsequent exact integrated-SHA CI must pass before this becomes the final technical candidate. The decline path previously exited with status 0; the fix returns 2 with PT-BR/EN resume guidance and adds real Bash/PTTY negative tests. Do not label the earlier staging SHA as the final reviewed release SHA.
+
+The official MCP 2026-07-28 full-suite baseline is unchanged: normal production Gateway **8 PASS / 2 FAIL / 3 SKIPPED / 24 NOT_TESTED** and test-only fixture **35 PASS / 1 FAIL / 1 SKIPPED / 0 NOT_TESTED**; both `release_gate_passed=false`. The [capability audit](mcp-release-capability-audit.md) identifies unadvertised optional completions, synthetic-fixture requirements and OAuth boundary evidence, without modifying the frozen suite or issuing a certification claim.
+
+**Four valid gate statuses only:** PASS, FAIL, NOT TESTED, and NOT APPLICABLE (with explicit justification). The gate table below uses NOT TESTED wherever the newest final candidate still lacks required evidence, even when an earlier commit already passed related tests. Gate C remains FAIL under the complete frozen-suite requirement. No stable release may be published with mandatory gates outstanding.
+
 ## Integration inputs and review responsibilities
 
 | Input | Working PRs | Dependency | Ready to merge into a release candidate? |
@@ -21,9 +31,9 @@ Never cherry-pick stacked commits blindly or overwrite a peer branch. Trace each
 
 | Gate | Evidence and pass criteria | Current |
 |---|---|---|
-| A. Rights/license and publishing authority | license, attribution/NOTICE, contributor/ownership boundaries legally approved for **this** candidate; historical grants preserved | NOT TESTED / owner review required |
-| B. Reproducible integrated build/security | exact SHA; CI Go race/vet/build for amd64/arm64, `govulncheck`, `gosec`, secret scan, Docker scans/SBOM, OAuth, IPC/Broker, lifecycle, negative security cases; all required checks green | PARTIAL: round-two `9da4583...` has **18/18 staging workflows SUCCESS**; still no post-merge main or actual release build/signed assets |
-| C. MCP protocol and client support | official upstream requirements pinned, table of PASS/FAIL/SKIPPED/NOT TESTED/NOT APPLICABLE; no simulated client presented as real | FAIL/PARTIAL: Gateway normal **8 PASS/2 FAIL/3 SKIPPED/24 NOT TESTED**; isolated test fixture **35 PASS/1 FAIL/1 SKIPPED/0 NOT TESTED**; **both `release_gate_passed=false`**. Fixture result is not Gateway production conformance, #79 open |
+| A. Rights/license and publishing authority | license, attribution/NOTICE, contributor/ownership boundaries legally approved for **this** candidate; historical grants preserved | NOT TESTED: owner/legal review outstanding |
+| B. Reproducible integrated build/security | exact SHA; CI Go race/vet/build for amd64/arm64, `govulncheck`, `gosec`, secret scan, Docker scans/SBOM, OAuth, IPC/Broker, lifecycle, negative security cases; all required checks green | NOT TESTED: 18/18 successful at staging `7426484...`; rerun full matrix after final Block 4 merge on exact final SHA |
+| C. MCP protocol and client support | official upstream requirements pinned, table of PASS/FAIL/SKIPPED/NOT TESTED/NOT APPLICABLE; no simulated client presented as real | FAIL: normal Gateway **8 PASS / 2 FAIL / 3 SKIPPED / 24 NOT_TESTED**; fixture-only **35 PASS / 1 FAIL / 1 SKIPPED / 0 NOT_TESTED**; both `release_gate_passed=false`, #79 open |
 | D. Signed candidate | tag and commit match VERSION; actual source checksum+Sigstore bundle and GHCR image digests/signatures independently verified against expected release workflow/issuer; scan provenance and SBOM | NOT TESTED: no new signed RC published |
 | E. Installation and operator acceptance | clean supported Linux clone from the exact released tag; HTTPS+OAuth; real compatible AI MCP call; scoped grant, denial, expiration, protected secrets, revocation and audit; desktop and mobile UI where available; secure HTTPS/SSH fallback | NOT TESTED for integrated candidate |
 | F. Recovery and promotion | controlled backup/rollback and stop/tar failure rehearsal; no unexpected privilege/identity loss; CI candidate SHA **and separately main SHA after merge**; operator release approval | NOT TESTED |
