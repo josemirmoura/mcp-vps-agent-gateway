@@ -10,6 +10,31 @@ if [[ -n "$(git status --porcelain)" ]]; then
  echo "Checkout operacional contém alterações locais; staging cancelado." >&2; exit 2
 fi
 CURRENT="$(git rev-parse HEAD)"
+# The integration branch moves as other blocks are merged. Never validate an
+# unpinned or old authorization branch in place of the reviewed candidate.
+CANDIDATE_SHA="${PORTICO_STAGE_CANDIDATE_SHA:-}"
+if [[ ! "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+ echo "Informe PORTICO_STAGE_CANDIDATE_SHA com os 40 caracteres do commit revisado." >&2
+ exit 2
+fi
+CANDIDATE_REF="${PORTICO_STAGE_CANDIDATE_REF:-refs/heads/integration/community-stable-block5-20261009}"
+case "$CANDIDATE_REF" in
+ refs/heads/*|refs/tags/*) ;;
+ *) echo "PORTICO_STAGE_CANDIDATE_REF deve ser refs/heads/... ou refs/tags/..." >&2; exit 2 ;;
+esac
+if ! git check-ref-format "$CANDIDATE_REF"; then
+ echo "Referência Git do candidato inválida; staging cancelado." >&2
+ exit 2
+fi
+git fetch --quiet --no-tags origin "$CANDIDATE_REF"
+CANDIDATE="$(git rev-parse --verify 'FETCH_HEAD^{commit}')"
+if [[ "$CANDIDATE" != "$CANDIDATE_SHA" ]]; then
+ echo "Candidato divergiu do SHA revisado; staging cancelado. Atualize a aprovação antes de prosseguir." >&2
+ exit 2
+fi
+git merge-base --is-ancestor "$CURRENT" "$CANDIDATE" || {
+ echo "Candidato não descende do commit operacional; abortado." >&2; exit 2
+}
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 PARENT="${PORTICO_STAGE_PARENT:-$HOME/portico-operator-validation}"
 case "$PARENT" in
@@ -23,11 +48,6 @@ BACKUP="$PARENT/backup-$STAMP"
 if [[ -e "$STAGE" || -e "$BACKUP" ]]; then
  echo "Diretório existente; nenhuma alteração." >&2; exit 2
 fi
-git fetch --quiet origin feat/operator-approval-web-backend
-CANDIDATE="$(git rev-parse FETCH_HEAD)"
-git merge-base --is-ancestor "$CURRENT" "$CANDIDATE" || {
- echo "Candidato não descende do commit operacional; abortado." >&2; exit 2
-}
 git worktree add --quiet --detach "$STAGE" "$CANDIDATE"
 python3 "$STAGE/scripts/operator-portal-snapshot.py" --output "$BACKUP"
 if docker info >/dev/null 2>&1; then

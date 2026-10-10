@@ -33,7 +33,15 @@ go test ./...
 
 Usar as versões fixadas pelo repositório/workflows. Se o ambiente não permite toolchain Go, sockets Unix ou browser, executar a mesma verificação em runner adequado e registrar a limitação; não eliminar testes para produzir um resultado verde.
 
-O script da linha de base `scripts/operator-portal-stage.sh` busca a branch `feat/operator-approval-web-backend`, da PR #88. Ele não seleciona automaticamente o SHA adaptativo. Conferir a referência antes de usá-lo; `STAGING READY, NO DEPLOY` não significa que um cliente comercial foi testado.
+O preparador `scripts/operator-portal-stage.sh` exige **SHA completo e imutável** da revisão já conferida pelo integrador; não aceita uma branch antiga ou um candidato implícito. Por padrão consulta a branch de integração atual, mas só prossegue se o HEAD obtido coincidir exatamente com `PORTICO_STAGE_CANDIDATE_SHA`. Se o Bloco 5 atualizar staging, solicite a nova SHA verificada antes de executar. Para uma tag já aprovada, indique `PORTICO_STAGE_CANDIDATE_REF=refs/tags/<tag>`. Exemplo de preparo (sem iniciar contêineres):
+
+```bash
+PORTICO_STAGE_CANDIDATE_SHA=COLE_O_SHA_EXATO_DE_40_CARACTERES \
+PORTICO_STAGE_CANDIDATE_REF=refs/heads/integration/community-stable-block5-20261009 \
+bash scripts/operator-portal-stage.sh
+```
+
+O script aborta antes de criar novo worktree/backup se a referência não coincidir, não for descendente da instalação atual ou estiver inválida. Ainda é necessário validar a proveniência do SHA, os workflows e a configuração de isolamento antes de qualquer implantação. `STAGING READY, NO DEPLOY` significa somente preparação e verificação local, não aceite de cliente real.
 
 Para execução de serviços, preferir VM/nó descartável. Usar banco, raízes, sockets, credenciais, projeto Compose, portas, DNS/TLS e OAuth de teste próprios. Um worktree sozinho não isola serviços: o modelo possui nome padrão de projeto, Broker privilegiado e recursos do host. Nunca executar um `docker compose up` genérico no checkout de revisão supondo que ele é independente da instalação ativa.
 
