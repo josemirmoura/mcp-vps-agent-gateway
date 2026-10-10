@@ -11,8 +11,8 @@ let generation=0,deciding=false,loggingOut=false;
 function status(message){$('status').textContent=message}
 function notify(state){if(embedded&&window.parent!==window)window.parent.postMessage({type:'portico-operator',request_id:requestId,status:state},'*')}
 async function readJSON(response){if(!response.ok){const errors={401:'Sessão não autenticada. Entre na Central segura.',403:'Operador sem autorização ou verificação recusada.',404:'Pedido indisponível para este operador.',409:'Decisão expirada, repetida ou sessão alterada. Consulte o estado.',428:'Confirme novamente a identidade para esta operação.',503:'Broker temporariamente indisponível. Consulte o estado antes de repetir.'};throw Error(errors[response.status]||'Não foi possível confirmar a solicitação.')}return response.json()}
-async function load(){
- if(deciding||loggingOut)return;
+async function load(afterLogin=false){
+ if(deciding||loggingOut||(loggingIn&&afterLogin!==true))return;
  const view=++generation;
  csrf='';nonce='';$('approve').disabled=true;$('deny').disabled=true;
  if(!requestId||!validId.test(requestId)){status('Abra um pedido válido pelo link fornecido pelo Pórtico.');return}
@@ -41,7 +41,7 @@ async function load(){
 async function decide(decision){
  // The visible owner button is the explicit confirmation. Browser modal
  // dialogs are not available in the minimum MCP Apps iframe sandbox.
- if(deciding||loggingOut||!csrf||!nonce||!['approve','deny'].includes(decision))return;
+ if(deciding||loggingOut||loggingIn||!csrf||!nonce||!['approve','deny'].includes(decision))return;
  deciding=true;
  const view=++generation,decisionCsrf=csrf,decisionNonce=nonce;
  $('refresh').disabled=true;
@@ -65,7 +65,7 @@ $('approve').addEventListener('click',()=>decide('approve'));
 $('deny').addEventListener('click',()=>decide('deny'));
 $('refresh').addEventListener('click',load);
 $('logout').addEventListener('click',async()=>{
- if(loggingOut||!sessionCsrf)return;
+ if(loggingOut||loggingIn||!sessionCsrf)return;
  loggingOut=true;++generation;csrf='';nonce='';$('approve').disabled=true;$('deny').disabled=true;$('refresh').disabled=true;
  try{await readJSON(await fetch(api+'/logout',{method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':sessionCsrf}}));sessionCsrf='';$('details').hidden=true;$('login-panel').hidden=false;$('step-up-password').value='';status('Sessão encerrada.')}
  catch(e){status(e.message+' Consulte o estado antes de decidir novamente.')}
@@ -73,9 +73,12 @@ $('logout').addEventListener('click',async()=>{
 });
 async function login(){
  if(loggingIn||loggingOut||deciding||!$('login-form').reportValidity())return;
- loggingIn=true;$('login').disabled=true;$('login-error').textContent='';
+ loggingIn=true;++generation;csrf='';nonce='';sessionCsrf='';
+ $('login').disabled=true;$('refresh').disabled=true;$('logout').disabled=true;
+ $('approve').disabled=true;$('deny').disabled=true;$('details').hidden=true;
+ $('step-up-password').value='';$('login-error').textContent='';
  const password=$('password').value;$('password').value='';
- try{await readJSON(await fetch(api+'/login',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})}));$('login-panel').hidden=true;await load()}catch(err){$('login-error').textContent=err.message}finally{loggingIn=false;$('login').disabled=false}
+ try{await readJSON(await fetch(api+'/login',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})}));$('login-panel').hidden=true;await load(true)}catch(err){$('login-error').textContent=err.message}finally{loggingIn=false;$('login').disabled=false;$('refresh').disabled=false;$('logout').disabled=false}
 }
 // The minimum MCP Apps sandbox suppresses native form submission before its
 // submit event. Explicit click/Enter fetches work without allow-forms.

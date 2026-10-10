@@ -1,6 +1,6 @@
 # Authorization candidate: desktop/mobile acceptance
 
-This checklist covers the authorization candidate derived from #93/#88, preserving #94. It is a scoped Community review, not a release or deployment authorization. The integration owner selects the final integrated SHA and records its CI separately. See [rollout and rollback](adaptive-approvals-rollout.md).
+This checklist covers the authorization candidate integrated from #88/#93/#101, preserving #94, and the second-round review based on integration commit `272ecf4bb8576213564141fec31c61cf804c7ae2`. It is a scoped Community review, not a release or deployment authorization. The integration owner selects the final integrated SHA and records its CI separately. See [rollout and rollback](adaptive-approvals-rollout.md).
 
 ## Candidate and isolation
 
@@ -17,6 +17,22 @@ node --test web/operator-approval/test_*.mjs
 ```
 
 The dedicated browser workflow also runs the pinned Chromium harness. It emulates desktop/mobile; the real Broker test exercises HTTP BFF → restricted Unix IPC → SQLite decision/grant/audit. Neither is real ChatGPT acceptance.
+
+The second-round HTTP regressions hold Broker queries open while logout, session expiry/rotation or operator/node/credential changes occur. No late query may reveal details or issue new proof for the invalid session. Terminal status and decision acknowledgements must match the requested ID. An ambiguous decision acknowledgement consumes the nonce and requires a state query; it does not roll back a decision already committed by the Broker. Login invalidates previous UI reads and proof, serializes refresh/logout and obtains a new request-bound nonce before enabling buttons. Logout and session rotation discard unused nonces/step-up proof without changing existing Broker grants.
+
+## Roteiro curto para Josemir: computador e celular reais
+
+O bloco 5 prepara antes um Linux descartável, endpoint de staging, pastas/arquivos sintéticos, links dos pedidos, versão/SHA final e CI. Entrega uma página com o que deve aparecer em cada etapa. Não começar este aceite na instalação de produção. Senhas entram somente na origem HTTPS da Central; nunca no chat.
+
+1. No chat conectado ao staging, peça a leitura de uma pasta de teste ainda bloqueada. Confira máquina, cliente, pasta, acesso e prazo. Se a Central não aparecer dentro da conversa, abra o link HTTPS do pedido. Registre qual caminho apareceu; ausência de popup nativo não concede acesso.
+2. Entre na Central e toque **Negar**. O pedido deve ficar negado e a leitura continuar bloqueada. Tire uma captura somente dos dados sintéticos e do resultado.
+3. Faça outro pedido curto de leitura e toque **Autorizar**. A leitura deve funcionar só na pasta e no prazo exibidos. A sessão pode ser reutilizada, mas cada pedido exige novo clique. O bloco 5 confere a decisão e o sujeito na auditoria.
+4. No pedido de trabalho/arquivo protegido preparado pelo bloco 5, **Autorizar** deve pedir confirmação da senha; uma senha incorreta não autoriza. **Negar** deve funcionar sem redigitar a senha.
+5. Toque **Consultar estado** e em seguida **Encerrar sessão**. Uma resposta atrasada não deve reabrir os detalhes/botões. Ao entrar novamente, espere os detalhes novos antes de decidir. Repita um pedido em duas janelas: só uma decisão pode vencer.
+6. No teste de expiração e revogação preparado pelo bloco 5, confira que a leitura perde acesso e **Consultar estado** mostra expirado/revogado. Logout encerra a sessão da Central; não revoga uma permissão já concedida.
+7. Repita no telefone físico, registrando navegador/OS, data, SHA e se os botões/textos estavam legíveis e acessíveis. Emulação Chromium não substitui esta observação. Ao terminar, o bloco 5 revoga as permissões sintéticas e fecha o staging conforme o plano autorizado.
+
+Se houver comportamento inesperado, pare de autorizar, capture somente o estado público e informe a etapa. Use **Consultar estado** antes de repetir; a falta de resposta não comprova que o Broker deixou de decidir. Se a interface embutida falhar, use o portal externo ou o SSH interativo preparado pelo integrador. Nunca compartilhar cookie, token, nonce, senha ou captura de tráfego bruto.
 
 ## Real client sequence
 

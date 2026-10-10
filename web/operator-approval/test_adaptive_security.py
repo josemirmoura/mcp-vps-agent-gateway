@@ -186,7 +186,7 @@ class OperatorSecurity(unittest.TestCase):
         other, _ = self.login(); other_details = self.details(other)
         body = {"decision": "approve", "decision_nonce": details["decision_nonce"]}
         path = "/operator/api/approvals/" + ID + "/decision"
-        with patch.object(app.OperatorIPC, "call", return_value={"status": "approved"}) as call:
+        with patch.object(app.OperatorIPC, "call", return_value={"request_id": ID, "status": "approved"}) as call:
             self.assertEqual(self.req(path, body, other, other_details["csrf_token"])[0], 409)
             self.assertEqual(self.req(path.replace(ID, "apr_another1234"), body, cookie, details["csrf_token"])[0], 409)
             self.assertEqual(self.req(path, body, cookie, details["csrf_token"], "https://attacker.test")[0], 403)
@@ -199,7 +199,7 @@ class OperatorSecurity(unittest.TestCase):
         cookie, _ = self.login(); details = self.details(cookie)
         path = "/operator/api/approvals/" + ID
         body = {"decision_nonce": details["decision_nonce"], "decision": "approve"}
-        with patch.object(app.OperatorIPC, "call", return_value={"status": "approved"}) as call:
+        with patch.object(app.OperatorIPC, "call", return_value={"request_id": ID, "status": "approved"}) as call:
             self.assertEqual(self.req(path + "/decision", body, cookie, details["csrf_token"])[0], 428)
             self.assertEqual(call.call_count, 0)
             with patch.object(app, "verify_password", return_value=True):
@@ -207,7 +207,7 @@ class OperatorSecurity(unittest.TestCase):
             self.assertEqual(self.req(path + "/decision", body, cookie, details["csrf_token"])[0], 200)
             call.assert_called_once_with("approve", ID, snapshot_hash="a" * 64, node_id="node-a", step_up=True)
         details = self.details(cookie)
-        with patch.object(app.OperatorIPC, "call", return_value={"status": "denied"}):
+        with patch.object(app.OperatorIPC, "call", return_value={"request_id": ID, "status": "denied"}):
             self.assertEqual(self.req(path + "/decision", {"decision_nonce": details["decision_nonce"], "decision": "deny"}, cookie, details["csrf_token"])[0], 200)
 
     def test_expired_nonce_and_network_loss_never_allow_blind_retry(self):
@@ -331,6 +331,117 @@ class OperatorSecurity(unittest.TestCase):
             self.assertEqual(sorted(results), [200, 409])
             self.assertEqual(call.call_count, 1)
         self.assertNotIn(details["decision_nonce"], app.NONCES)
+
+    def assert_late_query_rejects_invalid_session(self, terminal):
+        for change in ("logout", "expiry", "rotation", "operator", "node", "credential"):
+            with self.subTest(change=change, terminal=terminal), patch.dict(os.environ):
+                cookie, _ = self.login()
+                details = self.details(cookie)
+                app.NONCES.clear()
+                entered, release = threading.Event(), threading.Event()
+                results, failures = [], []
+
+                def blocked_query(*args, **kwargs):
+                    entered.set()
+                    if not release.wait(5):
+                        raise AssertionError("query was not released")
+                    return {"request_id": ID, "status": "approved"} if terminal else self.item
+
+                def read():
+                    try:
+                        results.append(self.req("/operator/api/approvals/" + ID, cookie=cookie))
+                    except Exception as error:
+                        failures.append(error)
+
+                patches = [patch.object(app.OperatorIPC, "request", return_value=None),
+                           patch.object(app.OperatorIPC, "call", side_effect=blocked_query)] if terminal else [
+                           patch.object(app.OperatorIPC, "request", side_effect=blocked_query)]
+                with patches[0], (patches[1] if terminal else patch.dict(os.environ)):
+                    worker = threading.Thread(target=read, daemon=True)
+                    worker.start()
+                    try:
+                        self.assertTrue(entered.wait(5))
+                        if change == "logout":
+                            self.assertEqual(self.req("/operator/api/logout", {}, cookie, details["csrf_token"])[0], 200)
+                        elif change == "rotation":
+                            with patch.object(app, "verify_password", return_value=True):
+                                self.assertEqual(self.req("/operator/api/login", {"password": "synthetic"}, cookie)[0], 200)
+                        elif change == "expiry":
+                            with app.LOCK:
+                                sid = cookie.split("=", 1)[1]
+                                app.SESSIONS[sid] = (0, *app.SESSIONS[sid][1:])
+                        else:
+                            key = {"operator": "PORTICO_OPERATOR_ID", "node": "PORTICO_OPERATOR_NODE_ID",
+                                   "credential": "PORTICO_OPERATOR_APPROVAL_TOKEN"}[change]
+                            os.environ[key] = "changed-binding"
+                    finally:
+                        release.set(); worker.join(5)
+                    self.assertFalse(worker.is_alive())
+                    self.assertFalse(failures)
+                    self.assertEqual(results[0][0], 401)
+                    self.assertEqual(results[0][2], {"error": "login required"})
+                    self.assertEqual(app.NONCES, {}, "Invalid sessions must not issue fresh proof")
+
+    def test_pending_query_revalidates_session_after_slow_broker(self):
+        self.assert_late_query_rejects_invalid_session(False)
+
+    def test_terminal_query_revalidates_session_after_slow_broker(self):
+        self.assert_late_query_rejects_invalid_session(True)
+
+    def test_terminal_query_rejects_swapped_request_id(self):
+        cookie, _ = self.login()
+        for request_id in (None, "apr_another1234"):
+            with self.subTest(request_id=request_id), patch.object(app.OperatorIPC, "request", return_value=None), \
+                    patch.object(app.OperatorIPC, "call", return_value={"request_id": request_id, "status": "approved"}):
+                code, _, data = self.req("/operator/api/approvals/" + ID, cookie=cookie)
+                self.assertEqual(code, 503)
+                self.assertNotIn("csrf_token", data)
+
+    def test_decision_rejects_missing_or_swapped_broker_request_id(self):
+        cookie, _ = self.login()
+        for decision in ("approve", "deny"):
+            for request_id in (None, "apr_another1234"):
+                with self.subTest(decision=decision, request_id=request_id):
+                    details = self.details(cookie)
+                    body = {"decision": decision, "decision_nonce": details["decision_nonce"]}
+                    path = "/operator/api/approvals/" + ID + "/decision"
+                    with patch.object(app.OperatorIPC, "call", return_value={"request_id": request_id,
+                            "status": "approved" if decision == "approve" else "denied"}) as call:
+                        code, _, data = self.req(path, body, cookie, details["csrf_token"])
+                        self.assertEqual(code, 409)
+                        self.assertNotIn("request_id", data)
+                        self.assertEqual(self.req(path, body, cookie, details["csrf_token"])[0], 409)
+                        self.assertEqual(call.call_count, 1, "Ambiguous acknowledgement cannot be retried blindly")
+
+    def test_logout_removes_session_nonces_and_step_up_without_affecting_another_session(self):
+        cookie, _ = self.login(); details = self.details(cookie)
+        other, _ = self.login(); other_details = self.details(other)
+        nonce, other_nonce = details["decision_nonce"], other_details["decision_nonce"]
+        app.STEPUPS[nonce] = (app.time.monotonic() + 60, cookie.split("=", 1)[1])
+        self.assertEqual(self.req("/operator/api/logout", {}, cookie, details["csrf_token"])[0], 200)
+        self.assertNotIn(nonce, app.NONCES)
+        self.assertNotIn(nonce, app.STEPUPS)
+        self.assertIn(other_nonce, app.NONCES)
+        self.assertIsNotNone(app.session_from_cookie(other))
+
+    def test_login_rotation_removes_old_nonce_and_verification(self):
+        cookie, _ = self.login(); details = self.details(cookie)
+        nonce = details["decision_nonce"]
+        app.STEPUPS[nonce] = (app.time.monotonic() + 60, cookie.split("=", 1)[1])
+        with patch.object(app, "verify_password", return_value=True):
+            code, headers, _ = self.req("/operator/api/login", {"password": "synthetic"}, cookie)
+        self.assertEqual(code, 200)
+        self.assertIsNone(app.session_from_cookie(cookie))
+        self.assertNotIn(nonce, app.NONCES)
+        self.assertNotIn(nonce, app.STEPUPS)
+        self.assertIsNotNone(app.session_from_cookie(headers["Set-Cookie"].split(";", 1)[0]))
+
+    def test_broker_socket_permission_failure_is_unavailable_not_an_authentication_failure(self):
+        cookie, _ = self.login()
+        with patch.object(app.OperatorIPC, "request", side_effect=PermissionError("socket unavailable")):
+            code, _, data = self.req("/operator/api/approvals/" + ID, cookie=cookie)
+        self.assertEqual(code, 503)
+        self.assertEqual(data, {"error": "broker unavailable"})
 
 
 if __name__ == "__main__":

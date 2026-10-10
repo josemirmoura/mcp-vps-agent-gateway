@@ -151,11 +151,25 @@ def session_from_cookie(raw, embedded=False):
 
 def prune():
     now = time.monotonic()
+    current_binding = binding()
     for sid, state in list(SESSIONS.items()):
-        if state[0] <= now:
-            SESSIONS.pop(sid, None)
+        if len(state) != 3 or state[0] <= now or state[2] != current_binding:
+            discard_session(sid)
     for nonce, value in list(NONCES.items()):
         if value["expires"] <= now:
+            NONCES.pop(nonce, None)
+            STEPUPS.pop(nonce, None)
+
+
+class SessionChangedError(RuntimeError):
+    pass
+
+
+def discard_session(sid):
+    """Called under LOCK; discard unused proof, never Broker-issued authority."""
+    SESSIONS.pop(sid, None)
+    for nonce, record in list(NONCES.items()):
+        if record["sid"] == sid:
             NONCES.pop(nonce, None)
             STEPUPS.pop(nonce, None)
 
@@ -164,6 +178,8 @@ def create_nonce(session, item):
     nonce = secrets.token_urlsafe(32)
     with LOCK:
         prune()
+        if not Handler.session_valid(session):
+            raise SessionChangedError("operator session changed during query")
         if len(NONCES) >= 4096:
             raise RuntimeError("decision capacity exceeded")
         NONCES[nonce] = {"sid": session[0], "request_id": item["id"],
@@ -288,12 +304,19 @@ class Handler(BaseHTTPRequestHandler):
                 data.update(csrf_token=session[1], decision_nonce=create_nonce(session, item))
             else:
                 data = OperatorIPC.call("status", match["id"])
-                if not isinstance(data, dict) or data.get("status") not in ("approved", "denied", "expired", "cancelled", "revoked"):
+                with LOCK:
+                    if not self.session_valid(session):
+                        raise SessionChangedError("operator session changed during query")
+                if not isinstance(data, dict) or data.get("request_id") != match["id"]:
+                    raise RuntimeError("operator Broker status request mismatch")
+                if data.get("status") not in ("approved", "denied", "expired", "cancelled", "revoked"):
                     self.reply(404, {"error": "request unavailable"}); return
                 data.update(node=os.environ.get("PORTICO_OPERATOR_NODE_LABEL", "Local"), operator=identity(),
                             ttl_label=f'{data.get("delegation_ttl_seconds", 0)} segundos', expires_at=data.get("approval_expires_at"), ceiling_wide=False,
                             csrf_token=session[1])
             self.reply(200, data)
+        except SessionChangedError:
+            self.reply(401, {"error": "login required"})
         except (RuntimeError, OSError, ValueError):
             self.reply(503, {"error": "broker unavailable"})
 
@@ -321,7 +344,7 @@ class Handler(BaseHTTPRequestHandler):
                     prune()
                     if len(SESSIONS) >= 500:
                         self.reply(429, {"error": "session capacity exceeded"}); return
-                    if old: SESSIONS.pop(old[0], None)
+                    if old: discard_session(old[0])
                     SESSIONS[sid] = (time.monotonic() + MAX_AGE, csrf, verified_binding)
                 key = EMBED_COOKIE if embedded else COOKIE
                 cookie_path = "/operator/embed" if embedded else "/operator"
@@ -340,7 +363,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(403, {"error": "csrf denied"}); return
         if path == prefix + "/logout":
             with LOCK:
-                SESSIONS.pop(session[0], None)
+                discard_session(session[0])
             self.reply(200, {"status": "signed_out"}); return
         try:
             request = self.body()
@@ -374,7 +397,7 @@ class Handler(BaseHTTPRequestHandler):
                 NONCES.pop(nonce, None); STEPUPS.pop(nonce, None)
             result = OperatorIPC.call(decision, record["request_id"], snapshot_hash=record["fingerprint"], node_id=record["node_id"], step_up=stepped)
             expected = "approved" if decision == "approve" else "denied"
-            if not isinstance(result, dict) or result.get("status") != expected:
+            if not isinstance(result, dict) or result.get("request_id") != record["request_id"] or result.get("status") != expected:
                 self.reply(409, {"error": "broker refused decision"}); return
             self.reply(200, {"request_id": record["request_id"], "status": expected})
         except (RuntimeError, OSError, ValueError, json.JSONDecodeError):
@@ -383,7 +406,8 @@ class Handler(BaseHTTPRequestHandler):
     @staticmethod
     def session_valid(session):
         state = SESSIONS.get(session[0])
-        return bool(state and state[0] > time.monotonic() and state[2] == binding())
+        return bool(state and len(state) == 3 and state[0] > time.monotonic()
+                    and hmac.compare_digest(state[1], session[1]) and state[2] == binding())
 
 
 def main():

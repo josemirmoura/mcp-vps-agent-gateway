@@ -60,11 +60,22 @@ try:
         code, _, result = req(path + "/decision", {**proof, "decision": decision}, csrf)
         expected = "denied" if name == "denied" else "approved"
         assert code == 200 and result["status"] == expected, (name, code, result)
+        assert result["request_id"] == ids[name]
         assert req(path + "/decision", {**proof, "decision": decision}, csrf)[0] == 409
         code, _, terminal = req(path)
         assert code == 200 and terminal["status"] == expected, (name, code, terminal)
+        assert terminal["request_id"] == ids[name]
         assert "decision_nonce" not in terminal
-    print("REAL_BROKER_BFF_OK: read approval, denial, work/protected step-up, session reuse, replay rejection, final status")
+    assert req("/operator/api/logout", {}, terminal["csrf_token"])[0] == 200
+    assert req(path)[0] == 401
+    assert req(path + "/decision", {**proof, "decision": "approve"}, csrf)[0] == 401
+    code, headers, _ = req("/operator/api/login", {"password": password})
+    assert code == 200
+    cookie = headers["Set-Cookie"].split(";", 1)[0]
+    code, _, terminal = req(path)
+    assert code == 200 and terminal["status"] == "approved", "Logout must not revoke Broker authority"
+    assert "decision_nonce" not in terminal
+    print("REAL_BROKER_BFF_OK: read approval, denial, work/protected step-up, session reuse, replay rejection, bound final status, logout and reauthentication")
 finally:
     server.shutdown()
     server.server_close()

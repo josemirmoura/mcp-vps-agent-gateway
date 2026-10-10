@@ -87,3 +87,38 @@ test('a decision acknowledgement for another request cannot claim success',async
   assert.doesNotMatch(h.elements.get('status').textContent,/aprovada com sucesso/);
   await h.click('approve');assert.equal(h.calls.length,2,'Fresh state required after an ambiguous reply');
 });
+
+test('login invalidates earlier reads and serializes refresh and logout until fresh proof arrives',async()=>{
+  const h=harness();
+  h.elements.get('password').value='synthetic-password';
+  const loggingIn=h.click('login');
+  assert.equal(h.elements.get('refresh').disabled,true);
+  assert.equal(h.elements.get('logout').disabled,true);
+  await h.click('refresh');await h.click('logout');
+  h.calls[0].reply(pending);await turn();
+  assert.equal(h.elements.get('approve').disabled,true,'A read from before authentication cannot enable decisions');
+  assert.equal(h.calls.length,2,'Only the explicit login may run during authentication');
+  h.calls[1].reply({ok:true});await turn();
+  assert.equal(h.calls.length,3,'Successful login needs its own fresh request proof');
+  await h.click('refresh');await h.click('logout');
+  assert.equal(h.calls.length,3);
+  h.calls[2].reply({...pending,csrf_token:'new-session',decision_nonce:'new-proof'});await loggingIn;
+  assert.equal(h.elements.get('refresh').disabled,false);
+  assert.equal(h.elements.get('logout').disabled,false);
+  const deciding=h.click('deny');
+  assert.equal(h.calls[3].opts.headers['X-CSRF-Token'],'new-session');
+  assert.equal(JSON.parse(h.calls[3].opts.body).decision_nonce,'new-proof');
+  h.calls[3].reply({request_id:id,status:'denied'});await deciding;
+});
+
+test('failed reauthentication cannot reuse an older decision proof',async()=>{
+  const h=harness();h.calls[0].reply(pending);await turn();
+  const loggingIn=h.click('login');
+  h.calls[1].reply({error:'denied'},403);await loggingIn;
+  await h.click('approve');await h.click('logout');
+  assert.equal(h.calls.length,2,'Neither old nonce nor old session CSRF survives a login attempt');
+  assert.equal(h.elements.get('approve').disabled,true);
+  assert.equal(h.elements.get('deny').disabled,true);
+  assert.equal(h.elements.get('details').hidden,true);
+  assert.equal(h.elements.get('refresh').disabled,false);
+});
