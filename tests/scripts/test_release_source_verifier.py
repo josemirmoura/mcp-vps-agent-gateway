@@ -104,8 +104,10 @@ class ReleaseSourceVerifierTests(unittest.TestCase):
         source = self.base / "fixture-repo"
         source.mkdir()
         (source / "VERSION").write_text("0.1.0-rc.7\n")
+        (source / "docs").mkdir()
+        (source / "docs" / "guide.txt").write_text("installation guide\n")
         subprocess.run(["git", "init", "-q", str(source)], check=True)
-        subprocess.run(["git", "-C", str(source), "add", "VERSION"], check=True)
+        subprocess.run(["git", "-C", str(source), "add", "."], check=True)
         subprocess.run(
             ["git", "-C", str(source), "-c", "user.name=Verifier Test",
              "-c", "user.email=verifier@example.invalid", "commit", "-qm", "init"],
@@ -228,7 +230,22 @@ class ReleaseSourceVerifierTests(unittest.TestCase):
         self.resign_fixture_checksum()
         result = self.execute()
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("duplicate VERSION", result.stderr)
+        self.assertIn("duplicate member", result.stderr)
+
+    def test_duplicate_non_version_member_is_rejected_even_if_signed(self):
+        with tarfile.open(self.archive, "w:gz") as pack:
+            version = b"0.1.0-rc.7\n"
+            member = tarfile.TarInfo("mcp-vps-agent/VERSION")
+            member.size = len(version)
+            pack.addfile(member, io.BytesIO(version))
+            for body in (b"safe", b"replaced"):
+                duplicate = tarfile.TarInfo("mcp-vps-agent/docs/guide.txt")
+                duplicate.size = len(body)
+                pack.addfile(duplicate, io.BytesIO(body))
+        self.resign_fixture_checksum()
+        result = self.execute()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("duplicate member", result.stderr)
 
     def test_archive_with_escaping_member_is_rejected(self):
         with tarfile.open(self.archive, "w:gz") as pack:
