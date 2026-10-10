@@ -2,7 +2,7 @@
 
 **Scope:** one compatible AI chat, one Linux computer, Scoped authority. This ledger is a release-readiness contract, not a notice of general availability. Public Community facts only; private Cloud plans and owner infrastructure details do not belong here.
 
-**Round-two integration snapshot (2026-10-09, 23:59 UTC onward):** public `main` = `4212f30f7c145c8bbd0043b42bdc7dd95e466cd5`; **staging PR #99** = `9da45838517d6e4baa5e63236027f6a7471c66cb`. The second-round code changes from Blocks 1–4 are already combined in staging; `main` and owner VPS remain unchanged. At the independent recheck, **17/18 exact-SHA GitHub Actions workflows were SUCCESS, with only `docker-package-acceptance` still in progress and no recorded failures**. This is a point-in-time observation, not a claim that the last run passed. The newest verified published release remains `v0.1.0-rc.6`, and `VERSION=0.1.0-rc.7` alone is not a published signed RC7. Staging CI does not certify official MCP conformance, real client UX, legal rights or release signatures.
+**Round-two integration snapshot (2026-10-09, 23:59 UTC onward):** public `main` = `4212f30f7c145c8bbd0043b42bdc7dd95e466cd5`; **staging PR #99** = `9da45838517d6e4baa5e63236027f6a7471c66cb`. The second-round code changes from Blocks 1–4 are already combined in staging; `main` and owner VPS remain unchanged. Final exact-SHA recheck: **18/18 GitHub Actions workflows completed with SUCCESS** for `9da45838517d6e4baa5e63236027f6a7471c66cb`, including `docker-package-acceptance` run `38009010754`. These are automated staging results, not owner acceptance or a release signature. The newest verified published release remains `v0.1.0-rc.6`, and `VERSION=0.1.0-rc.7` alone is not a published signed RC7. Staging CI does not certify official MCP conformance, real client UX, legal rights or release signatures.
 
 ## Integration inputs and review responsibilities
 
@@ -22,7 +22,7 @@ Never cherry-pick stacked commits blindly or overwrite a peer branch. Trace each
 | Gate | Evidence and pass criteria | Current |
 |---|---|---|
 | A. Rights/license and publishing authority | license, attribution/NOTICE, contributor/ownership boundaries legally approved for **this** candidate; historical grants preserved | NOT TESTED / owner review required |
-| B. Reproducible integrated build/security | exact SHA; CI Go race/vet/build for amd64/arm64, `govulncheck`, `gosec`, secret scan, Docker scans/SBOM, OAuth, IPC/Broker, lifecycle, negative security cases; all required checks green | PARTIAL: round-two `9da4583...` had 17/18 workflows SUCCESS at audit time, Docker still running; no post-merge main or actual release build/signed assets |
+| B. Reproducible integrated build/security | exact SHA; CI Go race/vet/build for amd64/arm64, `govulncheck`, `gosec`, secret scan, Docker scans/SBOM, OAuth, IPC/Broker, lifecycle, negative security cases; all required checks green | PARTIAL: round-two `9da4583...` has **18/18 staging workflows SUCCESS**; still no post-merge main or actual release build/signed assets |
 | C. MCP protocol and client support | official upstream requirements pinned, table of PASS/FAIL/SKIPPED/NOT TESTED/NOT APPLICABLE; no simulated client presented as real | FAIL/PARTIAL: Gateway normal **8 PASS/2 FAIL/3 SKIPPED/24 NOT TESTED**; isolated test fixture **35 PASS/1 FAIL/1 SKIPPED/0 NOT TESTED**; **both `release_gate_passed=false`**. Fixture result is not Gateway production conformance, #79 open |
 | D. Signed candidate | tag and commit match VERSION; actual source checksum+Sigstore bundle and GHCR image digests/signatures independently verified against expected release workflow/issuer; scan provenance and SBOM | NOT TESTED: no new signed RC published |
 | E. Installation and operator acceptance | clean supported Linux clone from the exact released tag; HTTPS+OAuth; real compatible AI MCP call; scoped grant, denial, expiration, protected secrets, revocation and audit; desktop and mobile UI where available; secure HTTPS/SSH fallback | NOT TESTED for integrated candidate |
@@ -34,7 +34,7 @@ Classification: **PASS**, **FAIL**, **SKIPPED**, **NOT TESTED**, or **NOT APPLIC
 
 | Field | Required recorded value |
 |---|---|
-| Integration PR / reviewed SHA | [staging #99](https://github.com/josemirmoura/mcp-vps-agent-gateway/pull/99), `9da45838517d6e4baa5e63236027f6a7471c66cb`, 17/18 SUCCESS at audit time and Docker in progress, **not** final release SHA |
+| Integration PR / reviewed SHA | [staging #99](https://github.com/josemirmoura/mcp-vps-agent-gateway/pull/99), `9da45838517d6e4baa5e63236027f6a7471c66cb`, **18/18 GitHub Actions workflows SUCCESS**, **not** final release SHA |
 | Post-merge `main` SHA and CI URLs | `TBD` |
 | Release tag and target commit | `TBD` |
 | Architecture and package version | `TBD` |
