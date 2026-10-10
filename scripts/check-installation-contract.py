@@ -9,6 +9,8 @@ SUPPORTED = [
     "README.pt-BR.md",
     "docs/quick-start.md",
     "docs/quick-start.pt-BR.md",
+    "docs/first-install-acceptance.md",
+    "docs/first-install-acceptance.pt-BR.md",
     "docs/installer-flow.md",
     "docs/installer-flow.pt-BR.md",
     "docs/installation-contract.md",
@@ -76,12 +78,20 @@ for rel in SUPPORTED:
 # A complete installation journey must be equivalent in English and PT-BR.
 BILINGUAL_GUIDES = (
     ("docs/quick-start.md", "docs/quick-start.pt-BR.md"),
+    ("docs/first-install-acceptance.md", "docs/first-install-acceptance.pt-BR.md"),
     ("docs/installer-flow.md", "docs/installer-flow.pt-BR.md"),
     ("docs/installation-contract.md", "docs/installation-contract.pt-BR.md"),
     ("docs/chatgpt-integration.md", "docs/chatgpt-integration.pt-BR.md"),
 )
 
 FLOW_MARKERS = {
+    "docs/first-install-acceptance.md": (
+        "bash scripts/install.sh", "bash scripts/verify.sh",
+        "bash scripts/verify-public.sh", "scripts/connect-chatgpt.sh",
+        "python3 scripts/operator-approvals.py --list",
+        "bash scripts/remove.sh safe", "INSTALLATION COMPLETE",
+        "system.info", "OAuth", "Broker", "Scoped",
+    ),
     "docs/quick-start.md": (
         "bash scripts/install.sh", "--profile custom", "--scope /opt",
         "--local-only", "--yes", "--run-as", "--create-scope",
@@ -389,6 +399,8 @@ required_flow = {
     ],
     "docs/chatgpt-integration.md": ["scripts/connect-chatgpt.sh"],
     "docs/quick-start.pt-BR.md": ["scripts/install.sh", "INSTALLATION COMPLETE"],
+    "docs/first-install-acceptance.md": ["scripts/install.sh", "INSTALLATION COMPLETE"],
+    "docs/first-install-acceptance.pt-BR.md": ["scripts/install.sh", "INSTALLATION COMPLETE"],
     "docs/installer-flow.pt-BR.md": ["scripts/setup-integrated-auth.sh", "scripts/verify-public.sh", "scripts/connect-chatgpt.sh", "INSTALLATION COMPLETE"],
     "docs/chatgpt-integration.pt-BR.md": ["scripts/connect-chatgpt.sh", "INSTALLATION COMPLETE"],
     "docs/installation-contract.md": ["scripts/connect-chatgpt.sh", "INSTALLATION COMPLETE"],
@@ -425,6 +437,8 @@ completion_files = [
     "docs/installation-contract.md",
     "docs/installation-contract.pt-BR.md",
     "docs/quick-start.pt-BR.md",
+    "docs/first-install-acceptance.md",
+    "docs/first-install-acceptance.pt-BR.md",
     "site/index.html",
     "site/pt-BR/index.html",
 ]
