@@ -19,7 +19,7 @@ import (
 // the local loopback authority. This leaves headless MCP clients working and
 // refuses arbitrary DNS names resolving to the locally bound Gateway.
 func guardMCPOrigin(resource string, next http.Handler) http.Handler {
-    expected := parseMCPOrigin(resource)
+    expected := parseMCPResourceOrigin(resource)
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         origins := r.Header.Values("Origin")
         if len(origins) == 0 {
@@ -53,6 +53,17 @@ func guardMCPOrigin(resource string, next http.Handler) http.Handler {
         }
         next.ServeHTTP(w, r)
     })
+}
+
+func parseMCPResourceOrigin(raw string) *url.URL {
+    u, err := url.Parse(raw)
+    if err != nil || u == nil || u.User != nil || u.Host == "" ||
+        u.RawQuery != "" || u.Fragment != "" {
+        return nil
+    }
+    // OAuth resource identifiers include a path such as /mcp. The browser
+    // Origin header necessarily contains only scheme and authority.
+    return parseMCPOrigin(u.Scheme + "://" + u.Host)
 }
 
 func parseMCPOrigin(raw string) *url.URL {
