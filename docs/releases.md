@@ -33,7 +33,10 @@ owner-initiated action and remains blocked until the documented legal, security,
 conformance and client acceptance gates are actually passed.
 
 The repository owner initiates publication in GitHub Actions → **release** →
-**Run workflow**, selecting the reviewed **main** branch. The form requires:
+**Run workflow**, selecting the reviewed **main** branch.
+
+For a click-by-click explanation in Portuguese for a beginner, see
+[autorização de publicação PT-BR](release-owner-authorization.pt-BR.md). The form requires:
 
 1. **tag**: the exact SemVer tag matching `VERSION`, e.g. `v0.1.0-rc.7`;
 2. **approved_sha**: the full 40-character main commit SHA already reviewed,
