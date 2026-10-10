@@ -273,7 +273,7 @@ jobs:
           sha256sum dist/mcp-vps-agent-source-package.tar.gz > dist/mcp-vps-agent-source-package.tar.gz.sha256
           # Signed provenance binds the release to the exact reviewed main SHA.
           digest="$(cut -d ' ' -f1 dist/mcp-vps-agent-source-package.tar.gz.sha256)"
-          printf '{"schema":1,"tag":"%s","commit_sha":"%s","source_sha256":"%s"}\\n' \
+          printf '{"schema":1,"tag":"%s","commit_sha":"%s","source_sha256":"%s"}\n' \
             "$RELEASE_TAG" "$GITHUB_SHA" "$digest" > dist/RELEASE-PROVENANCE.json
       - uses: sigstore/cosign-installer@v4.1.2
       - name: Keyless-sign and verify source artifacts
