@@ -159,4 +159,19 @@ jobs:
           data=json.load(open(sys.argv[1]))
           assert data['ok'] and data['result']['valid'],data
           PY
-          echo 'REAL BROKER MIGRATION FAILURE AND ROLLBACK: PASS'
+          python3 - <<'PY'
+          import json,sqlite3
+          with sqlite3.connect("state/state.db") as db:
+              audit=[json.loads(row[0]) for row in db.execute(
+                  "SELECT event_json FROM audit_events ORDER BY seq")]
+              assert any(ev.get("tool")=="system.rollback_revoke_all"
+                         for ev in audit), "recovery revocation audit event missing"
+              for table in ("grants", "root_delegations"):
+                  active=db.execute(
+                      f"SELECT COUNT(*) FROM {table} WHERE revoked_at IS NULL").fetchone()[0]
+                  assert active == 0, (table,active)
+              pending=db.execute(
+                  "SELECT COUNT(*) FROM approvals WHERE status='pending'").fetchone()[0]
+              assert pending == 0, pending
+          PY
+          echo 'REAL BROKER MIGRATION FAILURE, REVOKED AUTHORITY AND AUDIT: PASS'
