@@ -314,7 +314,13 @@ jobs:
             git push origin "refs/tags/$RELEASE_TAG"
           fi
           # Never trust a tag that may have changed concurrently on remote.
-          test "$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG" | cut -f1)" = "$GITHUB_SHA"
+          remote_lines="$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}")"
+          remote_sha="$(printf '%s\n' "$remote_lines" | awk -v ref="refs/tags/$RELEASE_TAG" '
+            $2 == ref { direct=$1 }
+            $2 == ref "^{}" { peeled=$1 }
+            END { if (peeled != "") print peeled; else print direct }
+          ')"
+          test "$remote_sha" = "$GITHUB_SHA"
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
