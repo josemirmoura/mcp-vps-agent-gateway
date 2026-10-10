@@ -78,14 +78,22 @@ jobs:
           test "$before_env" = "$(sha256sum .env | cut -d' ' -f1)"
           test "$before_policy" = "$(sha256sum config/policy.yaml | cut -d' ' -f1)"
           bash scripts/verify.sh
-      - name: Preserve operator state during safe removal
+      - name: Safe remove preserves identity and policy but rotates local credentials
         run: |
           set -euo pipefail
           before_env="$(sha256sum .env | cut -d' ' -f1)"
           before_policy="$(sha256sum config/policy.yaml | cut -d' ' -f1)"
+          before_instance="$(sed -n 's/^VPS_AGENT_INSTANCE_ID=//p' .env)"
+          test -n "$before_instance"
           bash scripts/remove.sh safe
-          test "$before_env" = "$(sha256sum .env | cut -d' ' -f1)"
+          test -f .env
+          test -f config/policy.yaml
+          test -d state
+          test -f scripts/install.sh
+          test "$(stat -c '%a' .env)" = 600
+          test "$before_env" != "$(sha256sum .env | cut -d' ' -f1)"
           test "$before_policy" = "$(sha256sum config/policy.yaml | cut -d' ' -f1)"
+          test "$before_instance" = "$(sed -n 's/^VPS_AGENT_INSTANCE_ID=//p' .env)"
       - name: Cleanup isolated test containers on failure
         if: always()
         run: |
