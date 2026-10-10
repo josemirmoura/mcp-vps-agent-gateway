@@ -170,34 +170,8 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
 
-  prepare-tag:
-    needs: [validate, security, image-security]
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - name: Ensure exact release tag
-        shell: bash
-        run: |
-          set -euo pipefail
-          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
-            tagged_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
-            test "$tagged_sha" = "$GITHUB_SHA" || {
-              echo "existing tag $RELEASE_TAG points to $tagged_sha, expected $GITHUB_SHA" >&2
-              exit 1
-            }
-            echo "Release tag already points to this commit."
-          else
-            git tag "$RELEASE_TAG" "$GITHUB_SHA"
-            git push origin "refs/tags/$RELEASE_TAG"
-            echo "Created release tag $RELEASE_TAG at $GITHUB_SHA."
-          fi
-
   images:
-    needs: prepare-tag
+    needs: [validate, security, image-security]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -273,6 +247,25 @@ jobs:
           mkdir -p dist
           git archive --format=tar --prefix=mcp-vps-agent/ "$GITHUB_SHA" | gzip -n > dist/mcp-vps-agent-source-package.tar.gz
           sha256sum dist/mcp-vps-agent-source-package.tar.gz > dist/mcp-vps-agent-source-package.tar.gz.sha256
+      - name: Generate commit-bound release provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          source = Path("dist/mcp-vps-agent-source-package.tar.gz")
+          payload = {
+              "schema_version": 1,
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "tag": os.environ["RELEASE_TAG"],
+              "commit_sha": os.environ["GITHUB_SHA"],
+              "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+          }
+          Path("dist/RELEASE-PROVENANCE.json").write_text(
+              json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n"
+          )
+          PY
       - uses: sigstore/cosign-installer@v4.1.2
       - name: Keyless-sign and verify source artifacts
         shell: bash
@@ -283,7 +276,8 @@ jobs:
 
           for artifact in \
             dist/mcp-vps-agent-source-package.tar.gz \
-            dist/mcp-vps-agent-source-package.tar.gz.sha256
+            dist/mcp-vps-agent-source-package.tar.gz.sha256 \
+            dist/RELEASE-PROVENANCE.json
           do
             bundle="$artifact.sigstore.json"
             cosign sign-blob "$artifact" --bundle "$bundle" --yes
@@ -299,6 +293,23 @@ jobs:
           Verification binds signatures to the Portico release workflow identity and the GitHub Actions OIDC issuer.
           The preferred updateable installation remains a tagged Git checkout.
           EOF
+      - name: Ensure exact release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tagged_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
+            test "$tagged_sha" = "$GITHUB_SHA" || {
+              echo "existing tag $RELEASE_TAG points to $tagged_sha, expected $GITHUB_SHA" >&2
+              exit 1
+            }
+            echo "Release tag already points to this commit."
+          else
+            git tag "$RELEASE_TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/$RELEASE_TAG"
+            echo "Created release tag $RELEASE_TAG at $GITHUB_SHA."
+          fi
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -309,9 +320,12 @@ jobs:
             flags+=(--prerelease)
           fi
           gh release create "$RELEASE_TAG" \
+            --target "$GITHUB_SHA" \
             dist/mcp-vps-agent-source-package.tar.gz \
             dist/mcp-vps-agent-source-package.tar.gz.sha256 \
             dist/mcp-vps-agent-source-package.tar.gz.sigstore.json \
             dist/mcp-vps-agent-source-package.tar.gz.sha256.sigstore.json \
+            dist/RELEASE-PROVENANCE.json \
+            dist/RELEASE-PROVENANCE.json.sigstore.json \
             dist/RELEASE-INTEGRITY.txt \
             "${flags[@]}"
