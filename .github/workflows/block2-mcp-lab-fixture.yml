@@ -6,6 +6,8 @@ on:
       - '.github/workflows/block2-mcp-lab-fixture.yml'
       - 'cmd/portico-mcp-conformance-fixture/**'
       - 'scripts/mcp_conformance_matrix.py'
+      - 'scripts/mcp_release_scope_audit.py'
+      - 'tests/scripts/test_mcp_release_scope_audit.py'
       - 'internal/gateway/**'
       - 'go.mod'
       - 'go.sum'
@@ -36,7 +38,8 @@ jobs:
         run: |
           set -euo pipefail
           go build -trimpath -o "$RUNNER_TEMP/portico-production-gateway" ./cmd/vps-agent-gateway
-          go test ./internal/gateway -run 'TestIntegratedOAuthResourceServerBoundaryE2E|TestMCPInitializeAdvertisesPackagedVersion' -count=1
+          go test ./internal/gateway -run 'TestIntegratedOAuthResourceServerBoundaryE2E|TestMCPInitializeAdvertisesPackagedVersion|TestMCPCompletionCapabilityIsAbsentAndMethodIsClosed|TestProductionMCPServerDoesNotExposeConformanceFixtures' -count=1 -v
+          python3 -m unittest discover -s tests/scripts -p 'test_mcp_release_scope_audit.py' -v
       - name: Build test-only MCP server fixture
         shell: bash
         run: |
@@ -135,6 +138,12 @@ jobs:
             --requirements "$RUNNER_TEMP/mcp-conformance/requirements/2026-07-28.yaml" \
             --results results-fixture --runner-exit "$rc" \
             --output evidence/fixture-matrix.json
+          python3 scripts/mcp_release_scope_audit.py \
+            --official evidence/production-matrix.json \
+            --output evidence/production-applicability.json
+          python3 scripts/mcp_release_scope_audit.py \
+            --official evidence/fixture-matrix.json \
+            --output evidence/fixture-applicability.json
           python3 - <<'PY'
           import json
           from pathlib import Path
