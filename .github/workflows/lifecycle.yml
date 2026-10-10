@@ -77,10 +77,19 @@ jobs:
           git add .lifecycle-update-marker
           git commit -m 'test: lifecycle good update target'
           good="$(git rev-parse HEAD)"
-          git branch lifecycle-good-ref "$good"
+          fixture_dir="/tmp/portico-lifecycle-release-${GITHUB_RUN_ID}"
+          mkdir -p "$fixture_dir"
+          git init --bare -q "$fixture_dir/origin.git"
+          git remote set-url origin "$fixture_dir/origin.git"
+          git tag v0.1.0-rc.7 "$good"
+          git push -q origin "refs/tags/v0.1.0-rc.7"
+          python3 tests/scripts/setup_published_release_fixture.py \
+            --root "$fixture_dir" --repo "$PWD" --tag v0.1.0-rc.7 --commit "$good"
           git switch lifecycle-current
 
-          VPS_AGENT_UPDATE_REF=lifecycle-good-ref bash scripts/update.sh
+          PORTICO_FIXTURE_ROOT="$fixture_dir" \
+            VPS_AGENT_UPDATE_REF=v0.1.0-rc.7 \
+            PATH="$fixture_dir/fakebin:$PATH" bash scripts/update.sh
           test "$(git rev-parse HEAD)" = "$good"
           cmp /tmp/policy.before config/policy.yaml
           docker compose exec -T broker /usr/local/bin/vps-agent audit-status >/tmp/audit.after-update.json
@@ -97,14 +106,21 @@ jobs:
           good="$(git rev-parse HEAD)"
           git switch -c lifecycle-bad-target
           printf 'THIS IS NOT A DOCKERFILE\n' > Dockerfile
-          git add Dockerfile
+          printf '0.1.0-rc.8\n' > VERSION
+          git add Dockerfile VERSION
           git commit -m 'test: lifecycle broken update target'
           bad="$(git rev-parse HEAD)"
-          git branch lifecycle-bad-ref "$bad"
+          fixture_dir="/tmp/portico-lifecycle-release-${GITHUB_RUN_ID}"
+          git tag v0.1.0-rc.8 "$bad"
+          git push -q origin "refs/tags/v0.1.0-rc.8"
+          python3 tests/scripts/setup_published_release_fixture.py \
+            --root "$fixture_dir" --repo "$PWD" --tag v0.1.0-rc.8 --commit "$bad"
           git switch lifecycle-current
           test "$(git rev-parse HEAD)" = "$good"
 
-          if VPS_AGENT_UPDATE_REF=lifecycle-bad-ref bash scripts/update.sh; then
+          if PORTICO_FIXTURE_ROOT="$fixture_dir" \
+             PATH="$fixture_dir/fakebin:$PATH" \
+             VPS_AGENT_UPDATE_REF=v0.1.0-rc.8 bash scripts/update.sh; then
             echo 'broken update unexpectedly succeeded' >&2
             exit 1
           fi

@@ -133,6 +133,13 @@ jobs:
           printf 'migration-target\n' > .block3-migration-target
           git add .block3-migration-target
           git commit -m 'test: migration fault target fixture'
+          target="$(git rev-parse HEAD)"
+          git init --bare -q "$d/origin.git"
+          git remote set-url origin "$d/origin.git"
+          git tag v0.1.0-rc.7 "$target"
+          git push -q origin "refs/tags/v0.1.0-rc.7"
+          python3 tests/scripts/setup_published_release_fixture.py \
+            --root "$d" --repo "$PWD" --tag v0.1.0-rc.7 --commit "$target"
           git switch block3-current
 
           mkdir -p "$d/fakebin"
@@ -145,7 +152,8 @@ jobs:
           exec /usr/bin/docker "$@"
           SHIM
           chmod 755 "$d/fakebin/docker"
-          if VPS_AGENT_UPDATE_REF=block3-target PATH="$d/fakebin:$PATH" bash scripts/update.sh; then
+          if PORTICO_FIXTURE_ROOT="$d" VPS_AGENT_UPDATE_REF=v0.1.0-rc.7 \
+             PATH="$d/fakebin:$PATH" bash scripts/update.sh; then
             echo 'Injected migration failure unexpectedly succeeded' >&2
             exit 1
           fi

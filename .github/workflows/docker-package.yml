@@ -389,6 +389,9 @@ jobs:
           git -C /tmp/vps-agent-update-work add .update-acceptance-marker
           git -C /tmp/vps-agent-update-work commit -m "test: benign update target"
           git -C /tmp/vps-agent-update-work push origin update-target
+          good="$(git -C /tmp/vps-agent-update-work rev-parse HEAD)"
+          git -C /tmp/vps-agent-update-work tag v0.1.0-rc.7 "$good"
+          git -C /tmp/vps-agent-update-work push origin "refs/tags/v0.1.0-rc.7"
 
           git -C /tmp/vps-agent-update-work checkout -b update-fail
           cat > /tmp/vps-agent-update-work/scripts/verify.sh <<'SH'
@@ -396,20 +399,37 @@ jobs:
           echo "intentional acceptance failure" >&2
           exit 99
           SH
-          git -C /tmp/vps-agent-update-work add scripts/verify.sh
+          printf '0.1.0-rc.8\n' > /tmp/vps-agent-update-work/VERSION
+          git -C /tmp/vps-agent-update-work add scripts/verify.sh VERSION
           git -C /tmp/vps-agent-update-work commit -m "test: failing update target"
           git -C /tmp/vps-agent-update-work push origin update-fail
+          bad="$(git -C /tmp/vps-agent-update-work rev-parse HEAD)"
+          git -C /tmp/vps-agent-update-work tag v0.1.0-rc.8 "$bad"
+          git -C /tmp/vps-agent-update-work push origin "refs/tags/v0.1.0-rc.8"
+
+          fixture_dir="/tmp/portico-docker-release-${GITHUB_RUN_ID}"
+          mkdir -p "$fixture_dir"
+          python3 tests/scripts/setup_published_release_fixture.py \
+            --root "$fixture_dir" --repo /tmp/vps-agent-update-work \
+            --tag v0.1.0-rc.7 --commit "$good"
+          python3 tests/scripts/setup_published_release_fixture.py \
+            --root "$fixture_dir" --repo /tmp/vps-agent-update-work \
+            --tag v0.1.0-rc.8 --commit "$bad"
 
           ORIGINAL_ORIGIN="$(git remote get-url origin)"
           git remote set-url origin /tmp/vps-agent-update-origin.git
           trap 'git remote set-url origin "$ORIGINAL_ORIGIN"' EXIT
 
-          VPS_AGENT_UPDATE_REF=origin/update-target bash scripts/update.sh | tee evidence/update-success.txt
+          PORTICO_FIXTURE_ROOT="$fixture_dir" \
+            PATH="$fixture_dir/fakebin:$PATH" \
+            VPS_AGENT_UPDATE_REF=v0.1.0-rc.7 bash scripts/update.sh | tee evidence/update-success.txt
           test -f .update-acceptance-marker
           SUCCESS_HEAD="$(git rev-parse HEAD)"
           grep -q '"result":"success"' state/update.log
 
-          if VPS_AGENT_UPDATE_REF=origin/update-fail bash scripts/update.sh >evidence/update-rollback.txt 2>&1; then
+          if PORTICO_FIXTURE_ROOT="$fixture_dir" \
+             PATH="$fixture_dir/fakebin:$PATH" \
+             VPS_AGENT_UPDATE_REF=v0.1.0-rc.8 bash scripts/update.sh >evidence/update-rollback.txt 2>&1; then
             echo "failing update unexpectedly succeeded" >&2
             exit 1
           fi

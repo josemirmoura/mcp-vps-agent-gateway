@@ -58,12 +58,22 @@ class ReleaseWorkflowSecurityContract(unittest.TestCase):
         self.assertIn("needs: images", job("github-release", source))
         self.assertIn("needs: [validate, security, image-security]", job("prepare-tag", source))
 
+        prepare = job("prepare-tag", source)
+        published = job("github-release", source)
+        self.assertNotIn("git push origin", prepare)
+        self.assertIn("git push origin", published)
+        self.assertLess(published.index("Keyless-sign and verify source artifacts"),
+                        published.index("Create tag only after all signed assets"))
+        self.assertIn("dist/RELEASE-PROVENANCE.json.sigstore.json", published)
+
     def test_token_permissions_are_job_scoped(self):
         before_jobs, rest = self.workflow.split("\njobs:\n", 1)
         self.assertIn("permissions:\n  contents: read", before_jobs)
         self.assertNotIn("packages: write", before_jobs)
         self.assertNotIn("id-token: write", before_jobs)
-        self.assertIn("contents: write", job("prepare-tag", self.workflow))
+        # The publication-visible tag is created in the final job, after signing.
+        self.assertIn("contents: read", job("prepare-tag", self.workflow))
+        self.assertIn("contents: write", job("github-release", self.workflow))
         self.assertIn("packages: write", job("images", self.workflow))
         self.assertIn("id-token: write", job("images", self.workflow))
         self.assertIn("id-token: write", job("github-release", self.workflow))
