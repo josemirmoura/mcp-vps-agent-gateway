@@ -183,6 +183,48 @@ print("sha256:"+"a"*64)
     def test_invalid_tag_or_commit_rejected(self):
         self.assert_blocked(self.verify(commit="main"), "SemVer tags")
 
+    def test_rejected_release_never_stops_docker_or_creates_operational_backup(self):
+        # Execute the real updater in a disposable Git checkout, with a
+        # populated .env and policy, while GitHub release metadata is denied.
+        (self.repo / "scripts/lib").mkdir(parents=True)
+        shutil.copyfile(ROOT / "scripts/update.sh", self.repo / "scripts/update.sh")
+        (self.repo / "scripts/lib/product.sh").write_text(
+            'vps_agent_init_language() { :; }\\n'
+            'vps_agent_text() { printf "%s" "$1"; }\\n'
+            'vps_agent_banner() { :; }\\n'
+            'vps_agent_version() { printf "0.1.0-rc.7"; }\\n'
+        )
+        self.commit_change()
+        installed = run("git", "rev-parse", "HEAD", cwd=self.repo).stdout.strip()
+        (self.repo / "RELEASE-MARKER").write_text("candidate\\n")
+        self.commit_change()
+        candidate = run("git", "rev-parse", "HEAD", cwd=self.repo).stdout.strip()
+        run("git", "tag", "-f", TAG, cwd=self.repo)
+        run("git", "push", "-q", "--force", "origin",
+            "refs/tags/" + TAG, cwd=self.repo)
+        run("git", "reset", "--hard", installed, cwd=self.repo)
+        (self.repo / ".env").write_text("PORTICO_TEST_ONLY=1\\n")
+        (self.repo / "config").mkdir()
+        (self.repo / "config/policy.yaml").write_text("{}\\n")
+        docker_log = self.base / "docker.log"
+        self.make_command("docker", """
+import os,sys
+with open(os.environ["MOCK_DOCKER_LOG"],"a") as handle:
+    handle.write(" ".join(sys.argv[1:])+"\\n")
+sys.exit(83)
+""")
+        env = dict(self.env, VPS_AGENT_UPDATE_REF=TAG, MOCK_GH_DENY="1",
+                   MOCK_DOCKER_LOG=str(docker_log))
+        result = run("bash", "scripts/update.sh", cwd=self.repo,
+                     env=env, check=False)
+        self.assert_blocked(result)
+        self.assertFalse(docker_log.exists(), "Docker was touched before release verification")
+        self.assertEqual(run("git", "rev-parse", "HEAD",
+                             cwd=self.repo).stdout.strip(), installed)
+        self.assertFalse(list((self.repo / "backups").iterdir()),
+                         "operational backups exist despite failed publication")
+        self.assertNotEqual(installed, candidate)
+
     def test_timeout_on_required_helper_is_fatal(self):
         import importlib.util
         spec = importlib.util.spec_from_file_location("preflight_timeout", SCRIPT)
