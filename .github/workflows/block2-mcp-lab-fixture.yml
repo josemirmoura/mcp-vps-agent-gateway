@@ -7,6 +7,8 @@ on:
       - 'cmd/portico-mcp-conformance-fixture/**'
       - 'scripts/mcp_conformance_matrix.py'
       - 'scripts/mcp_release_scope_audit.py'
+      - 'scripts/mcp_gate_c_diagnostic.py'
+      - 'tests/scripts/test_mcp_gate_c_diagnostic.py'
       - 'tests/scripts/test_mcp_release_scope_audit.py'
       - 'internal/gateway/**'
       - 'go.mod'
@@ -26,6 +28,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -38,8 +42,9 @@ jobs:
         run: |
           set -euo pipefail
           go build -trimpath -o "$RUNNER_TEMP/portico-production-gateway" ./cmd/vps-agent-gateway
-          go test ./internal/gateway -run 'TestIntegratedOAuthResourceServerBoundaryE2E|TestMCPInitializeAdvertisesPackagedVersion|TestMCPCompletionCapabilityIsAbsentAndMethodIsClosed|TestProductionMCPServerDoesNotExposeConformanceFixtures' -count=1 -v
+          go test ./internal/gateway -run 'TestIntegratedOAuthResourceServerBoundaryE2E|TestMCPInitializeAdvertisesPackagedVersion|TestMCPCompletionCapabilityIsAbsentAndMethodIsClosed|TestProductionMCPServerDoesNotExposeConformanceFixtures|TestGateCStatelessHTTPRejectsHeaderSpoofingBeforeExecutor' -count=1 -v
           python3 -m unittest discover -s tests/scripts -p 'test_mcp_release_scope_audit.py' -v
+          python3 -m unittest discover -s tests/scripts -p 'test_mcp_gate_c_diagnostic.py' -v
       - name: Build test-only MCP server fixture
         shell: bash
         run: |
@@ -160,6 +165,25 @@ jobs:
           PY
           # Do not make an artificially successful fixture run certify production.
           # Fail only if infrastructure cannot create an honest matrix.
+      - name: Verify all 37 original per-check records and archive redacted manifest
+        shell: bash
+        env:
+          GATE_C_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/mcp_gate_c_diagnostic.py             --official evidence/production-matrix.json             --results results-production             --gateway-sha "$GATE_C_SOURCE_SHA"             --output evidence/production-original-checks-redacted.json
+          python3 scripts/mcp_gate_c_diagnostic.py             --official evidence/fixture-matrix.json             --results results-fixture             --gateway-sha "$GATE_C_SOURCE_SHA"             --output evidence/fixture-original-checks-redacted.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          a = json.loads(Path("evidence/production-original-checks-redacted.json").read_text())
+          b = json.loads(Path("evidence/fixture-original-checks-redacted.json").read_text())
+          assert len(a["scenarios"]) == len(b["scenarios"]) == 37
+          assert a["gateway_sha"] == b["gateway_sha"]
+          assert not a["release_gate_passed"] and not b["release_gate_passed"]
+          assert a["waivers_applied"] == b["waivers_applied"] == 0
+          print("ORIGINAL RUNNER EVIDENCE RECONCILED, BOTH FROZEN GATES STILL BLOCKED")
+          PY
       - name: Preserve test fixture and frozen official evidence
         if: always()
         uses: actions/upload-artifact@v4
