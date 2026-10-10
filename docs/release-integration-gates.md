@@ -13,7 +13,7 @@
 | Update/backup recovery | #97/#100 and round-two #111 | Rollback staged restore and revoked-grant fence merged in staging | Disposable Broker/volumes CI present; real owner install and recovery gate pending |
 | Release source and GHCR signatures | #95, #96 | Require genuine signed assets from an authorized published release; mock cosign/crane covers behavior only | Pending first signed RC |
 | EN/PT-BR installation | #85/#102 and round-two #112 | Complete bilingual guides and first-run smoke merged into staging | Disposable bilingual CI present; clean install of an authorized signed tag and owner UX pending |
-| Coordinated candidate/release | staging #99, rounds #109 through #113 | All five blocks' second-round contributions combined at `9da4583...` | Pending last exact-SHA Docker CI, MCP conformance, actual signed RC, legal and operator gates |
+| Coordinated candidate/release | staging #99, rounds #109 through #113, third-round reviews #114/#115 | Five second-round blocks combined at `9da4583...` (18/18 SUCCESS); subsequent third-round staging revisions require separate CI on their exact new SHA | MCP conformance, genuinely signed RC, real client acceptance, legal and owner gates remain pending |
 
 Never cherry-pick stacked commits blindly or overwrite a peer branch. Trace each contribution to a PR/SHA, resolve overlapping files once, and test the resulting integrated tree independently.
 
