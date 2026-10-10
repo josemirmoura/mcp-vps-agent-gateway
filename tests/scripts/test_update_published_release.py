@@ -180,6 +180,19 @@ print("sha256:"+"a"*64)
         self.write_release()
         self.assert_blocked(self.verify(commit=latest), "source package differs")
 
+    def test_archive_from_other_commit_with_identical_tree_is_rejected(self):
+        # Git archive records its originating commit in a global PAX header.
+        # A new empty commit has identical tree and VERSION but different SHA.
+        older = self.sha
+        run("git", "commit", "--allow-empty", "-qm", "same tree", cwd=self.repo)
+        newer = run("git", "rev-parse", "HEAD", cwd=self.repo).stdout.strip()
+        run("git", "tag", "-f", TAG, cwd=self.repo)
+        run("git", "push", "-q", "--force", "origin", "refs/tags/" + TAG,
+            cwd=self.repo)
+        self.create_assets(older, signed_sha=newer)
+        self.write_release()
+        self.assert_blocked(self.verify(commit=newer), "source package differs")
+
     def test_invalid_tag_or_commit_rejected(self):
         self.assert_blocked(self.verify(commit="main"), "SemVer tags")
 
