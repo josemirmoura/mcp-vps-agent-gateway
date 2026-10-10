@@ -46,6 +46,23 @@ A separate conformance fixture that is *actually attached to the Portico Handler
 
 `internal/gateway/oauth_resource_smoke_test.go` tests the actual Gateway HTTP handler against disposable loopback introspection for protected-resource metadata, Bearer challenge, missing/expired/inactive tokens, issuer/audience/subject/scope denial and positive subject propagation. It is synthetic Resource Server evidence, **not** a live browser authorization-code+PKCE test and does not certify the external identity provider.
 
+## Segunda rodada: comparação no mesmo SHA
+
+A [PR #110](https://github.com/josemirmoura/mcp-vps-agent-gateway/pull/110) adiciona um executável de conformance isolado por build tag, com ferramentas, prompts e recursos sintéticos exigidos pelo teste oficial. Esse binário **não** faz parte do Gateway Community publicado; qualquer PASS adicional não é uma prova de suporte funcional no servidor de produção.
+
+Na [execução oficial 38008396287](https://github.com/josemirmoura/mcp-vps-agent-gateway/actions/runs/38008396287), código Community **`04ce22b3fe4917c05f8158dcfdbb2dc5ffecb887`**, o mesmo upstream fixado (`c37eec888e1c6ff140af79987a40008548b7cc5f`) e os mesmos 37 cenários obrigatórios foram exercitados **em duas variantes no mesmo commit**:
+
+| Variante | PASS | FAIL | SKIPPED | NOT_TESTED | Release gate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Gateway normal, compilado **sem** fixtures | **8** | **2** | **3** | **24** | **BLOCKED** |
+| Gateway MCP compartilhado + catálogo sintético exclusivo do laboratório | **35** | **1** | **1** | **0** | **BLOCKED** |
+
+O artefato de evidência preservado pelo GitHub Actions, ID `11652840175`, contém os dois arquivos `evidence/production-matrix.json` e `evidence/fixture-matrix.json`, resultados originais da suíte e saída do runner. O workflow concluiu com sucesso **como coleta de evidência**, mas **ambos os runners oficiais retornaram código 1 e ambos registraram `release_gate_passed=false`**.
+
+A única falha classificada no laboratório é `completion-complete`, porque a instância real `gateway.NewMCPServer` não registra `completion/complete`. A única classificação `SKIPPED` no laboratório é `server-stateless`, pois o runner também contém verificações opcionais/ignoradas; nenhum cenário recebeu falsamente PASS por exceção. O laboratório já registra `test_missing_capability` e verifica o erro oficial `-32021`/HTTP 400, mas isso **não comprova sozinho** aplicação dessa regra no Gateway normal com OAuth/Broker.
+
+**Handoff:** configurar `mcp.ServerOptions.CompletionHandler` na inicialização do servidor exige revisar `internal/gateway/gateway.go`, arquivo sob responsabilidade do Bloco 1. A integração e a CI do SHA reunido pertencem ao Bloco 5. Nunca integrar ferramentas `test_*` ao catálogo real para elevar pontuação.
+
 ## Release blockers and coordination
 
 - Fully reconcile and run the required scenario matrix for the **exact final integrated SHA**, identifying missing features/fixtures without exposing synthetic diagnostic tools on the production MCP catalog.
