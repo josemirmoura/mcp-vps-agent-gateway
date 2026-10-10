@@ -95,10 +95,6 @@ echo "$(vps_agent_text 'Target commit' 'Commit alvo'):   $target_sha"
 echo
 echo "$(vps_agent_text 'Changes:' 'Alterações:')"
 git log --oneline --no-decorate "$current..$target_sha" | head -n 12 || true
-if [ "$current" = "$target_sha" ]; then
-  echo "$(vps_agent_text 'Already at target version.' 'Já está na versão alvo.')"
-  exit 0
-fi
 if ! git merge-base --is-ancestor "$current" "$target_sha"; then
   echo "$(vps_agent_text "Refusing non-fast-forward update: target $target_sha is not a descendant of $current." "Atualização non-fast-forward recusada: o alvo $target_sha não descende de $current.")" >&2
   exit 1
@@ -112,6 +108,12 @@ if ! python3 scripts/verify-update-publication.py \
     --tag "$target" --commit "$target_sha" --repo "$PWD"; then
   echo "UPDATE BLOCKED: release publication verification failed before stopping services." >&2
   exit 1
+fi
+
+# Even a no-op update must not report an incomplete/unsigned tag as accepted.
+if [ "$current" = "$target_sha" ]; then
+  echo "$(vps_agent_text 'Already at target version.' 'Já está na versão alvo.')"
+  exit 0
 fi
 
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
