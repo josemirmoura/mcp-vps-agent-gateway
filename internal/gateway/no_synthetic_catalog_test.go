@@ -45,4 +45,31 @@ func TestProductionMCPServerDoesNotExposeConformanceFixtures(t *testing.T) {
             t.Fatalf("synthetic conformance fixture %q leaked into production tools/list", tool.Name)
         }
     }
+    prompts, err := session.ListPrompts(ctx, &mcp.ListPromptsParams{})
+    if err != nil {
+        t.Fatal(err)
+    }
+    for _, prompt := range prompts.Prompts {
+        if strings.HasPrefix(prompt.Name, "test_") {
+            t.Fatalf("synthetic prompt %q leaked into production prompts/list", prompt.Name)
+        }
+    }
+    resources, err := session.ListResources(ctx, &mcp.ListResourcesParams{})
+    if err != nil {
+        t.Fatal(err)
+    }
+    for _, resource := range resources.Resources {
+        if strings.HasPrefix(resource.URI, "test://") {
+            t.Fatalf("synthetic resource %q leaked into production resources/list", resource.URI)
+        }
+    }
+    templates, err := session.ListResourceTemplates(ctx, &mcp.ListResourceTemplatesParams{})
+    if err != nil {
+        t.Fatal(err)
+    }
+    for _, template := range templates.ResourceTemplates {
+        if strings.HasPrefix(template.URITemplate, "test://") {
+            t.Fatalf("synthetic template %q leaked into production resource templates", template.URITemplate)
+        }
+    }
 }
