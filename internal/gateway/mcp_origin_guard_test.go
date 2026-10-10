@@ -93,3 +93,31 @@ func TestGateCOriginAuthorityPreventsDNSRebinding(t *testing.T) {
         })
     }
 }
+
+func TestGateCOriginParserAcceptsValidHostnamesWithT(t *testing.T) {
+    // Regression: a mistaken string escape can treat the ASCII letter "t"
+    // as a forbidden host byte and reject localhost/trusted domains.
+    for _, origin := range []string{
+        "http://localhost:8080",
+        "https://test.example.invalid",
+        "https://trusted.example.invalid:8443",
+        "http://127.0.0.1:18994",
+        "http://[::1]:18994",
+    } {
+        if got := parseMCPOrigin(origin); got == nil {
+            t.Fatalf("valid Origin unexpectedly rejected: %q", origin)
+        }
+    }
+    for _, origin := range []string{
+        "null",
+        "https://trusted.example.invalid/path",
+        "https://trusted.example.invalid?x=1",
+        "https://name@trusted.example.invalid",
+        "https://test.example.invalid, https://attacker.invalid",
+        "https://trusted.example.invalid ",
+    } {
+        if got := parseMCPOrigin(origin); got != nil {
+            t.Fatalf("invalid Origin unexpectedly accepted: %q", origin)
+        }
+    }
+}
