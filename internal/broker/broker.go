@@ -40,6 +40,9 @@ type Broker struct {
 	InstanceID      string
 	InstanceName    string
 	elevationMu     sync.Mutex
+	// Serialize mutating requests through pre-intent and final journal outcome.
+	// No second mutation can pass the health fence while another is failing.
+	auditMutationMu   sync.Mutex
 	// Once durable audit fails, refuse new external mutations until an operator
 	// reconciles and restarts the Broker. Never automatically clear this latch.
 	auditDegraded    atomic.Bool
@@ -82,6 +85,10 @@ func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
 		req.ID = fmt.Sprintf("req-%d", time.Now().UnixNano())
 	}
 	mutation := !auditedReadOnlyTool(req.Tool)
+	if mutation {
+		b.auditMutationMu.Lock()
+		defer b.auditMutationMu.Unlock()
+	}
 	actionID := req.InvocationID
 	if actionID == "" {
 		actionID = req.ID
