@@ -2,7 +2,7 @@
 
 **Scope:** one compatible AI chat, one Linux computer, Scoped authority. This ledger is a release-readiness contract, not a notice of general availability. Public Community facts only; private Cloud plans and owner infrastructure details do not belong here.
 
-**Snapshot (2026-10-09):** `main` = `4212f30f7c145c8bbd0043b42bdc7dd95e466cd5`; latest **published** release = `v0.1.0-rc.6` (2026-10-06). `VERSION=0.1.0-rc.7` represents the working runtime lineage, **not** a published signed RC7. On this snapshot, `main` has a failing `vuln` check. All facts must be refreshed at the exact candidate commit.
+**Integration snapshot (2026-10-09):** public `main` = `4212f30f7c145c8bbd0043b42bdc7dd95e466cd5`, still on the old Go vulnerability baseline; **staging PR #99** = `272ecf4bb8576213564141fec31c61cf804c7ae2`, 16/16 GitHub Actions workflows SUCCESS **on that exact SHA**, including patched Go security scanning, Docker lifecycle, browser harness and disposable authorization tests. The newest published release is still `v0.1.0-rc.6` (2026-10-06); `VERSION=0.1.0-rc.7` is not a published signed RC7. Staging CI does not certify MCP 37/37, owner client UX, legal rights or release artifacts. Revalidate all facts at the next candidate SHA.
 
 ## Integration inputs and review responsibilities
 
@@ -22,8 +22,8 @@ Never cherry-pick stacked commits blindly or overwrite a peer branch. Trace each
 | Gate | Evidence and pass criteria | Current |
 |---|---|---|
 | A. Rights/license and publishing authority | license, attribution/NOTICE, contributor/ownership boundaries legally approved for **this** candidate; historical grants preserved | NOT TESTED / owner review required |
-| B. Reproducible integrated build/security | exact SHA; CI Go race/vet/build for amd64/arm64, `govulncheck`, `gosec`, secret scan, Docker scans/SBOM, OAuth, IPC/Broker, lifecycle, negative security cases; all required checks green | FAIL: baseline vulnerability scan |
-| C. MCP protocol and client support | official upstream requirements pinned, table of PASS/SKIPPED/NOT TESTED/NOT APPLICABLE; no simulated client presented as real | PARTIAL: prior stateless smoke; full applicable conformance unaccepted |
+| B. Reproducible integrated build/security | exact SHA; CI Go race/vet/build for amd64/arm64, `govulncheck`, `gosec`, secret scan, Docker scans/SBOM, OAuth, IPC/Broker, lifecycle, negative security cases; all required checks green | PARTIAL: 16/16 staging workflows passed at `272ecf4...`; no post-merge main or actual release build/signed assets |
+| C. MCP protocol and client support | official upstream requirements pinned, table of PASS/SKIPPED/NOT TESTED/NOT APPLICABLE; no simulated client presented as real | FAIL/PARTIAL: 8 PASS, 2 FAIL, 3 SKIPPED, 24 NOT TESTED among 37 server requirements; `release_gate_passed=false`, #79 open |
 | D. Signed candidate | tag and commit match VERSION; actual source checksum+Sigstore bundle and GHCR image digests/signatures independently verified against expected release workflow/issuer; scan provenance and SBOM | NOT TESTED: no new signed RC published |
 | E. Installation and operator acceptance | clean supported Linux clone from the exact released tag; HTTPS+OAuth; real compatible AI MCP call; scoped grant, denial, expiration, protected secrets, revocation and audit; desktop and mobile UI where available; secure HTTPS/SSH fallback | NOT TESTED for integrated candidate |
 | F. Recovery and promotion | controlled backup/rollback and stop/tar failure rehearsal; no unexpected privilege/identity loss; CI candidate SHA **and separately main SHA after merge**; operator release approval | NOT TESTED |
@@ -34,7 +34,7 @@ Classification: **PASS**, **FAIL**, **SKIPPED**, **NOT TESTED**, or **NOT APPLIC
 
 | Field | Required recorded value |
 |---|---|
-| Integration PR / reviewed SHA | `TBD` |
+| Integration PR / reviewed SHA | [staging #99](https://github.com/josemirmoura/mcp-vps-agent-gateway/pull/99), `272ecf4bb8576213564141fec31c61cf804c7ae2`, 16/16 workflows SUCCESS, **not** final release SHA |
 | Post-merge `main` SHA and CI URLs | `TBD` |
 | Release tag and target commit | `TBD` |
 | Architecture and package version | `TBD` |
@@ -53,7 +53,7 @@ Do not put credentials, access tokens, unredacted user or tenant identifiers, co
 ## Safe promotion and rollback path
 
 1. Freeze and review an integration commit. Run all required CI and negative tests **against that SHA**. Review the Linux/Scoped product boundary, repository ownership, security findings, and actual PR diffs.
-2. Coordinate merge to protected `main` only after required review/authorization, then verify **new** CI on the post-merge SHA. An earlier PR check does not cover this merge.
+2. Coordinate merge to protected `main` only after required review/authorization, then verify **new** CI on the post-merge SHA. An earlier PR check does not cover this merge. The publication workflow accepts **only owner-operated `workflow_dispatch` from main**, with the current reviewed 40-character SHA and an exact typed confirmation; Git tag pushes alone must never publish.
 3. With rights resolved and an explicitly authorized release operation, create a version-tagged candidate using the documented workflow, then independently verify its **published** source and image artifacts by digest, checksum, Sigstore identity and expected issuer. Refuse unsigned/missing assets. Never infer immutable tag provenance solely from a successful verification of one blob.
 4. Perform the [operator acceptance](operator-acceptance.md) on a disposable/recoverable supported Linux system from the exact published tag. For an MCP client without embedded/natively supported approval, verify the portal or SSH workflow with operator identity, explicit approve/deny and Broker enforcement; never claim generic native elicitation support.
 5. Preserve rollback points for code, policy, audit, identity database/volumes and credentials. Exercise controlled `scripts/update.sh` failure recovery in disposable infrastructure first. Restore the previously accepted tag/volumes via the documented updater, checking audit, OAuth and Broker policy; **purge is not rollback**.
