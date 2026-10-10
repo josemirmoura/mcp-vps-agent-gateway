@@ -6,6 +6,26 @@ cd "$(dirname "$0")/.."
 source scripts/lib/product.sh
 vps_agent_init_language ""
 
+# Serialize lifecycle changes for this installation. Without this lock, two
+# updater processes can stop, snapshot, reset Git and restore the same state
+# concurrently. Lock the backups DIRECTORY inode: no symlinkable lockfile and
+# no stale PID cleanup. File descriptor 9 remains held until updater exits.
+if [ -L backups ] || { [ -e backups ] && [ ! -d backups ]; }; then
+  echo "UPDATE BLOCKED: backups must be a real directory, not a symlink." >&2
+  exit 1
+fi
+mkdir -p backups
+chmod 700 backups
+if ! command -v flock >/dev/null 2>&1; then
+  echo "UPDATE BLOCKED: flock (util-linux) is required for safe update locking." >&2
+  exit 1
+fi
+exec 9< backups
+if ! flock -n 9; then
+  echo "UPDATE BLOCKED: another update is already running for this installation." >&2
+  exit 1
+fi
+
 if [ ! -f .env ] || [ ! -f config/policy.yaml ]; then
   echo "$(vps_agent_text 'Missing .env or config/policy.yaml. Run scripts/init.sh first.' 'Arquivo .env ou config/policy.yaml ausente. Execute scripts/init.sh primeiro.')" >&2
   exit 1
@@ -46,9 +66,9 @@ else
 fi
 
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-backup_dir="backups/$stamp"
-mkdir -p "$backup_dir"
-chmod 700 backups "$backup_dir"
+# Same-second retries must NEVER reuse and overwrite a previous snapshot.
+backup_dir="$(mktemp -d "backups/$stamp.XXXXXXXX")"
+chmod 700 "$backup_dir"
 
 compose=(docker compose -f compose.yaml)
 if [ "${VPS_AGENT_WHOLE_HOST:-0}" = "1" ]; then
