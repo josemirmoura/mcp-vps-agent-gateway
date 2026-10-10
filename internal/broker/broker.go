@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/hostexec"
@@ -39,6 +40,9 @@ type Broker struct {
 	InstanceID      string
 	InstanceName    string
 	elevationMu     sync.Mutex
+	// Once durable audit fails, refuse new external mutations until an operator
+	// reconciles and restarts the Broker. Never automatically clear this latch.
+	auditDegraded    atomic.Bool
 	// Fault injection for package-local tests; production always uses State.
 	auditAppendForTest func(context.Context, state.AuditEvent) (string, error)
 }
@@ -91,11 +95,15 @@ func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
 	// Record durable intent BEFORE invoking any potentially mutating handler.
 	// This also prevents new privileged work when audit storage is unavailable.
 	if mutation {
+		if b.auditDegraded.Load() {
+			return deny(req.ID, "reconcile_required", "audit storage was degraded; operator reconciliation required before mutations resume")
+		}
 		if b.State == nil {
 			return deny(req.ID, "audit_unavailable", "mutations require durable audit storage")
 		}
 		ev.Decision = "intent"
 		if _, err := b.appendRequestAudit(ctx, ev); err != nil {
+			b.auditDegraded.Store(true)
 			slog.ErrorContext(ctx, "audit_intent_failed", "tool", req.Tool,
 				"request_id", req.ID, "invocation_id", req.InvocationID,
 				"error", err)
@@ -111,6 +119,7 @@ func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
 	if b.State != nil {
 		ev.Decision = decision
 		if _, err := b.appendRequestAudit(ctx, ev); err != nil {
+			b.auditDegraded.Store(true)
 			slog.ErrorContext(ctx, "audit_append_failed",
 				"instance_id", b.InstanceID, "instance_name", b.InstanceName,
 				"request_id", req.ID, "invocation_id", req.InvocationID,
