@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 	"net/http"
 	"os"
 
@@ -89,12 +90,25 @@ func fixtureServer() (*mcp.Server, error) {
 			Content: textResult("This tool intentionally returns an error for testing"),
 		}
 	})
-	syntheticTool(server, "test_tool_with_progress", func() *mcp.CallToolResult {
-		return &mcp.CallToolResult{Content: textResult("Progress diagnostic executed")}
-	})
+	mcp.AddTool(server, &mcp.Tool{Name: "test_tool_with_progress",
+		Description: "Conformance fixture progress, never available to production clients."},
+		func(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, struct{}, error) {
+			token := req.Params.GetProgressToken()
+			if token != nil {
+				for _, progress := range []float64{0, 50, 100} {
+					if err := req.Session.NotifyProgress(ctx, &mcp.ProgressNotificationParams{
+						ProgressToken: token, Progress: progress, Total: 100,
+					}); err != nil {
+						return nil, struct{}{}, err
+					}
+					time.Sleep(15 * time.Millisecond)
+				}
+			}
+			return &mcp.CallToolResult{Content: textResult("Progress diagnostic executed")}, struct{}{}, nil
+		})
 
 	textPrompt := func(name, text string) {
-		server.AddPrompt(&mcp.Prompt{Name: name},
+		server.AddPrompt(&mcp.Prompt{Name: name, Description: "Conformance diagnostic prompt; test-only fixture."},
 			func(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 				return &mcp.GetPromptResult{Messages: []*mcp.PromptMessage{{
 					Role: "user", Content: &mcp.TextContent{Text: text},
@@ -103,7 +117,7 @@ func fixtureServer() (*mcp.Server, error) {
 	}
 	textPrompt("test_simple_prompt", "This is a simple prompt for testing.")
 	server.AddPrompt(&mcp.Prompt{
-		Name: "test_prompt_with_arguments",
+		Name: "test_prompt_with_arguments", Description: "Two argument substitution diagnostic.",
 		Arguments: []*mcp.PromptArgument{{Name: "arg1", Required: true}, {Name: "arg2", Required: true}},
 	}, func(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		args := req.Params.Arguments
@@ -114,7 +128,7 @@ func fixtureServer() (*mcp.Server, error) {
 		}}}, nil
 	})
 	server.AddPrompt(&mcp.Prompt{
-		Name: "test_prompt_with_embedded_resource",
+		Name: "test_prompt_with_embedded_resource", Description: "Embedded resource diagnostic.",
 		Arguments: []*mcp.PromptArgument{{Name: "resourceUri", Required: true}},
 	}, func(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		return &mcp.GetPromptResult{Messages: []*mcp.PromptMessage{
@@ -125,7 +139,7 @@ func fixtureServer() (*mcp.Server, error) {
 			{Role: "user", Content: &mcp.TextContent{Text: "Please process the embedded resource above."}},
 		}}, nil
 	})
-	server.AddPrompt(&mcp.Prompt{Name: "test_prompt_with_image"},
+	server.AddPrompt(&mcp.Prompt{Name: "test_prompt_with_image", Description: "Image diagnostic."},
 		func(_ context.Context, _ *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 			return &mcp.GetPromptResult{Messages: []*mcp.PromptMessage{
 				{Role: "user", Content: &mcp.ImageContent{Data: image, MIMEType: "image/png"}},
@@ -166,7 +180,7 @@ func main() {
 		log.Fatal(err)
 	}
 	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server },
-		&mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true, MaxRequestBodyBytes: 1 << 20})
+		&mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: false, MaxRequestBodyBytes: 1 << 20})
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", handler)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
