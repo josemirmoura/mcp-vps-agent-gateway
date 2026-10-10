@@ -86,10 +86,22 @@ func TestIntegratedOAuthResourceServerBoundaryE2E(t *testing.T) {
 			response["exp"] = time.Now().Add(-time.Minute).Unix()
 		case "wrong-issuer":
 			response["iss"] = "https://different.example.invalid"
+		case "missing-issuer":
+			delete(response, "iss")
 		case "wrong-audience":
 			response["aud"] = []string{"another-resource"}
+		case "missing-audience":
+			delete(response, "aud")
+		case "malformed-audience":
+			response["aud"] = 42
 		case "wrong-scope":
 			response["scope"] = "unrelated.scope"
+		case "missing-scope":
+			delete(response, "scope")
+		case "scope-prefix-only":
+			response["scope"] = requiredScope + ".extra"
+		case "missing-expiration":
+			delete(response, "exp")
 		case "empty-subject":
 			response["sub"] = ""
 		default:
@@ -179,11 +191,17 @@ func TestIntegratedOAuthResourceServerBoundaryE2E(t *testing.T) {
 		{name: "inactive bearer", token: "inactive", want: http.StatusUnauthorized},
 		{name: "expired bearer", token: "expired", want: http.StatusUnauthorized},
 		{name: "wrong issuer", token: "wrong-issuer", want: http.StatusUnauthorized},
+		{name: "missing issuer", token: "missing-issuer", want: http.StatusUnauthorized},
 		{name: "wrong audience", token: "wrong-audience", want: http.StatusUnauthorized},
+		{name: "missing audience", token: "missing-audience", want: http.StatusUnauthorized},
+		{name: "malformed audience", token: "malformed-audience", want: http.StatusUnauthorized},
+		{name: "missing expiration", token: "missing-expiration", want: http.StatusUnauthorized},
 		{name: "empty subject", token: "empty-subject", want: http.StatusUnauthorized},
-		// A missing required OAuth scope MUST fail before any tool execution.
+		// OAuth scopes are exact tokens, not prefixes; no false authorization.
 		// Either 401 or 403 is acceptable here; the SDK controls the status.
 		{name: "insufficient scope", token: "wrong-scope", want: 0},
+		{name: "missing scope", token: "missing-scope", want: 0},
+		{name: "scope prefix confusion", token: "scope-prefix-only", want: 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			before, _ := probe.snapshot()
