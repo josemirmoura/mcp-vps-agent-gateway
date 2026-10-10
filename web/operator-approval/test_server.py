@@ -36,6 +36,18 @@ class PortalSecurityTests(unittest.TestCase):
     def test_request_id_rejects_special_characters(self):
         self.assertIsNone(app.API_RE.fullmatch("/operator/api/approvals/apr_12345678/../../deny"))
         self.assertIsNone(app.API_RE.fullmatch("/operator/api/approvals/apr_12345678%2Fdecision"))
+    def test_logout_cookie_clearing(self):
+        regular = app.expired_session_cookie()
+        embedded = app.expired_session_cookie(True)
+        self.assertIn("Max-Age=0", regular)
+        self.assertIn("SameSite=Strict", regular)
+        self.assertIn("Path=/operator;", regular)
+        self.assertIn("HttpOnly; Secure", regular)
+        self.assertIn("Max-Age=0", embedded)
+        self.assertIn("SameSite=None; Partitioned", embedded)
+        self.assertIn("Path=/operator/embed;", embedded)
+        self.assertIn("HttpOnly; Secure", embedded)
+
     def test_portal_path_exists(self):
         self.assertTrue(app.UI_PATH.is_file())
 
