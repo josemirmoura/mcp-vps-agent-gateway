@@ -46,7 +46,8 @@ jobs:
           go test ./internal/gateway -run 'TestIntegratedOAuthResourceServerBoundaryE2E|TestMCPInitializeAdvertisesPackagedVersion|TestMCPCompletionCapabilityIsAbsentAndMethodIsClosed|TestProductionMCPServerDoesNotExposeConformanceFixtures|TestGateCStatelessHTTPRejectsHeaderSpoofingBeforeExecutor|TestGateCOriginAuthorityPreventsDNSRebinding' -count=1 -v
           python3 -m unittest discover -s tests/scripts -p 'test_mcp_release_scope_audit.py' -v
           python3 -m unittest discover -s tests/scripts -p 'test_mcp_gate_c_diagnostic.py' -v
-          go test ./tests/integration -run '^TestGateCOAuthStatelessRealBrokerFailClosed
+          go test ./tests/integration -run TestGateCOAuthStatelessRealBrokerFailClosed -count=1 -v
+      - name: Build test-only MCP server fixture
         shell: bash
         run: |
           set -euo pipefail
