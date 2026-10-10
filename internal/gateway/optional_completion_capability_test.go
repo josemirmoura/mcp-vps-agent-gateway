@@ -97,10 +97,15 @@ func TestMCPCompletionCapabilityIsAbsentAndMethodIsClosed(t *testing.T) {
 	if len(result.SupportedVersions) == 0 {
 		t.Fatal("server/discover has no supported protocol versions")
 	}
+	supports2026 := false
 	for _, v := range result.SupportedVersions {
 		if v == "2026-07-28" {
+			supports2026 = true
 			break
 		}
+	}
+	if !supports2026 {
+		t.Fatal("discovery does not advertise tested 2026-07-28 protocol revision")
 	}
 	if _, advertised := result.Capabilities["completions"]; advertised {
 		t.Fatal("Gateway advertises completions without an implementation")
