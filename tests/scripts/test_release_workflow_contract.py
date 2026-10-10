@@ -77,9 +77,9 @@ class ReleaseWorkflowSecurityContract(unittest.TestCase):
         self.assertIn("git archive --format=tar", self.workflow)
 
     def test_release_cannot_publish_automatically_from_tag_push(self):
-        event_section = self.workflow.split("\\nconcurrency:", 1)[0]
-        self.assertIn("\\n  workflow_dispatch:\\n", event_section)
-        self.assertNotIn("\\n  push:\\n", event_section)
+        event_section = self.workflow.split("\nconcurrency:", 1)[0]
+        self.assertIn("\n  workflow_dispatch:\n", event_section)
+        self.assertNotIn("\n  push:\n", event_section)
         for value in ("approved_sha:", "publish_confirmation:"):
             self.assertIn(value, event_section)
 
@@ -102,12 +102,12 @@ class ReleaseWorkflowSecurityContract(unittest.TestCase):
     def test_owner_release_request_negative_paths(self):
         # Execute the actual inline bash owner gate with simulated GitHub inputs.
         validate = job("validate", self.workflow)
-        start_marker = "      - name: Validate explicit owner publication request\\n"
+        start_marker = "      - name: Validate explicit owner publication request\n"
         self.assertIn(start_marker, validate)
         gate = validate.split(start_marker, 1)[1].split(
             "      - uses: actions/checkout@v7", 1)[0]
-        script_part = gate.split("        run: |\\n", 1)[1]
-        script = "\\n".join(
+        script_part = gate.split("        run: |\n", 1)[1]
+        script = "\n".join(
             line[10:] if line.startswith("          ") else line
             for line in script_part.splitlines()
         )
