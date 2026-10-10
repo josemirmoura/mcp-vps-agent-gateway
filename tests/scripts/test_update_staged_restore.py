@@ -126,8 +126,8 @@ class RollbackRecoveryTests(unittest.TestCase):
         (self.root / "scripts/verify.sh").write_text("#!/bin/sh\nexit 0\n")
         (self.root / "scripts/verify-public.sh").write_text("#!/bin/sh\nexit 0\n")
         (self.root / "config").mkdir()
-        (self.root / "config/policy.yaml").write_text("upgraded-policy\n")
-        (self.root / ".env").write_text("upgraded-secret-not-real\n")
+        (self.root / "config/policy.yaml").write_text("original-policy\n")
+        (self.root / ".env").write_text("original-secret-not-real\n")
         (self.root / "state").mkdir()
         (self.root / "state/state.db").write_text("upgraded-db\n")
         (self.root / "backups/test").mkdir(parents=True)
@@ -167,6 +167,14 @@ class RollbackRecoveryTests(unittest.TestCase):
             '  if [ "$FAILURE" = "stage-move" ] && [[ "$*" == *"/state state" ]]; then return 75; fi\n'
             '  command mv "$@"\n'
             '}\n'
+            'python3() {\n'
+            '  if [[ "${1:-}" == scripts/lib/invalidate-update-authority.py ]]; then\n'
+            '    printf "offline-revocation-called\\n" >> "$TEST_LOG"\n'
+            '    if [[ "$FAILURE" == authority ]]; then return 76; fi\n'
+            '    return 0\n'
+            '  fi\n'
+            '  command python3 "$@"\n'
+            '}\n'
             'VPS_AGENT_AUTH_MODE=none\n'
             + self.rollback_functions + '\n'
             'false\n'
@@ -186,6 +194,22 @@ class RollbackRecoveryTests(unittest.TestCase):
         self.assertIn("ROLLBACK BLOCKED", result.stderr)
         self.assertEqual((self.root / "state/state.db").read_text(), "upgraded-db\n")
         self.assertFalse(any(" stop" in x for x in calls))
+
+    def test_live_policy_change_blocks_rollback_without_overwrite(self):
+        (self.root / "config/policy.yaml").write_text("revoked-policy\\n")
+        result, calls = self.execute()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("live credentials or policy differ", result.stderr)
+        self.assertEqual((self.root / "config/policy.yaml").read_text(), "revoked-policy\\n")
+        self.assertEqual((self.root / "state/state.db").read_text(), "upgraded-db\\n")
+        self.assertFalse(any(" stop" in line for line in calls))
+
+    def test_authority_precheck_failure_preserves_state_and_policy(self):
+        result, calls = self.execute(failure="authority")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("authority could not be invalidated", result.stderr)
+        self.assertEqual((self.root / "state/state.db").read_text(), "upgraded-db\\n")
+        self.assertFalse(any(" stop" in line for line in calls))
 
     def test_stop_error_leaves_state_intact(self):
         result, _ = self.execute(failure="stop")
