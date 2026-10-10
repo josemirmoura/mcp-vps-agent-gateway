@@ -61,6 +61,15 @@ func TestAuditIntentWriteFailureBlocksMutationBeforeService(t *testing.T) {
 	if svc.restarts != 0 {
 		t.Fatalf("service mutated despite failed durable intent: %d", svc.restarts)
 	}
+	// Recovering the dependency alone does not remove the unsafe state.
+	b.auditAppendForTest = nil
+	if next := b.Handle(context.Background(), auditRestartRequest()); next.OK ||
+		next.Error == nil || next.Error.Code != "reconcile_required" {
+		t.Fatalf("audit failure did not latch Broker as degraded: %+v", next)
+	}
+	if svc.restarts != 0 {
+		t.Fatal("degraded Broker executed a mutation")
+	}
 }
 
 func TestAuditOutcomeFailureReportsUncertaintyAndPreservesIntent(t *testing.T) {
@@ -89,14 +98,23 @@ func TestAuditOutcomeFailureReportsUncertaintyAndPreservesIntent(t *testing.T) {
 		t.Fatalf("durable intent audit chain invalid: %v", err)
 	}
 
-	// The same invocation is handled by the existing idempotency journal;
-	// a client's reconciliation/retry must not duplicate the service restart.
+	// A transient database recovery must NOT silently unlock this Broker.
 	b.auditAppendForTest = nil
-	if repeat := b.Handle(context.Background(), req); !repeat.OK {
-		t.Fatalf("existing cached operation could not be reconciled: %+v", repeat)
+	if repeat := b.Handle(context.Background(), req); repeat.OK || repeat.Error == nil ||
+		repeat.Error.Code != "reconcile_required" {
+		t.Fatalf("degraded Broker accepted a second mutation: %+v", repeat)
 	}
 	if svc.restarts != 1 {
 		t.Fatalf("side effect duplicated after uncertain response: %d", svc.restarts)
+	}
+	// A new Broker process may resume after operator reconciliation. The
+	// existing operation journal must still stop duplicate side effects.
+	recovered := &Broker{Policy: b.Policy, FS: b.FS, State: store, Services: svc}
+	if repeat := recovered.Handle(context.Background(), req); !repeat.OK {
+		t.Fatalf("reconciled idempotent operation failed: %+v", repeat)
+	}
+	if svc.restarts != 1 {
+		t.Fatalf("side effect duplicated after recovery: %d", svc.restarts)
 	}
 }
 
