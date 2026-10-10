@@ -31,7 +31,7 @@ class UpdateSerializationTests(unittest.TestCase):
         self.prelude = full[:full.index("if [ ! -f .env ]")]
         self.allocator = full[
             full.index('stamp="$(date -u +%Y%m%dT%H%M%SZ)"'):
-            full.index("compose=(docker compose -f compose.yaml)")
+            full.index("\n# At this point the live package")
         ]
 
     def run_shell(self, command, timeout=6):
