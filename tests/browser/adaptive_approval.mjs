@@ -143,6 +143,19 @@ async function noHorizontalOverflow(scope) {
   assert.ok(sizes.width <= sizes.viewport + 1, JSON.stringify(sizes));
 }
 
+async function fetchFixtureRoute(route) {
+  // Chromium's resolver rules do not apply to Playwright's Node HTTP client.
+  // Reach only the fixture's loopback listener and retain its exact Host/Origin
+  // and browser cookies; never log authentication headers or response bodies.
+  const target = new URL(route.request().url());
+  assert.equal(target.origin, metadata.operator);
+  const host = target.host;
+  target.hostname = '127.0.0.1';
+  return route.fetch({ url: target.href,
+    headers: { ...await route.request().allHeaders(), host },
+    maxRedirects: 0, timeout: 5_000 });
+}
+
 for (const profile of profiles) {
   test(profile.name + ': delayed reads stay signed out and login waits for fresh proof', { timeout: 30_000 }, () => run(profile, 'portal-session-races', async ({ page, context, checkpoint }) => {
     await page.goto(metadata.operator + '/operator?request=' + metadata.read);
@@ -154,7 +167,7 @@ for (const profile of profiles) {
     const readDone = new Promise(resolve => { finishRead = resolve; });
     await page.route(detailURL, async route => {
       try {
-        const response = await route.fetch();
+        const response = await fetchFixtureRoute(route);
         enterRead(); await readGate;
         await route.fulfill({ response });
       } finally { finishRead(); }
@@ -178,7 +191,7 @@ for (const profile of profiles) {
     const loginURL = metadata.operator + '/operator/api/login';
     await page.route(loginURL, async route => {
       try {
-        const response = await route.fetch();
+        const response = await fetchFixtureRoute(route);
         enterLogin(); await loginGate;
         await route.fulfill({ response });
       } finally { finishLogin(); }
