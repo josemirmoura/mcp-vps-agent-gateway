@@ -58,7 +58,7 @@ func labSignedState(key []byte, phase string) string {
 }
 
 func labVerifyState(key []byte, raw string) (string, bool) {
-	for _, phase := range []string{"round-1", "round-2", "basic", "sampling", "roots", "state", "multiple", "capabilities", "tampered"} {
+	for _, phase := range []string{"round-1", "round-2", "basic", "sampling", "roots", "state", "multiple", "capabilities", "tampered", "prompt"} {
 		if hmac.Equal([]byte(raw), []byte(labSignedState(key, phase))) {
 			return phase, true
 		}
@@ -162,6 +162,7 @@ func fixtureServer() (*mcp.Server, error) {
 	image := fakePNG()
 	if err := registerLabInputTools(server); err != nil { return nil, err }
 	if err := registerOtherLabInputTools(server); err != nil { return nil, err }
+	if err := registerLabInputPrompt(server); err != nil { return nil, err }
 
 	syntheticTool(server, "test_simple_text", func() *mcp.CallToolResult {
 		return &mcp.CallToolResult{Content: textResult("This is a simple text response for testing.")}
