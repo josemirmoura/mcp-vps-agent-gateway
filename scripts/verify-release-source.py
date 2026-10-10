@@ -87,6 +87,7 @@ def archived_version(path: Path) -> str:
     version = None
     members = 0
     unpacked_bytes = 0
+    seen: set[str] = set()
     try:
         # Git archive --prefix=mcp-vps-agent/ encodes its root directory
         # as "mcp-vps-agent" (no final slash). Accept only that root directory,
@@ -96,6 +97,9 @@ def archived_version(path: Path) -> str:
                 members += 1
                 if members > MAX_TAR_MEMBERS:
                     raise VerificationFailure("source archive exceeds member count limit")
+                if entry.name in seen:
+                    raise VerificationFailure("source archive contains duplicate member")
+                seen.add(entry.name)
                 if entry.name == "mcp-vps-agent":
                     if not entry.isdir():
                         raise VerificationFailure("source archive has invalid root directory")
