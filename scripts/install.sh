@@ -90,17 +90,24 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --profile)
       [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --profile needs a value.' 'ERRO: --profile precisa de um valor.')" >&2; exit 2; }
+      [ -n "$2" ] || { echo "$(vps_agent_text 'ERROR: --profile cannot be empty.' 'ERRO: --profile não pode ser vazio.')" >&2; exit 2; }
       PROFILE="$2"; shift 2 ;;
     --scope)
       [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --scope needs a value.' 'ERRO: --scope precisa de um valor.')" >&2; exit 2; }
+      [ -n "$2" ] || { echo "$(vps_agent_text 'ERROR: --scope cannot be empty.' 'ERRO: --scope não pode ser vazio.')" >&2; exit 2; }
       SCOPE="$2"; shift 2 ;;
     --create-scope) CREATE_SCOPE=1; shift ;;
     --run-as)
       [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --run-as needs a value.' 'ERRO: --run-as precisa de um valor.')" >&2; exit 2; }
+      [ -n "$2" ] || { echo "$(vps_agent_text 'ERROR: --run-as cannot be empty.' 'ERRO: --run-as não pode ser vazio.')" >&2; exit 2; }
       RUN_AS="$2"; shift 2 ;;
     --lang)
       [ "$#" -ge 2 ] || { echo "$(vps_agent_text 'ERROR: --lang needs a value.' 'ERRO: --lang precisa de um valor.')" >&2; exit 2; }
       LANG_OVERRIDE="$2"
+      case "$LANG_OVERRIDE" in
+        pt-BR|en) ;;
+        *) echo "$(vps_agent_text 'ERROR: --lang must be pt-BR or en.' 'ERRO: --lang deve ser pt-BR ou en.')" >&2; exit 2 ;;
+      esac
       VPS_AGENT_LANG_EXPLICIT=1
       vps_agent_init_language "$LANG_OVERRIDE"
       shift 2 ;;
@@ -198,7 +205,12 @@ fi
 
 case "$PROFILE" in
   custom|project) ;;
-  whole-host) SCOPE="/" ;;
+  whole-host)
+    if [ -n "$SCOPE" ] && [ "$SCOPE" != "/" ]; then
+      echo "$(vps_agent_text 'ERROR: Whole Host cannot use a different --scope; remove --scope or select a Scoped profile.' 'ERRO: Whole Host não permite outro --scope; retire --scope ou selecione um perfil Scoped.')" >&2
+      exit 2
+    fi
+    SCOPE="/" ;;
   *) echo "$(vps_agent_text 'ERROR: --profile must be custom, project or whole-host.' 'ERRO: --profile deve ser custom, project ou whole-host.')" >&2; exit 2 ;;
 esac
 
@@ -227,28 +239,24 @@ if [[ "$SCOPE" != /* ]]; then
   exit 2
 fi
 
-if [ "$SCOPE" != "/" ] && [ ! -d "$SCOPE" ]; then
-  if [ "$CREATE_SCOPE" -eq 1 ]; then
-    echo "$(vps_agent_text "Creating $SCOPE with sudo install." "Criando $SCOPE com sudo install.")"
-    sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 "$SCOPE"
-  elif [ -t 0 ]; then
-    printf '%s' "$(vps_agent_text "$SCOPE does not exist. Create it now? [y/N]: " "$SCOPE não existe. Criar agora? [s/N]: ")"
-    read -r create_answer
-    case "$create_answer" in
-      y|Y|yes|YES|s|S|sim|SIM)
-        sudo install -d -o "$USER" -g "$(id -gn)" -m 0750 "$SCOPE"
-        ;;
-      *)
-        echo "$(vps_agent_text 'Installation stopped before startup.' 'Instalação interrompida antes da inicialização.')" >&2
-        exit 1
-        ;;
-    esac
-  else
-    echo "$(vps_agent_text "ERROR: scope does not exist: $SCOPE" "ERRO: o escopo não existe: $SCOPE")" >&2
-    exit 1
-  fi
+# Refuse invalid/non-consensual non-interactive runs before creating a
+# directory, .env, policy, or any runtime state. Preflight is read-only.
+if [ ! -t 0 ] && [ "$ASSUME_YES" -ne 1 ]; then
+  echo "$(vps_agent_text 'ERROR: --yes is required in non-interactive mode before modifying state.' 'ERRO: --yes é obrigatório em modo não interativo antes de modificar o estado.')" >&2
+  exit 2
+fi
+if [ "$PROFILE" = "whole-host" ] && [ "$ASSUME_YES" -eq 1 ] && [ "$ACK_WHOLE_HOST" -ne 1 ]; then
+  echo "$(vps_agent_text 'ERROR: non-interactive Whole Host requires --ack-whole-host.' 'ERRO: Whole Host não interativo requer --ack-whole-host.')" >&2
+  exit 2
+fi
+if [ "$PROFILE" != "whole-host" ] && [ "$SCOPE" = "/" ]; then
+  echo "$(vps_agent_text 'ERROR: / is reserved for explicit Whole Host mode.' 'ERRO: / exige seleção explícita do perfil Whole Host.')" >&2
+  exit 2
 fi
 
+# The confined shell user must be known before creating a missing project
+# scope. Using $USER here assigned it to root under sudo and broke the
+# non-root execution contract (or aborted under set -u if USER was missing).
 if [ -z "$RUN_AS" ]; then
   RUN_AS="${SUDO_USER:-$(id -un)}"
 fi
@@ -261,9 +269,46 @@ if [ "$RUN_AS" = "root" ]; then
     exit 2
   fi
 fi
-if [ -z "$RUN_AS" ] || [ "$RUN_AS" = "root" ] || ! id -u "$RUN_AS" >/dev/null 2>&1; then
+if [ -z "$RUN_AS" ] || ! id -u "$RUN_AS" >/dev/null 2>&1 || [ "$(id -u "$RUN_AS")" -eq 0 ]; then
   echo "$(vps_agent_text "ERROR: invalid non-root shell user: $RUN_AS" "ERRO: usuário não-root inválido para shell: $RUN_AS")" >&2
   exit 2
+fi
+
+create_scope_directory() {
+  local owner_group
+  owner_group="$(id -gn "$RUN_AS")" || return 1
+  # Root login environments commonly lack sudo; do not demand sudo of root.
+  if [ "$(id -u)" -eq 0 ]; then
+    install -d -o "$RUN_AS" -g "$owner_group" -m 0750 -- "$SCOPE"
+  else
+    if ! command -v sudo >/dev/null 2>&1; then
+      echo "$(vps_agent_text 'ERROR: sudo is required to create this directory; create it manually or install sudo.' 'ERRO: sudo é necessário para criar esta pasta; crie-a manualmente ou instale sudo.')" >&2
+      return 1
+    fi
+    sudo install -d -o "$RUN_AS" -g "$owner_group" -m 0750 -- "$SCOPE"
+  fi
+}
+
+if [ "$SCOPE" != "/" ] && [ ! -d "$SCOPE" ]; then
+  if [ "$CREATE_SCOPE" -eq 1 ]; then
+    echo "$(vps_agent_text "Creating $SCOPE for $RUN_AS." "Criando $SCOPE para $RUN_AS.")"
+    create_scope_directory
+  elif [ -t 0 ]; then
+    printf '%s' "$(vps_agent_text "$SCOPE does not exist. Create it now? [y/N]: " "$SCOPE não existe. Criar agora? [s/N]: ")"
+    read -r create_answer
+    case "$create_answer" in
+      y|Y|yes|YES|s|S|sim|SIM)
+        create_scope_directory
+        ;;
+      *)
+        echo "$(vps_agent_text 'Installation stopped before startup.' 'Instalação interrompida antes da inicialização.')" >&2
+        exit 1
+        ;;
+    esac
+  else
+    echo "$(vps_agent_text "ERROR: scope does not exist: $SCOPE" "ERRO: o escopo não existe: $SCOPE")" >&2
+    exit 1
+  fi
 fi
 
 init_args=(--scope "$SCOPE" --run-as "$RUN_AS" --lang "$VPS_AGENT_LANG")

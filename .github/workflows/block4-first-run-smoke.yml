@@ -1,0 +1,101 @@
+name: block4-bilingual-first-run-smoke
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/install.sh'
+      - 'scripts/lib/product.sh'
+      - 'scripts/check-installation-contract.py'
+      - 'tests/scripts/test_first_run_installer.py'
+      - 'docs/first-install-acceptance*.md'
+      - '.github/workflows/block4-first-run-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  safe-argument-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify first-run shell/fixtures syntax
+        run: |
+          set -euo pipefail
+          bash -n scripts/install.sh
+          python3 -m py_compile tests/scripts/test_first_run_installer.py
+      - name: No-mutation argument and ownership tests (no Docker)
+        run: python3 -m unittest discover -s tests/scripts -p 'test_first_run_installer.py' -v
+      - name: Installation EN/PT parity and documentation safety
+        run: python3 scripts/check-installation-contract.py
+
+  disposable-linux-onboarding:
+    # This job intentionally owns only fresh hosted runners, never production.
+    needs: safe-argument-gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [pt-BR, en]
+    env:
+      PORTICO_FIRST_RUN_LANGUAGE: ${{ matrix.language }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Confirm clean checkout with no operator state
+        run: |
+          set -euo pipefail
+          test ! -e .env
+          test ! -e config/policy.yaml
+          test ! -e state/state.db
+      - name: Run actual guided installer to local-only checkpoint
+        run: |
+          set -euo pipefail
+          bash scripts/install.sh --lang "$PORTICO_FIRST_RUN_LANGUAGE" --profile custom --scope /opt --run-as runner --local-only --yes > first-run.log 2>&1 || {
+            echo "First install failed (redacted logs not uploaded)."
+            exit 1
+          }
+          grep -Eq 'LOCAL CHECKPOINT COMPLETE|CHECKPOINT LOCAL CONCLUÍDO' first-run.log
+          if grep -Fq 'INSTALLATION COMPLETE' first-run.log; then
+            echo "Local-only checkpoint incorrectly claimed full installation." >&2
+            exit 1
+          fi
+          bash scripts/verify.sh
+      - name: Verify re-run preserves preexisting operator policy and secrets
+        run: |
+          set -euo pipefail
+          before_env="$(sha256sum .env | cut -d' ' -f1)"
+          before_policy="$(sha256sum config/policy.yaml | cut -d' ' -f1)"
+          bash scripts/install.sh --lang "$PORTICO_FIRST_RUN_LANGUAGE" --profile custom --scope /opt --run-as runner --local-only --yes > second-run.log 2>&1 || {
+            echo "Restarting guided installer failed (redacted logs not uploaded)." >&2
+            exit 1
+          }
+          test "$before_env" = "$(sha256sum .env | cut -d' ' -f1)"
+          test "$before_policy" = "$(sha256sum config/policy.yaml | cut -d' ' -f1)"
+          bash scripts/verify.sh
+      - name: Safe remove preserves identity and policy but rotates local credentials
+        run: |
+          set -euo pipefail
+          before_env="$(sha256sum .env | cut -d' ' -f1)"
+          before_policy="$(sha256sum config/policy.yaml | cut -d' ' -f1)"
+          before_instance="$(sed -n 's/^VPS_AGENT_INSTANCE_ID=//p' .env)"
+          test -n "$before_instance"
+          bash scripts/remove.sh safe
+          test -f .env
+          test -f config/policy.yaml
+          test -d state
+          test -f scripts/install.sh
+          test "$(stat -c '%a' .env)" = 600
+          test "$before_env" != "$(sha256sum .env | cut -d' ' -f1)"
+          test "$before_policy" = "$(sha256sum config/policy.yaml | cut -d' ' -f1)"
+          test "$before_instance" = "$(sed -n 's/^VPS_AGENT_INSTANCE_ID=//p' .env)"
+      - name: Cleanup isolated test containers on failure
+        if: always()
+        run: |
+          docker compose -f compose.yaml down --remove-orphans || true
+          rm -f first-run.log second-run.log

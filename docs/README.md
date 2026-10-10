@@ -11,6 +11,7 @@ Each installation document below has an EN and PT-BR version. The command and au
 Start here:
 
 1. [quick-start.md](quick-start.md) · [PT-BR](quick-start.pt-BR.md) - shortest supported path into the guided terminal flow.
+   - [First installation and acceptance, for beginners](first-install-acceptance.md) · [PT-BR](first-install-acceptance.pt-BR.md) - exact-candidate guided walkthrough with expected screens and safe recovery.
 2. [installation-contract.md](installation-contract.md) · [PT-BR](installation-contract.pt-BR.md) - normative user-installation boundary.
 3. [installer-flow.md](installer-flow.md) · [PT-BR](installer-flow.pt-BR.md) - complete installation phases.
 4. [product-model.md](product-model.md) - authority and capability model.
