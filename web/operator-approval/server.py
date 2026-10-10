@@ -364,7 +364,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == prefix + "/logout":
             with LOCK:
                 discard_session(session[0])
-            self.reply(200, {"status": "signed_out"}); return
+            key = EMBED_COOKIE if embedded else COOKIE
+            cookie_path = "/operator/embed" if embedded else "/operator"
+            expired_cookie = (f"{key}=; HttpOnly; Secure; Path={cookie_path}; Max-Age=0; "
+                              + ("SameSite=None; Partitioned" if embedded else "SameSite=Strict"))
+            self.reply(200, {"status": "signed_out"}, {"Set-Cookie": expired_cookie}); return
         try:
             request = self.body()
             nonce = request.get("decision_nonce")
