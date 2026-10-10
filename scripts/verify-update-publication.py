@@ -144,6 +144,13 @@ def members(path: Path, mode: str) -> dict[str, tuple]:
                 else:
                     raise Blocked("unsupported source member type")
                 result[name] = (kind, item.mode & 0o777)
+            # git archive <commit> writes the *commit ID*, not only its tree,
+            # into the global PAX comment. Comparing it rejects signed
+            # same-tree packages generated from a different commit.
+            provenance = stream.pax_headers.get("comment", "")
+            if not SHA_PATTERN.fullmatch(provenance):
+                raise Blocked("source tar lacks Git commit provenance")
+            result["\\0git-archive-commit"] = (provenance,)
     except (tarfile.TarError, OSError) as exc:
         raise Blocked("source tar failed integrity inspection") from exc
     return result
