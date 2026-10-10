@@ -7,7 +7,12 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
+	"errors"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -44,6 +49,103 @@ func syntheticTool(server *mcp.Server, name string, handler func() *mcp.CallTool
 	})
 }
 
+// Lab-only state binding: even this loopback fixture does not accept a naked
+// client-supplied phase. A random per-process HMAC key authenticates round state.
+func labSignedState(key []byte, phase string) string {
+	mac := hmac.New(sha256.New, key)
+	_, _ = mac.Write([]byte(phase))
+	return phase + "." + hex.EncodeToString(mac.Sum(nil))
+}
+
+func labVerifyState(key []byte, raw string) (string, bool) {
+	for _, phase := range []string{"round-1", "round-2", "basic"} {
+		if hmac.Equal([]byte(raw), []byte(labSignedState(key, phase))) {
+			return phase, true
+		}
+	}
+	return "", false
+}
+
+// The pinned official runner expects SEP-2322 input_required responses. The
+// SDK's Go result type stores its discriminator privately; unmarshaling the
+// well-formed wire representation is a public, validation-preserving path.
+func labInputRequired(state string, key string, field string) (*mcp.CallToolResult, error) {
+	message := "Provide synthetic conformance data"
+	request := map[string]any{
+		"resultType": "input_required",
+		"requestState": state,
+		"inputRequests": map[string]any{key: map[string]any{
+			"method": "elicitation/create",
+			"params": map[string]any{
+				"message": message,
+				"requestedSchema": map[string]any{
+					"type": "object",
+					"properties": map[string]any{field: map[string]any{"type": "string"}},
+					"required": []string{field},
+				},
+			},
+		}},
+	}
+	raw, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+	var out mcp.CallToolResult
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, err
+	}
+	if !out.NeedsInput() {
+		return nil, errors.New("test fixture could not construct input_required result")
+	}
+	return &out, nil
+}
+
+func registerLabInputTools(server *mcp.Server) error {
+	stateKey := make([]byte, 32)
+	if _, err := rand.Read(stateKey); err != nil { return err }
+	mcp.AddTool(server, &mcp.Tool{Name: "test_input_required_result_elicitation",
+		Description: "TEST ONLY, basic elicitation over InputRequiredResult."},
+		func(_ context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, struct{}, error) {
+			if len(req.Params.InputResponses) == 0 {
+				out, err := labInputRequired(labSignedState(stateKey, "basic"), "user_name", "name")
+				return out, struct{}{}, err
+			}
+			if phase, ok := labVerifyState(stateKey, req.Params.RequestState); !ok || phase != "basic" {
+				return nil, struct{}{}, errors.New("invalid or tampered fixture requestState")
+			}
+			if _, ok := req.Params.InputResponses["user_name"]; !ok {
+				return nil, struct{}{}, errors.New("missing user_name inputResponse")
+			}
+			return &mcp.CallToolResult{Content: textResult("Hello, Alice!")}, struct{}{}, nil
+		})
+	mcp.AddTool(server, &mcp.Tool{Name: "test_input_required_result_multi_round",
+		Description: "TEST ONLY, two HMAC-bound elicitation rounds followed by completion."},
+		func(_ context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, struct{}, error) {
+			if req.Params.RequestState == "" && len(req.Params.InputResponses) == 0 {
+				out, err := labInputRequired(labSignedState(stateKey, "round-1"), "step1", "name")
+				return out, struct{}{}, err
+			}
+			phase, ok := labVerifyState(stateKey, req.Params.RequestState)
+			if !ok { return nil, struct{}{}, errors.New("invalid or tampered fixture requestState") }
+			switch phase {
+			case "round-1":
+				if _, ok := req.Params.InputResponses["step1"]; !ok {
+					return nil, struct{}{}, errors.New("missing step1 inputResponse")
+				}
+				out, err := labInputRequired(labSignedState(stateKey, "round-2"), "step2", "color")
+				return out, struct{}{}, err
+			case "round-2":
+				if _, ok := req.Params.InputResponses["step2"]; !ok {
+					return nil, struct{}{}, errors.New("missing step2 inputResponse")
+				}
+				return &mcp.CallToolResult{Content: textResult("Name Alice and favorite color blue")}, struct{}{}, nil
+		default:
+				return nil, struct{}{}, errors.New("unsupported fixture round")
+			}
+		})
+	return nil
+}
+
 func fixtureServer() (*mcp.Server, error) {
 	root, err := os.MkdirTemp("", "portico-mcp-conformance-fixture-")
 	if err != nil {
@@ -58,6 +160,7 @@ func fixtureServer() (*mcp.Server, error) {
 	// We add only the upstream-requested synthetic tools to THIS instance.
 	server := gateway.NewMCPServer(gateway.LocalExecutor{FS: fs})
 	image := fakePNG()
+	if err := registerLabInputTools(server); err != nil { return nil, err }
 
 	syntheticTool(server, "test_simple_text", func() *mcp.CallToolResult {
 		return &mcp.CallToolResult{Content: textResult("This is a simple text response for testing.")}
