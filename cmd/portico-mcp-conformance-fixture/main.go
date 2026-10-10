@@ -58,7 +58,7 @@ func labSignedState(key []byte, phase string) string {
 }
 
 func labVerifyState(key []byte, raw string) (string, bool) {
-	for _, phase := range []string{"round-1", "round-2", "basic"} {
+	for _, phase := range []string{"round-1", "round-2", "basic", "sampling", "roots", "state", "multiple", "capabilities", "tampered"} {
 		if hmac.Equal([]byte(raw), []byte(labSignedState(key, phase))) {
 			return phase, true
 		}
@@ -106,7 +106,7 @@ func registerLabInputTools(server *mcp.Server) error {
 	mcp.AddTool(server, &mcp.Tool{Name: "test_input_required_result_elicitation",
 		Description: "TEST ONLY, basic elicitation over InputRequiredResult."},
 		func(_ context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, struct{}, error) {
-			if len(req.Params.InputResponses) == 0 {
+			if len(req.Params.InputResponses) == 0 || req.Params.InputResponses["user_name"] == nil {
 				out, err := labInputRequired(labSignedState(stateKey, "basic"), "user_name", "name")
 				return out, struct{}{}, err
 			}
@@ -161,6 +161,7 @@ func fixtureServer() (*mcp.Server, error) {
 	server := gateway.NewMCPServer(gateway.LocalExecutor{FS: fs})
 	image := fakePNG()
 	if err := registerLabInputTools(server); err != nil { return nil, err }
+	if err := registerOtherLabInputTools(server); err != nil { return nil, err }
 
 	syntheticTool(server, "test_simple_text", func() *mcp.CallToolResult {
 		return &mcp.CallToolResult{Content: textResult("This is a simple text response for testing.")}
