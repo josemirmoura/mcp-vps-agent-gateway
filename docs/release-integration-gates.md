@@ -2,18 +2,18 @@
 
 **Scope:** one compatible AI chat, one Linux computer, Scoped authority. This ledger is a release-readiness contract, not a notice of general availability. Public Community facts only; private Cloud plans and owner infrastructure details do not belong here.
 
-**Integration snapshot (2026-10-09):** public `main` = `4212f30f7c145c8bbd0043b42bdc7dd95e466cd5`, still on the old Go vulnerability baseline; **staging PR #99** = `272ecf4bb8576213564141fec31c61cf804c7ae2`, 16/16 GitHub Actions workflows SUCCESS **on that exact SHA**, including patched Go security scanning, Docker lifecycle, browser harness and disposable authorization tests. The newest published release is still `v0.1.0-rc.6` (2026-10-06); `VERSION=0.1.0-rc.7` is not a published signed RC7. Staging CI does not certify MCP 37/37, owner client UX, legal rights or release artifacts. Revalidate all facts at the next candidate SHA.
+**Round-two integration snapshot (2026-10-09, 23:59 UTC onward):** public `main` = `4212f30f7c145c8bbd0043b42bdc7dd95e466cd5`; **staging PR #99** = `9da45838517d6e4baa5e63236027f6a7471c66cb`. The second-round code changes from Blocks 1–4 are already combined in staging; `main` and owner VPS remain unchanged. At the independent recheck, **17/18 exact-SHA GitHub Actions workflows were SUCCESS, with only `docker-package-acceptance` still in progress and no recorded failures**. This is a point-in-time observation, not a claim that the last run passed. The newest verified published release remains `v0.1.0-rc.6`, and `VERSION=0.1.0-rc.7` alone is not a published signed RC7. Staging CI does not certify official MCP conformance, real client UX, legal rights or release signatures.
 
 ## Integration inputs and review responsibilities
 
 | Input | Working PRs | Dependency | Ready to merge into a release candidate? |
 |---|---|---|---|
-| Operator approval and Broker authority | #88 then #93 | #93 is stacked on #88 and contains #94 | Pending integrated review, no real ChatGPT mobile acceptance |
-| Runtime version, patched Go, MCP, OAuth | #89, #90, #91 | Consolidate duplicate version/toolchain changes, no bypass of `govulncheck` or `gosec` | Pending merged baseline and exact SHA matrix |
-| Update/backup recovery | #97 | Validate pre-backup `stop`/`tar`/volumes failure with disposable Docker/Broker | Pending real ephemeral recovery proof |
+| Operator approval and Broker authority | #88/#93/#101 and round-two #113 | Second-round authorization changes merged into staging, including replay/logout regressions | Automated browser/Broker evidence present; real ChatGPT desktop/mobile owner acceptance pending |
+| Runtime version, patched Go, MCP, OAuth | #89/#90/#91/#98 and round-two #110 | Version/toolchain and fixture-only MCP tests merged into staging | Patched Go/security CI present; production conformance gate FAIL, details below |
+| Update/backup recovery | #97/#100 and round-two #111 | Rollback staged restore and revoked-grant fence merged in staging | Disposable Broker/volumes CI present; real owner install and recovery gate pending |
 | Release source and GHCR signatures | #95, #96 | Require genuine signed assets from an authorized published release; mock cosign/crane covers behavior only | Pending first signed RC |
-| EN/PT-BR installation | #85 and subsequent bilingual additions | Two-language parity and clean install of **published** tag | Pending full tutorial |
-| Coordinated candidate/release | integration branch | All previous inputs | Pending CI, operator and legal gates |
+| EN/PT-BR installation | #85/#102 and round-two #112 | Complete bilingual guides and first-run smoke merged into staging | Disposable bilingual CI present; clean install of an authorized signed tag and owner UX pending |
+| Coordinated candidate/release | staging #99, rounds #109 through #113 | All five blocks' second-round contributions combined at `9da4583...` | Pending last exact-SHA Docker CI, MCP conformance, actual signed RC, legal and operator gates |
 
 Never cherry-pick stacked commits blindly or overwrite a peer branch. Trace each contribution to a PR/SHA, resolve overlapping files once, and test the resulting integrated tree independently.
 
@@ -22,8 +22,8 @@ Never cherry-pick stacked commits blindly or overwrite a peer branch. Trace each
 | Gate | Evidence and pass criteria | Current |
 |---|---|---|
 | A. Rights/license and publishing authority | license, attribution/NOTICE, contributor/ownership boundaries legally approved for **this** candidate; historical grants preserved | NOT TESTED / owner review required |
-| B. Reproducible integrated build/security | exact SHA; CI Go race/vet/build for amd64/arm64, `govulncheck`, `gosec`, secret scan, Docker scans/SBOM, OAuth, IPC/Broker, lifecycle, negative security cases; all required checks green | PARTIAL: 16/16 staging workflows passed at `272ecf4...`; no post-merge main or actual release build/signed assets |
-| C. MCP protocol and client support | official upstream requirements pinned, table of PASS/SKIPPED/NOT TESTED/NOT APPLICABLE; no simulated client presented as real | FAIL/PARTIAL: 8 PASS, 2 FAIL, 3 SKIPPED, 24 NOT TESTED among 37 server requirements; `release_gate_passed=false`, #79 open |
+| B. Reproducible integrated build/security | exact SHA; CI Go race/vet/build for amd64/arm64, `govulncheck`, `gosec`, secret scan, Docker scans/SBOM, OAuth, IPC/Broker, lifecycle, negative security cases; all required checks green | PARTIAL: round-two `9da4583...` had 17/18 workflows SUCCESS at audit time, Docker still running; no post-merge main or actual release build/signed assets |
+| C. MCP protocol and client support | official upstream requirements pinned, table of PASS/FAIL/SKIPPED/NOT TESTED/NOT APPLICABLE; no simulated client presented as real | FAIL/PARTIAL: Gateway normal **8 PASS/2 FAIL/3 SKIPPED/24 NOT TESTED**; isolated test fixture **35 PASS/1 FAIL/1 SKIPPED/0 NOT TESTED**; **both `release_gate_passed=false`**. Fixture result is not Gateway production conformance, #79 open |
 | D. Signed candidate | tag and commit match VERSION; actual source checksum+Sigstore bundle and GHCR image digests/signatures independently verified against expected release workflow/issuer; scan provenance and SBOM | NOT TESTED: no new signed RC published |
 | E. Installation and operator acceptance | clean supported Linux clone from the exact released tag; HTTPS+OAuth; real compatible AI MCP call; scoped grant, denial, expiration, protected secrets, revocation and audit; desktop and mobile UI where available; secure HTTPS/SSH fallback | NOT TESTED for integrated candidate |
 | F. Recovery and promotion | controlled backup/rollback and stop/tar failure rehearsal; no unexpected privilege/identity loss; CI candidate SHA **and separately main SHA after merge**; operator release approval | NOT TESTED |
@@ -34,14 +34,14 @@ Classification: **PASS**, **FAIL**, **SKIPPED**, **NOT TESTED**, or **NOT APPLIC
 
 | Field | Required recorded value |
 |---|---|
-| Integration PR / reviewed SHA | [staging #99](https://github.com/josemirmoura/mcp-vps-agent-gateway/pull/99), `272ecf4bb8576213564141fec31c61cf804c7ae2`, 16/16 workflows SUCCESS, **not** final release SHA |
+| Integration PR / reviewed SHA | [staging #99](https://github.com/josemirmoura/mcp-vps-agent-gateway/pull/99), `9da45838517d6e4baa5e63236027f6a7471c66cb`, 17/18 SUCCESS at audit time and Docker in progress, **not** final release SHA |
 | Post-merge `main` SHA and CI URLs | `TBD` |
 | Release tag and target commit | `TBD` |
 | Architecture and package version | `TBD` |
 | Source tarball checksum, bundle and verification | `TBD` |
 | Gateway/Broker image names and **immutable digest** | `TBD` |
 | Image cosign verification, signer issuer/identity and SBOM | `TBD` |
-| MCP requirements and recorded exceptions | `TBD` |
+| MCP requirements and recorded exceptions | [documented measured matrix](mcp-2026-07-28-requirements-matrix.md), **release gate blocked**; full applicability review and real-client acceptance still required |
 | Authorized clean-install target, redacted audit and OAuth evidence | `TBD` |
 | Desktop/mobile client (version, capabilities, approve/deny) | `TBD` |
 | Backup/recovery and rollback test | `TBD` |
