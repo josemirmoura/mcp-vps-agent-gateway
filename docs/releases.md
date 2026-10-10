@@ -26,30 +26,56 @@ The current acceptance candidate identifies itself as `0.1.0-rc.7`. RC7 carries 
 
 The stable `v0.1.0` tag is created only after the owner's final clean-install operator acceptance gate succeeds.
 
-## Publishing a release
+## Publishing a release (explicit owner-only gate)
 
-The preferred owner path is **GitHub Actions → release → Run workflow** on `main`.
+**A Git tag push alone never publishes a release.** Publishing is a separate,
+owner-initiated action and remains blocked until the documented legal, security,
+conformance and client acceptance gates are actually passed.
 
-Enter the exact SemVer tag required by `VERSION`, for example:
+The repository owner initiates publication in GitHub Actions → **release** →
+**Run workflow**, selecting the reviewed **main** branch.
 
-~~~text
-v0.1.0-rc.7
-~~~
+For a click-by-click explanation in Portuguese for a beginner, see
+[autorização de publicação PT-BR](release-owner-authorization.pt-BR.md). The form requires:
 
-The workflow validates source, tests and the installation contract first. Only after validation does a manual run create the exact tag, build/publish the multi-architecture images and create the GitHub Release. Existing external tag pushes remain supported and enter the same validated pipeline. Pre-release SemVer tags such as `-rc.7` are published as GitHub pre-releases.
+1. **tag**: the exact SemVer tag matching `VERSION`, e.g. `v0.1.0-rc.7`;
+2. **approved_sha**: the full 40-character main commit SHA already reviewed,
+   with complete CI and release authorization;
+3. **publish_confirmation**: type `PUBLICAR v0.1.0-rc.7` with the **actual tag**.
+
+Only the repository owner's GitHub account may initiate **or rerun** this
+publication workflow. A trigger from any other actor or branch is rejected.
+The selected commit must equal both `approved_sha` and the **current tip of
+main**, preventing the publication of stale or substituted builds. The tag is
+only created after source, security and multi-architecture image preflight
+checks pass.
+
+The confirmation is **not** evidence that license/IP rights, MCP requirements,
+physical client acceptance or signatures have passed. The owner must review
+those separate objective records before invoking the workflow; see
+[release integration gates](release-integration-gates.md) and
+[operator acceptance](operator-acceptance.md).
+
+A publish action creates GHCR image tags, keyless signatures and a GitHub
+Release. It is **not** an installation/deployment authorization. Do not test
+this workflow by publishing an unapproved version.
 
 ## Release artifacts
 
-The tag workflow builds:
+The publication workflow emits:
 
-- Gateway and Broker container images for `linux/amd64` and `linux/arm64`;
-- a Docker Compose package bundle;
-- SHA-256 checksum material;
-- GitHub Release notes.
+- Gateway, Broker and public connector images in GHCR for
+  `linux/amd64` and `linux/arm64`, each signed at its immutable image digest;
+- BuildKit SBOM/provenance attestations associated with the pushed images;
+- a source `tar.gz` bundle containing `VERSION`, its SHA-256 checksum
+  and separate Sigstore bundles for **both** files;
+- `RELEASE-INTEGRITY.txt` and GitHub Release notes.
 
-Security CI separately produces vulnerability reports and CycloneDX SBOM evidence during acceptance.
-
-The normal updateable installation remains a tagged Git checkout because `scripts/update.sh` intentionally uses Git fast-forward semantics, migration validation, backup and rollback.
+**No separate Docker Compose package download** is created by the current
+release workflow. Compose definitions are included in the signed source tree.
+The normal updateable installation remains a tagged Git checkout because
+`scripts/update.sh` uses Git fast-forward checks, migration validation,
+backups and rollback.
 
 ## Isolated keyless-signing proof (no release)
 
@@ -59,28 +85,28 @@ The published `release.yml` remains the authoritative, separate path for release
 
 ## Cryptographic release verification
 
-The current release workflow is configured to keyless-sign new release images and source artifacts with Sigstore/cosign using GitHub Actions OIDC.
-
-For source artifacts, each GitHub Release includes a Sigstore bundle beside the artifact. Verify with the expected workflow identity:
-
-~~~bash
-cosign verify-blob mcp-vps-agent-source-package.tar.gz \
-  --bundle mcp-vps-agent-source-package.tar.gz.sigstore.json \
-  --certificate-identity-regexp '^https://github\.com/josemirmoura/mcp-vps-agent-gateway/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)$' \
-  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
-~~~
-
-Release images are signed by immutable digest. Example:
+Use the two independent, fail-closed helpers against the **exact published
+version**. Download all source assets from the matching GitHub Release into one
+local directory, then run:
 
 ~~~bash
-cosign verify ghcr.io/josemirmoura/mcp-vps-agent-gateway@sha256:<digest> \
-  --certificate-identity-regexp '^https://github\.com/josemirmoura/mcp-vps-agent-gateway/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)$' \
-  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+python3 scripts/verify-release-source.py --directory /path/to/assets --tag v0.1.0-rc.7
+python3 scripts/verify-release-images.py --tag v0.1.0-rc.7
 ~~~
 
-This signing model avoids a long-lived project private key in GitHub Secrets. Trust is anchored in Sigstore plus the repository/workflow identity.
+The first helper checks the source archive, signed checksum, both Sigstore
+bundles, expected GitHub Actions OIDC release identity and packaged `VERSION`.
+The second resolves and pins three GHCR image digests, then checks cosign
+signatures of each against the specific release identity and issuer. These
+helpers require the appropriate `cosign` and `crane` installations; absence
+of either required tool must fail closed.
 
-Already-published release candidates created before this control remain historical unsigned artifacts. Do not infer a signature retroactively from documentation.
+**A successful synthetic signing proof or mocked-verifier test does not
+authenticate a real release.** Record verified SHA, tag, source digest, image
+digests and signing identities against the authorized release.
+
+Historical RC artifacts published before the signed workflow retain their
+original unsigned state. Documentation cannot retroactively sign them.
 
 ## Update behavior
 

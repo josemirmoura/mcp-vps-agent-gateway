@@ -1,13 +1,20 @@
 name: release
 
+# Publication is deliberately owner-dispatched; tag pushes never publish.
+# This is distinct from building/testing a release candidate on a PR.
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'SemVer tag to publish (must equal v + VERSION)'
+        description: 'Exact SemVer tag to publish, must equal v + VERSION'
+        required: true
+        type: string
+      approved_sha:
+        description: 'Full 40-character reviewed main commit SHA (copy from GitHub)'
+        required: true
+        type: string
+      publish_confirmation:
+        description: 'Type exactly: PUBLICAR <tag> (only after legal and release gates)'
         required: true
         type: string
 
@@ -16,16 +23,32 @@ permissions:
   contents: read
 
 concurrency:
-  group: community-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  group: community-release-${{ inputs.tag }}
   cancel-in-progress: false
 
 env:
-  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  RELEASE_TAG: ${{ inputs.tag }}
 
 jobs:
   validate:
     runs-on: ubuntu-24.04
     steps:
+      - name: Validate explicit owner publication request
+        shell: bash
+        env:
+          APPROVED_SHA: ${{ inputs.approved_sha }}
+          PUBLISH_CONFIRMATION: ${{ inputs.publish_confirmation }}
+        run: |
+          set -euo pipefail
+          # Each run, including reruns, must be operated by the repository owner.
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_ACTOR" = 'josemirmoura'
+          test "$GITHUB_TRIGGERING_ACTOR" = 'josemirmoura'
+          test "$GITHUB_REF" = 'refs/heads/main'
+          [[ "$APPROVED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$APPROVED_SHA" = "$GITHUB_SHA"
+          test "$PUBLISH_CONFIRMATION" = "PUBLICAR $RELEASE_TAG"
+          echo 'Explicit owner release request matches the exact reviewed commit.'
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -42,15 +65,15 @@ jobs:
             echo "release tag $RELEASE_TAG does not match VERSION ($expected)" >&2
             exit 1
           }
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            test "$GITHUB_REF_NAME" = "main" || {
-              echo "manual releases must be dispatched from main" >&2
-              exit 1
-            }
-          fi
           git fetch --no-tags origin main
           git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main || {
             echo "release source $GITHUB_SHA is not part of the reviewed main branch" >&2
+            exit 1
+          }
+          # Do not release an older commit after main has advanced.
+          main_sha="$(git rev-parse refs/remotes/origin/main)"
+          test "$GITHUB_SHA" = "$main_sha" || {
+            echo "main advanced to $main_sha after this release was reviewed" >&2
             exit 1
           }
       - name: Validate source and installation contract
@@ -167,13 +190,10 @@ jobs:
               exit 1
             }
             echo "Release tag already points to this commit."
-          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+          else
             git tag "$RELEASE_TAG" "$GITHUB_SHA"
             git push origin "refs/tags/$RELEASE_TAG"
             echo "Created release tag $RELEASE_TAG at $GITHUB_SHA."
-          else
-            echo "tag event did not provide a resolvable release tag" >&2
-            exit 1
           fi
 
   images:
