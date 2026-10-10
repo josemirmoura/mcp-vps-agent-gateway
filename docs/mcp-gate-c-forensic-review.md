@@ -34,7 +34,7 @@ Source baseline: Community PR #99, commit `835d9a0a486e35775543b53523ef4640b4d66
 | 19 | `prompts-get-with-args` | NOT_TESTED | PASS | Synthetic prompt with arguments required. |
 | 20 | `prompts-get-embedded-resource` | NOT_TESTED | PASS | Synthetic embedded prompt required. |
 | 21 | `prompts-get-with-image` | NOT_TESTED | PASS | Synthetic image prompt required. |
-| 22 | `dns-rebinding-protection` | PASS | PASS | Production Origin handling measured. |
+| 22 | `dns-rebinding-protection` | PASS | PASS | Frozen check passed **despite an undetected real invalid-Origin bypass**; independent negative test below found and fixes it. |
 | 23 | `caching` | SKIPPED | PASS | Normal server has no synthetic resources/read cache fixture. |
 | 24 | `input-required-result-basic-elicitation` | NOT_TESTED | PASS | Synthetic InputRequiredResult tool required. |
 | 25 | `input-required-result-basic-sampling` | NOT_TESTED | PASS | Synthetic InputRequiredResult tool required. |
@@ -72,6 +72,8 @@ This fix was discovered **after** the original official artifact, so those origi
 ## Production OAuth Resource Server and what is *not* tested
 
 The separate `TestIntegratedOAuthResourceServerBoundaryE2E` exercises a real `Handler` with a disposable introspection server. It verifies protected resource metadata, Bearer 401 challenge including `resource_metadata`, positive active introspection and subject propagation, and negative cases for inactive, expired, missing/altered issuer or audience, missing expiration/subject, missing/prefix-confused scopes. This is **OAuth resource-server evidence**, separate from the normal conformance run's `VPS_AGENT_AUTH_MODE=none`.
+
+A complementary `TestGateCOAuthStatelessRealBrokerFailClosed` crosses **the combined** OAuth introspection → production Streamable HTTP Handler → authenticated request → real IPC Unix-socket Broker → policy-restricted disposable service manager. It verifies missing/inactive bearer, audience-confused bearer, insufficient scope and malicious Origin are blocked before any restart, then exercises an authorized `service.status` and a Broker-rejected `service.restart` outside policy. No VPS root privilege, real OAuth provider, or user tokens are involved. The integrated test is included in the dedicated Gate C CI and the repository-wide Go/race test suite.
 
 PKCE, login through a browser, authorization-code exchange, AS metadata and end-user client experience remain integration responsibility of the **OAuth client/authorization server**, not proof of this resource server. Security of real provider configuration and authorization decisions still requires device/operator acceptance.
 
