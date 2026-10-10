@@ -77,7 +77,7 @@ func parseMCPOrigin(raw string) *url.URL {
         u.ForceQuery || u.Fragment != "" {
         return nil
     }
-    if strings.ContainsAny(u.Host, "@, \\t") {
+    if strings.ContainsAny(u.Host, "@, ") {
         return nil
     }
     return u
