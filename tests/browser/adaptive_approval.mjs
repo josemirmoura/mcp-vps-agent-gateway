@@ -144,6 +144,63 @@ async function noHorizontalOverflow(scope) {
 }
 
 for (const profile of profiles) {
+  test(profile.name + ': delayed reads stay signed out and login waits for fresh proof', { timeout: 30_000 }, () => run(profile, 'portal-session-races', async ({ page, context, checkpoint }) => {
+    await page.goto(metadata.operator + '/operator?request=' + metadata.read);
+    await login(page); await pending(page);
+    const detailURL = metadata.operator + '/operator/api/approvals/' + metadata.read;
+    let enterRead, releaseRead, finishRead;
+    const readEntered = new Promise(resolve => { enterRead = resolve; });
+    const readGate = new Promise(resolve => { releaseRead = resolve; });
+    const readDone = new Promise(resolve => { finishRead = resolve; });
+    await page.route(detailURL, async route => {
+      try {
+        const response = await route.fetch();
+        enterRead(); await readGate;
+        await route.fulfill({ response });
+      } finally { finishRead(); }
+    });
+    checkpoint('hold pending details before logout');
+    await page.locator('#refresh').click(); await readEntered;
+    try {
+      await page.locator('#logout').click();
+      await page.locator('#status').filter({ hasText: 'Sessão encerrada' }).waitFor();
+    } finally { releaseRead(); }
+    await readDone; await page.unroute(detailURL);
+    assert.equal(await page.locator('#details').isVisible(), false);
+    assert.equal(await page.locator('#approve').isDisabled(), true);
+    assert.equal(await page.locator('#deny').isDisabled(), true);
+    assert.equal((await state(context)).decisions.length, 0);
+
+    let enterLogin, releaseLogin, finishLogin;
+    const loginEntered = new Promise(resolve => { enterLogin = resolve; });
+    const loginGate = new Promise(resolve => { releaseLogin = resolve; });
+    const loginDone = new Promise(resolve => { finishLogin = resolve; });
+    const loginURL = metadata.operator + '/operator/api/login';
+    await page.route(loginURL, async route => {
+      try {
+        const response = await route.fetch();
+        enterLogin(); await loginGate;
+        await route.fulfill({ response });
+      } finally { finishLogin(); }
+    });
+    checkpoint('hold authentication and verify transition controls');
+    await page.locator('#password').fill(metadata.password);
+    await page.locator('#login').click(); await loginEntered;
+    try {
+      for (const id of ['login', 'refresh', 'logout', 'approve', 'deny']) {
+        assert.equal(await page.locator('#' + id).isDisabled(), true, id + ' must wait for authentication');
+      }
+      assert.equal(await page.locator('#password').inputValue(), '');
+      assert.equal((await state(context)).decisions.length, 0);
+    } finally { releaseLogin(); }
+    await loginDone; await page.unroute(loginURL);
+    await pending(page);
+    await page.locator('#logout:not([disabled])').waitFor();
+    checkpoint('explicit denial with fresh authenticated proof');
+    await page.locator('#deny').click(); await final(page, 'deny');
+    assert.deepEqual((await state(context)).decisions.map(call => call.action), ['deny']);
+  }));
+
   test(profile.name + ': explicit read decisions reuse an authenticated session', { timeout: 30_000 }, () => run(profile, 'portal-session', async ({ page, context }) => {
     await page.goto(metadata.operator + '/operator?request=' + metadata.read);
     await login(page); await pending(page); await noHorizontalOverflow(page);

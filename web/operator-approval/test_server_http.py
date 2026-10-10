@@ -92,7 +92,7 @@ class HttpContract(unittest.TestCase):
             with self.assertRaises(HTTPError) as e:
                 self.client.open(self.req(f"/operator/api/approvals/{ID}/decision","POST",{"decision":"approve"},{"Cookie":cookie}))
             self.assertEqual(e.exception.code,403)
-            with patch.object(app.OperatorIPC,"call",return_value={"status":"denied"}) as call:
+            with patch.object(app.OperatorIPC,"call",return_value={"request_id":ID,"status":"denied"}) as call:
                 response=json.load(self.client.open(self.req(f"/operator/api/approvals/{ID}/decision",
                          "POST",{"decision":"deny", "decision_nonce":result["decision_nonce"]},{"X-CSRF-Token":result["csrf_token"],"Cookie":cookie})))
                 self.assertEqual(response["status"],"denied")
