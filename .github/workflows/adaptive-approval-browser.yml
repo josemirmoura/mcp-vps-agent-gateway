@@ -1,0 +1,60 @@
+name: Adaptive authorization browser harness
+
+on:
+  pull_request:
+    paths:
+      - 'internal/gateway/approval_app.html'
+      - 'web/operator-approval/**'
+      - 'tests/browser/**'
+      - '.github/workflows/adaptive-approval-browser.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'internal/gateway/approval_app.html'
+      - 'web/operator-approval/**'
+      - 'tests/browser/**'
+      - '.github/workflows/adaptive-approval-browser.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromium:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Verify bridge rejects spoofing and never exposes approval authority
+        run: node --test web/operator-approval/test_bridge.mjs
+      - name: Install pinned browser test tooling outside the product
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/portico-browser-tools" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/portico-browser-tools/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Verify portal and reference host on desktop and mobile Chromium
+        env:
+          PORTICO_BROWSER_ARTIFACT_DIR: ${{ runner.temp }}/portico-browser-artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PORTICO_PLAYWRIGHT_MODULE="$RUNNER_TEMP/portico-browser-tools/node_modules/playwright"
+          node --test tests/browser/adaptive_approval.mjs
+      - name: Upload synthetic browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adaptive-authorization-browser-harness
+          path: ${{ runner.temp }}/portico-browser-artifacts/
+          if-no-files-found: ignore

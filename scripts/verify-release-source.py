@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+"""Fail-closed verification of published Portico source release assets.
+
+This verifies the two Sigstore bundles, signed checksum, source bytes, and
+VERSION inside the archive. It does not verify container image signatures,
+Git tag immutability, or approve any deployment.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import posixpath
+import re
+import shutil
+import subprocess
+import sys
+import tarfile
+from pathlib import Path
+
+ARCHIVE = "mcp-vps-agent-source-package.tar.gz"
+CHECKSUM = ARCHIVE + ".sha256"
+SUFFIX = ".sigstore.json"
+ISSUER = "https://token.actions.githubusercontent.com"
+IDENTITY_PREFIX = (
+    r"^https://github\.com/josemirmoura/mcp-vps-agent-gateway/"
+    r"\.github/workflows/release\.yml@refs/"
+)
+TAG_RE = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?\Z")
+MAX_ARCHIVE_BYTES = 300 * 1024 * 1024
+MAX_CHECKSUM_BYTES = 512
+MAX_BUNDLE_BYTES = 3 * 1024 * 1024
+MAX_TAR_MEMBERS = 100_000
+MAX_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
+
+
+class VerificationFailure(RuntimeError):
+    """Release could not be authenticated to the configured trust root."""
+
+
+def trusted_file(root: Path, name: str, maximum: int) -> Path:
+    path = root / name
+    if path.is_symlink() or not path.is_file():
+        raise VerificationFailure(f"missing or symlinked release asset: {name}")
+    if path.stat().st_size > maximum or path.stat().st_size == 0:
+        raise VerificationFailure(f"invalid release asset size: {name}")
+    return path
+
+
+def signed_checksum(filename: Path) -> str:
+    try:
+        data = filename.read_bytes()
+        line = data.decode("ascii").strip("\n")
+    except (UnicodeError, OSError) as exc:
+        raise VerificationFailure("cannot read ASCII checksum") from exc
+    match = re.fullmatch(
+        r"([0-9a-fA-F]{64})  (?:dist/)?" + re.escape(ARCHIVE),
+        line,
+    )
+    if not match:
+        raise VerificationFailure("checksum must contain exactly one expected archive name")
+    return match.group(1).lower()
+
+
+def identity_for_tag(tag: str) -> str:
+    # Exact tag match for releases triggered from refs/tags; the manual
+    # workflow_dispatch release is authenticated by refs/heads/main.
+    return IDENTITY_PREFIX + r"(heads/main|tags/" + re.escape(tag) + r")$"
+
+
+def verify_sigstore(cosign: str, artifact: Path, bundle: Path,
+                    identity: str) -> None:
+    command = [
+        cosign, "verify-blob", str(artifact), "--bundle", str(bundle),
+        "--certificate-identity-regexp", identity,
+        "--certificate-oidc-issuer", ISSUER,
+    ]
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True,
+                                   timeout=120, check=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise VerificationFailure(f"Sigstore verification failed to execute: {artifact.name}") from exc
+    if completed.returncode:
+        raise VerificationFailure(f"Sigstore rejected artifact: {artifact.name}")
+
+
+def archived_version(path: Path) -> str:
+    version = None
+    members = 0
+    unpacked_bytes = 0
+    seen: set[str] = set()
+    try:
+        # Git archive --prefix=mcp-vps-agent/ encodes its root directory
+        # as "mcp-vps-agent" (no final slash). Accept only that root directory,
+        # then require all other members to stay under its prefix.
+        with tarfile.open(path, mode="r|gz") as stream:
+            for entry in stream:
+                members += 1
+                if members > MAX_TAR_MEMBERS:
+                    raise VerificationFailure("source archive exceeds member count limit")
+                if entry.name in seen:
+                    raise VerificationFailure("source archive contains duplicate member")
+                seen.add(entry.name)
+                if entry.name == "mcp-vps-agent":
+                    if not entry.isdir():
+                        raise VerificationFailure("source archive has invalid root directory")
+                    continue
+                parts = entry.name.split("/")
+                if (not entry.name.startswith("mcp-vps-agent/")
+                        or any(part in ("", ".", "..") for part in parts)
+                        or chr(92) in entry.name):
+                    raise VerificationFailure("source archive contains unexpected member path")
+                if not (entry.isfile() or entry.isdir() or entry.issym() or entry.islnk()):
+                    raise VerificationFailure("source archive contains unsupported member type")
+                if entry.issym() or entry.islnk():
+                    target_name = entry.linkname
+                    if posixpath.isabs(target_name) or chr(92) in target_name:
+                        raise VerificationFailure("source archive contains unsafe link target")
+                    if entry.issym():
+                        # Symbolic links resolve relative to the parent directory.
+                        target_name = posixpath.join(posixpath.dirname(entry.name),
+                                                     target_name)
+                    # Hard links resolve relative to the tar archive root.
+                    target_name = posixpath.normpath(target_name)
+                    if not target_name.startswith("mcp-vps-agent/"):
+                        raise VerificationFailure("source archive contains unsafe link target")
+                if entry.isfile():
+                    unpacked_bytes += entry.size
+                    if unpacked_bytes > MAX_UNCOMPRESSED_BYTES:
+                        raise VerificationFailure("source archive exceeds unpacked size limit")
+                if entry.name != "mcp-vps-agent/VERSION":
+                    continue
+                if version is not None:
+                    raise VerificationFailure("source archive contains duplicate VERSION entries")
+                if not entry.isfile() or entry.size < 1 or entry.size > 128:
+                    raise VerificationFailure("invalid VERSION entry in source archive")
+                handle = stream.extractfile(entry)
+                if handle is None:
+                    raise VerificationFailure("unreadable VERSION entry")
+                version = handle.read(129).decode("ascii").strip()
+    except (tarfile.TarError, UnicodeError, OSError) as exc:
+        raise VerificationFailure("invalid signed source archive") from exc
+    if version is None:
+        raise VerificationFailure("source archive is missing mcp-vps-agent/VERSION")
+    return version
+
+
+def verify(directory: Path, expected_tag: str) -> None:
+    if not TAG_RE.fullmatch(expected_tag):
+        raise VerificationFailure("expected tag must be explicit vMAJOR.MINOR.PATCH[-prerelease]")
+    if not directory.is_dir():
+        raise VerificationFailure("release asset directory does not exist")
+    directory = directory.resolve(strict=True)
+    archive = trusted_file(directory, ARCHIVE, MAX_ARCHIVE_BYTES)
+    checksum = trusted_file(directory, CHECKSUM, MAX_CHECKSUM_BYTES)
+    archive_bundle = trusted_file(directory, ARCHIVE + SUFFIX, MAX_BUNDLE_BYTES)
+    checksum_bundle = trusted_file(directory, CHECKSUM + SUFFIX, MAX_BUNDLE_BYTES)
+
+    cosign = shutil.which("cosign")
+    if not cosign:
+        raise VerificationFailure("cosign is required; no unsigned fallback is allowed")
+    # Verify the checksum material is signed before trusting its digest.
+    identity = identity_for_tag(expected_tag)
+    verify_sigstore(cosign, checksum, checksum_bundle, identity)
+    expected_digest = signed_checksum(checksum)
+    with archive.open("rb") as stream:
+        digest = hashlib.file_digest(stream, "sha256").hexdigest()
+    if digest != expected_digest:
+        raise VerificationFailure("source archive differs from the signed SHA-256 checksum")
+    verify_sigstore(cosign, archive, archive_bundle, identity)
+    if archived_version(archive) != expected_tag.removeprefix("v"):
+        raise VerificationFailure("signed source VERSION does not match the requested release tag")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--directory", required=True, type=Path,
+                        help="directory containing four release source/signature assets")
+    parser.add_argument("--tag", required=True,
+                        help="expected GitHub release tag, e.g. v0.1.0-rc.7")
+    args = parser.parse_args()
+    try:
+        verify(args.directory, args.tag)
+    except VerificationFailure as exc:
+        print(f"RELEASE SOURCE VERIFICATION FAILED: {exc}", file=sys.stderr)
+        return 1
+    print(f"RELEASE SOURCE VERIFIED: {args.tag} (two Sigstore bundles, SHA-256, packaged VERSION)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"syscall"
 
+	portico "github.com/josemirmoura/mcp-vps-agent-gateway"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/broker"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/ipc"
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/jobs"
@@ -61,7 +62,27 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-	slog.Info("broker_start", "socket", socket, "instance_id", b.InstanceID, "instance_name", b.InstanceName, "policy", policyFile)
+	slog.Info("broker_start", "product_version", portico.Version(), "socket", socket, "instance_id", b.InstanceID, "instance_name", b.InstanceName, "policy", policyFile)
+	// Isolate web approvals on a distinct Unix socket and dedicated volume.
+	operatorSocket := os.Getenv("VPS_AGENT_OPERATOR_APPROVAL_SOCKET")
+	if operatorSocket == "" && operatorToken() != "" {
+		operatorSocket = "/run/portico-operator/operator.sock"
+	}
+	if operatorSocket != "" {
+		if len(operatorToken()) < 32 {
+			slog.Error("operator_approval_token_too_short")
+			os.Exit(1)
+		}
+		operatorServer := ipc.NewServer(operatorSocket, &operatorBridge{broker: b, token: operatorToken()})
+		operatorServer.SocketGroupGID = 65532
+		operatorServer.AllowPeerUIDs(0, 65532)
+		go func() {
+			if err := operatorServer.Serve(ctx); err != nil && ctx.Err() == nil {
+				slog.Error("operator_approval_socket_failed", "error", err)
+				cancel()
+			}
+		}()
+	}
 	server := ipc.NewServer(socket, b)
 	server.AllowPeerUIDs(0, 65532)
 	if gatewayUser, err := user.Lookup("vps-agent"); err == nil {

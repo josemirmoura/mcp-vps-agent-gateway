@@ -1,0 +1,188 @@
+name: Block 3 staged lifecycle fault recovery
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/update.sh'
+      - 'scripts/lib/update-snapshot.py'
+      - 'scripts/lib/invalidate-update-authority.py'
+      - 'tests/scripts/test_update_authority_fence.py'
+      - 'scripts/lib/verify-update-volume.py'
+      - 'scripts/lib/restore-identity-volume.sh'
+      - 'tests/scripts/test_update_staged_restore.py'
+      - 'tests/scripts/test_update_prebackup_recovery.py'
+      - 'tests/scripts/test_update_serialization.py'
+      - '.github/workflows/block3-lifecycle-recovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staged-restore-unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate updater shell and Python helpers
+        run: |
+          bash -n scripts/update.sh
+          sh -n scripts/lib/restore-identity-volume.sh
+          python3 -m py_compile scripts/lib/update-snapshot.py scripts/lib/verify-update-volume.py tests/scripts/test_update_staged_restore.py scripts/lib/invalidate-update-authority.py tests/scripts/test_update_authority_fence.py
+      - name: Test staged archive and post-backup rollback
+        run: python3 -m unittest discover -s tests/scripts -p 'test_update_staged_restore.py' -v
+      - name: Verify rollback SQLite authority fence and audit-chain integrity
+        run: python3 -m unittest discover -s tests/scripts -p 'test_update_authority_fence.py' -v
+      - name: Test earlier pre-backup recovery
+        run: python3 -m unittest discover -s tests/scripts -p 'test_update_prebackup_recovery.py' -v
+      - name: Test concurrent-updater lock and unique backup allocation
+        run: python3 -m unittest discover -s tests/scripts -p 'test_update_serialization.py' -v
+
+  disposable-docker-volume:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate restore with a real disposable Docker volume
+        shell: bash
+        run: |
+          set -euo pipefail
+          id="portico-block3-test-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          volume="$id-volume"
+          d="$(mktemp -d)"
+          docker volume create "$volume" >/dev/null
+          trap 'docker volume rm -f "$volume" >/dev/null 2>&1 || true; rm -rf "$d"' EXIT
+          mkdir -p "$d/backup" "$d/source"
+          printf 'old-data\n' > "$d/old"
+          printf 'new-data\n' > "$d/source/marker"
+          tar -czf "$d/backup/identity.tar.gz" -C "$d/source" .
+          python3 scripts/lib/verify-update-volume.py "$d/backup/identity.tar.gz"
+          docker run --rm -v "$volume:/target" -v "$d/old:/source/old:ro" alpine:3.22 sh -c 'cp /source/old /target/marker'
+          docker run --rm --network none -v "$volume:/target" \
+             -v "$d/backup:/backup:ro" -v "$PWD/scripts/lib/restore-identity-volume.sh:/restore.sh:ro" \
+             alpine:3.22 sh /restore.sh /backup/identity.tar.gz
+          actual="$(docker run --rm -v "$volume:/target:ro" alpine:3.22 cat /target/marker)"
+          test "$actual" = new-data
+
+          printf 'corrupt tar' > "$d/backup/identity-broken.tar.gz"
+          if docker run --rm --network none -v "$volume:/target" \
+             -v "$d/backup:/backup:ro" -v "$PWD/scripts/lib/restore-identity-volume.sh:/restore.sh:ro" \
+             alpine:3.22 sh /restore.sh /backup/identity-broken.tar.gz; then
+            echo 'Corrupted archive unexpectedly accepted' >&2
+            exit 1
+          fi
+          actual="$(docker run --rm -v "$volume:/target:ro" alpine:3.22 cat /target/marker)"
+          test "$actual" = new-data
+          # Simulate a failure DURING the swap, after originals have moved
+          # to the volume's previous/ staging directory.
+          mkdir -p "$d/failbin"
+          cat > "$d/failbin/mv" <<'MOVESH'
+          #!/bin/sh
+          case "${1:-}" in
+            /target/.portico-restore-stage.*/*) exit 83 ;;
+          esac
+          exec /bin/mv "$@"
+          MOVESH
+          chmod 755 "$d/failbin/mv"
+          printf 'third-data\n' > "$d/source/marker"
+          tar -czf "$d/backup/identity.tar.gz" -C "$d/source" .
+          if docker run --rm --network none \
+             -e PATH=/fake:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+             -v "$volume:/target" -v "$d/failbin:/fake:ro" \
+             -v "$d/backup:/backup:ro" -v "$PWD/scripts/lib/restore-identity-volume.sh:/restore.sh:ro" \
+             alpine:3.22 sh /restore.sh /backup/identity.tar.gz; then
+            echo 'Injected swap failure unexpectedly succeeded' >&2
+            exit 1
+          fi
+          actual="$(docker run --rm -v "$volume:/target:ro" alpine:3.22 cat /target/marker)"
+          test "$actual" = new-data
+          echo 'DOCKER VOLUME RESTORE: PASS (success + corrupt tar + failed swap reverted)'
+
+  migration-fault-with-real-broker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Boot real disposable Broker and fail copied-state migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          scope="/opt/portico-block3-${GITHUB_RUN_ID}"
+          d="$(mktemp -d)"
+          cleanup() {
+            docker compose down -v --remove-orphans >/dev/null 2>&1 || true
+            sudo rm -rf "$scope"
+            rm -rf "$d"
+          }
+          trap cleanup EXIT
+          sudo install -d -o "$USER" -g "$USER" -m 0750 "$scope"
+          bash scripts/init.sh --scope "$scope"
+          docker compose up -d --build
+          bash scripts/verify.sh
+          cp config/policy.yaml "$d/policy.before"
+          git config user.name portico-block3-test
+          git config user.email block3@example.invalid
+          current="$(git rev-parse HEAD)"
+          git switch -c block3-current "$current"
+          git switch -c block3-target
+          printf 'migration-target\n' > .block3-migration-target
+          git add .block3-migration-target
+          git commit -m 'test: migration fault target fixture'
+          target="$(git rev-parse HEAD)"
+          git init --bare -q "$d/origin.git"
+          git remote set-url origin "$d/origin.git"
+          git tag v0.1.0-rc.7 "$target"
+          git push -q origin "refs/tags/v0.1.0-rc.7"
+          python3 tests/scripts/setup_published_release_fixture.py \
+            --root "$d" --repo "$PWD" --tag v0.1.0-rc.7 --commit "$target"
+          git switch block3-current
+
+          mkdir -p "$d/fakebin"
+          cat > "$d/fakebin/docker" <<'SHIM'
+          #!/bin/bash
+          if [[ "$*" == *"state-check --db"* ]]; then
+            printf 'Injected copied-state migration fault\n' >&2
+            exit 87
+          fi
+          exec /usr/bin/docker "$@"
+          SHIM
+          chmod 755 "$d/fakebin/docker"
+          if PORTICO_FIXTURE_ROOT="$d" VPS_AGENT_UPDATE_REF=v0.1.0-rc.7 \
+             PATH="$d/fakebin:$PATH" bash scripts/update.sh; then
+            echo 'Injected migration failure unexpectedly succeeded' >&2
+            exit 1
+          fi
+
+          test "$(git rev-parse HEAD)" = "$current"
+          cmp "$d/policy.before" config/policy.yaml
+          test -f state/state.db
+          test -d backups
+          grep -q '"result":"rolled_back"' state/update.log
+          bash scripts/verify.sh
+          docker compose exec -T broker /usr/local/bin/vps-agent audit-status > "$d/audit.json"
+          python3 - "$d/audit.json" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1]))
+          assert data['ok'] and data['result']['valid'],data
+          PY
+          python3 - <<'PY'
+          import json,sqlite3
+          with sqlite3.connect("state/state.db") as db:
+              audit=[json.loads(row[0]) for row in db.execute(
+                  "SELECT event_json FROM audit_events ORDER BY seq")]
+              assert any(ev.get("tool")=="system.rollback_revoke_all"
+                         for ev in audit), "recovery revocation audit event missing"
+              for table in ("grants", "root_delegations"):
+                  active=db.execute(
+                      f"SELECT COUNT(*) FROM {table} WHERE revoked_at IS NULL").fetchone()[0]
+                  assert active == 0, (table,active)
+              pending=db.execute(
+                  "SELECT COUNT(*) FROM approvals WHERE status='pending'").fetchone()[0]
+              assert pending == 0, pending
+          PY
+          echo 'REAL BROKER MIGRATION FAILURE, REVOKED AUTHORITY AND AUDIT: PASS'

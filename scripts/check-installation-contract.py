@@ -8,8 +8,15 @@ SUPPORTED = [
     "README.md",
     "README.pt-BR.md",
     "docs/quick-start.md",
+    "docs/quick-start.pt-BR.md",
+    "docs/first-install-acceptance.md",
+    "docs/first-install-acceptance.pt-BR.md",
     "docs/installer-flow.md",
+    "docs/installer-flow.pt-BR.md",
+    "docs/installation-contract.md",
+    "docs/installation-contract.pt-BR.md",
     "docs/chatgpt-integration.md",
+    "docs/chatgpt-integration.pt-BR.md",
     "site/index.html",
     "site/pt-BR/index.html",
 ]
@@ -66,6 +73,113 @@ for rel in SUPPORTED:
     for pattern in DANGEROUS_PATTERNS:
         if pattern.search(text):
             errors.append(f"{rel}: prohibited credential/remote-access instruction matched: {pattern.pattern}")
+
+
+# A complete installation journey must be equivalent in English and PT-BR.
+BILINGUAL_GUIDES = (
+    ("docs/quick-start.md", "docs/quick-start.pt-BR.md"),
+    ("docs/first-install-acceptance.md", "docs/first-install-acceptance.pt-BR.md"),
+    ("docs/installer-flow.md", "docs/installer-flow.pt-BR.md"),
+    ("docs/installation-contract.md", "docs/installation-contract.pt-BR.md"),
+    ("docs/chatgpt-integration.md", "docs/chatgpt-integration.pt-BR.md"),
+)
+
+FLOW_MARKERS = {
+    "docs/first-install-acceptance.md": (
+        "bash scripts/install.sh", "bash scripts/verify.sh",
+        "bash scripts/verify-public.sh", "scripts/connect-chatgpt.sh",
+        "python3 scripts/operator-approvals.py --list",
+        "bash scripts/remove.sh safe", "INSTALLATION COMPLETE",
+        "system.info", "OAuth", "Broker", "Scoped",
+    ),
+    "docs/quick-start.md": (
+        "bash scripts/install.sh", "--profile custom", "--scope /opt",
+        "--local-only", "--yes", "--run-as", "--create-scope",
+        "permissions.request_root_access", "permissions.list_root_access",
+        "permissions.revoke_root_access", "VPS_AGENT_PURGE_CONFIRM",
+        "VPS_AGENT_REMOVE_SOURCE_CONFIRM", "INSTALLATION COMPLETE",
+    ),
+    "docs/installer-flow.md": (
+        "scripts/install.sh", "scripts/init.sh", "scripts/preflight.py",
+        "--dynamic-baseline", "VPS_AGENT_SCOPE_ROOT", "VPS_AGENT_WHOLE_HOST",
+        "permissions.discover_scope", "permissions.request_root_access",
+        "permissions.request_sensitive_access", "docker compose up -d --build",
+        "scripts/verify.sh", "scripts/setup-integrated-auth.sh",
+        "scripts/verify-public.sh", "scripts/connect-chatgpt.sh",
+        "INTEGRATED AUTH: READY", "INSTALLATION COMPLETE",
+        "scripts/update.sh", "scripts/remove.sh", "VPS_AGENT_PURGE_CONFIRM",
+        "VPS_AGENT_REMOVE_SOURCE_CONFIRM",
+    ),
+    "docs/installation-contract.md": (
+        "scripts/connect-chatgpt.sh", "INSTALLATION COMPLETE",
+        "scripts/check-installation-contract.py",
+    ),
+    "docs/chatgpt-integration.md": (
+        "scripts/verify.sh", "scripts/setup-integrated-auth.sh",
+        "scripts/verify-public.sh", "scripts/connect-chatgpt.sh",
+        "INTEGRATED AUTH: READY", "system.info", "INSTALLATION COMPLETE",
+        "vps-operator", "https://<domain>/mcp",
+    ),
+}
+
+# The executable code is not translated; prose and diagrams are localized.
+SHELL_BLOCKS = re.compile(r"(?ms)^~~~(?:bash|sh)[ \t]*\r?\n(.*?)^~~~[ \t]*$")
+
+
+def shell_commands(source: str) -> list[str]:
+    return [
+        "\n".join(
+            line.strip() for line in block.splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        )
+        for block in SHELL_BLOCKS.findall(source)
+    ]
+
+
+for en_path, pt_path in BILINGUAL_GUIDES:
+    en, pt = texts.get(en_path, ""), texts.get(pt_path, "")
+    if not en or not pt:
+        continue
+    if pathlib.PurePosixPath(pt_path).name not in en:
+        errors.append(f"{en_path}: missing PT-BR navigation")
+    if pathlib.PurePosixPath(en_path).name not in pt:
+        errors.append(f"{pt_path}: missing EN navigation")
+    if shell_commands(en) != shell_commands(pt):
+        errors.append(f"{en_path} <> {pt_path}: shell commands are not equivalent")
+    for marker in FLOW_MARKERS[en_path]:
+        if marker not in en:
+            errors.append(f"{en_path}: missing flow/security marker {marker}")
+        if marker not in pt:
+            errors.append(f"{pt_path}: missing flow/security marker {marker}")
+
+for rel in ("README.md", "README.pt-BR.md", "docs/README.md"):
+    source = (ROOT / rel).read_text(errors="replace")
+    for _, pt in BILINGUAL_GUIDES:
+        expected = ("docs/" if rel.startswith("README") else "") + pathlib.PurePosixPath(pt).name
+        if expected not in source:
+            errors.append(f"{rel}: missing localized link {expected}")
+
+for rel in ("site/pt-BR/index.html",):
+    source = texts.get(rel, "")
+    for _, pt in BILINGUAL_GUIDES:
+        if f"/docs/{pathlib.PurePosixPath(pt).name}" not in source:
+            errors.append(f"{rel}: missing localized guide link {pt}")
+
+# Keep the four installation guides and README navigation free of broken local links.
+LINK = re.compile(r"!?\[[^\]]+\]\(([^)]+)\)")
+for rel in ("README.md", "README.pt-BR.md", "docs/README.md", *[p for pair in BILINGUAL_GUIDES for p in pair]):
+    source = (ROOT / rel).read_text(errors="replace")
+    for link in LINK.findall(source):
+        target = link.split("#", 1)[0].split("?", 1)[0].strip()
+        if not target or "://" in target or target.startswith(("mailto:", "/", "#")):
+            continue
+        actual = (ROOT / pathlib.Path(rel).parent / target).resolve()
+        if not actual.is_relative_to(ROOT) or not actual.is_file():
+            errors.append(f"{rel}: dead or unsafe local link: {link}")
+
+for rel in ("docs/quick-start.md", "docs/quick-start.pt-BR.md"):
+    if re.search(r"git clone[^\n]*--branch[^\n]*v0\.1\.0(?:\s|$)", texts.get(rel, "")):
+        errors.append(f"{rel}: unshipped stable tag is recommended for cloning")
 
 
 # Repository-wide public sanitization guard. The literal definitions above live
@@ -202,12 +316,6 @@ ux_requirements = {
         "Ainda não detectamos a chamada system.info",
     ],
     "internal/gateway/native_approval.go": [
-        "mcp.InputRequestMap",
-        "mcp.ElicitParams",
-        "RequestState",
-        "ClientCapabilities",
-        "decline",
-        "cancel",
         "ATENÇÃO",
         "Autorizar Pórtico?",
         "Autorizar arquivo protegido?",
@@ -217,13 +325,13 @@ ux_requirements = {
     ],
     "internal/gateway/gateway.go": [
         '"permissions.request_root_access"',
-        'nativeApprovalDecision(req, "root")',
-        'nativeApprovalResult("root"',
+        's.navigationContinuation',
+        's.presentApproval',
     ],
     "internal/gateway/authority_tools.go": [
         '"permissions.request_sensitive_access"',
-        'nativeApprovalDecision(req, "sensitive")',
-        'nativeApprovalResult("sensitive"',
+        's.navigationContinuation',
+        's.presentApproval',
         'annotatedTool(',
     ],
     "internal/gateway/tool_annotations.go": [
@@ -233,6 +341,12 @@ ux_requirements = {
         "DestructiveHint",
         "IdempotentHint",
         "OpenWorldHint",
+    ],
+    "internal/gateway/adaptive_approval.go": [
+        "mcp.InputRequestMap", "mcp.ElicitParams", "RequestState",
+        "ClientCapabilities", '"decline"', '"cancel"',
+        '"approval_token"', '"io.modelcontextprotocol/ui"',
+        '"permissions.approval_status"', '"permissions.cancel_approval"',
     ],
     "internal/broker/broker.go": [
         '"ceiling_wide": root == physical',
@@ -251,12 +365,13 @@ ux_sources = {
     "internal/gateway/gateway.go": gateway_text,
     "internal/gateway/authority_tools.go": authority_tools_text,
     "internal/gateway/tool_annotations.go": tool_annotations_text,
+    "internal/gateway/adaptive_approval.go": (ROOT / "internal/gateway/adaptive_approval.go").read_text(),
     "internal/broker/broker.go": broker_text,
 }
 for rel, markers in ux_requirements.items():
     source = ux_sources[rel]
     for required in markers:
-        if required not in source:
+        if required not in source and re.sub(r"\s+", " ", required) not in re.sub(r"\s+", " ", source):
             errors.append(f"{rel}: clean-E2E invariant missing: {required}")
 
 if "dynamic delegation of the entire physical ceiling is not allowed" in broker_text:
@@ -283,6 +398,13 @@ required_flow = {
         "Development-only procedures",
     ],
     "docs/chatgpt-integration.md": ["scripts/connect-chatgpt.sh"],
+    "docs/quick-start.pt-BR.md": ["scripts/install.sh", "INSTALLATION COMPLETE"],
+    "docs/first-install-acceptance.md": ["scripts/install.sh", "INSTALLATION COMPLETE"],
+    "docs/first-install-acceptance.pt-BR.md": ["scripts/install.sh", "INSTALLATION COMPLETE"],
+    "docs/installer-flow.pt-BR.md": ["scripts/setup-integrated-auth.sh", "scripts/verify-public.sh", "scripts/connect-chatgpt.sh", "INSTALLATION COMPLETE"],
+    "docs/chatgpt-integration.pt-BR.md": ["scripts/connect-chatgpt.sh", "INSTALLATION COMPLETE"],
+    "docs/installation-contract.md": ["scripts/connect-chatgpt.sh", "INSTALLATION COMPLETE"],
+    "docs/installation-contract.pt-BR.md": ["scripts/connect-chatgpt.sh", "INSTALLATION COMPLETE"],
     "site/index.html": [
         "scripts/setup-integrated-auth.sh",
         "scripts/connect-chatgpt.sh",
@@ -309,7 +431,14 @@ completion_files = [
     "README.md",
     "README.pt-BR.md",
     "docs/installer-flow.md",
+    "docs/installer-flow.pt-BR.md",
     "docs/chatgpt-integration.md",
+    "docs/chatgpt-integration.pt-BR.md",
+    "docs/installation-contract.md",
+    "docs/installation-contract.pt-BR.md",
+    "docs/quick-start.pt-BR.md",
+    "docs/first-install-acceptance.md",
+    "docs/first-install-acceptance.pt-BR.md",
     "site/index.html",
     "site/pt-BR/index.html",
 ]

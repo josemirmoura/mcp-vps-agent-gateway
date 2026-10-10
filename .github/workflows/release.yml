@@ -1,28 +1,54 @@
 name: release
 
+# Publication is deliberately owner-dispatched; tag pushes never publish.
+# This is distinct from building/testing a release candidate on a PR.
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'SemVer tag to publish (must equal v + VERSION)'
+        description: 'Exact SemVer tag to publish, must equal v + VERSION'
+        required: true
+        type: string
+      approved_sha:
+        description: 'Full 40-character reviewed main commit SHA (copy from GitHub)'
+        required: true
+        type: string
+      publish_confirmation:
+        description: 'Type exactly: PUBLICAR <tag> (only after legal and release gates)'
         required: true
         type: string
 
+# Each job elevates only the GitHub privileges it requires.
 permissions:
-  contents: write
-  packages: write
-  id-token: write
+  contents: read
+
+concurrency:
+  group: community-release-${{ inputs.tag }}
+  cancel-in-progress: false
 
 env:
-  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  RELEASE_TAG: ${{ inputs.tag }}
 
 jobs:
   validate:
     runs-on: ubuntu-24.04
     steps:
+      - name: Validate explicit owner publication request
+        shell: bash
+        env:
+          APPROVED_SHA: ${{ inputs.approved_sha }}
+          PUBLISH_CONFIRMATION: ${{ inputs.publish_confirmation }}
+        run: |
+          set -euo pipefail
+          # Each run, including reruns, must be operated by the repository owner.
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_ACTOR" = 'josemirmoura'
+          test "$GITHUB_TRIGGERING_ACTOR" = 'josemirmoura'
+          test "$GITHUB_REF" = 'refs/heads/main'
+          [[ "$APPROVED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$APPROVED_SHA" = "$GITHUB_SHA"
+          test "$PUBLISH_CONFIRMATION" = "PUBLICAR $RELEASE_TAG"
+          echo 'Explicit owner release request matches the exact reviewed commit.'
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -39,16 +65,23 @@ jobs:
             echo "release tag $RELEASE_TAG does not match VERSION ($expected)" >&2
             exit 1
           }
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            test "$GITHUB_REF_NAME" = "main" || {
-              echo "manual releases must be dispatched from main" >&2
-              exit 1
-            }
-          fi
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main || {
+            echo "release source $GITHUB_SHA is not part of the reviewed main branch" >&2
+            exit 1
+          }
+          # Do not release an older commit after main has advanced.
+          main_sha="$(git rev-parse refs/remotes/origin/main)"
+          test "$GITHUB_SHA" = "$main_sha" || {
+            echo "main advanced to $main_sha after this release was reviewed" >&2
+            exit 1
+          }
       - name: Validate source and installation contract
         run: |
           set -euo pipefail
           go mod tidy
+          # Avoid testing a dependency graph that differs from the tagged archive.
+          git diff --exit-code -- go.mod go.sum
           go test -race -count=1 ./...
           bash -n scripts/*.sh
           bash -n scripts/lib/*.sh
@@ -58,36 +91,116 @@ jobs:
           bash scripts/version.sh
           bash scripts/validate-compose-model.sh
 
-  prepare-tag:
-    needs: validate
+  security:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Resolve exact module dependencies
+        run: go mod download
+      - name: Fail closed on reachable Go vulnerabilities
+        shell: bash
+        run: |
+          set -euo pipefail
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)/bin/govulncheck" ./...
+      - name: Fail closed on static security findings and incomplete SSA analysis
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Mirror the patched-toolchain scanner build in the main security CI.
+          # Build the scanner separately so x/tools does not alter product deps.
+          mkdir -p "$RUNNER_TEMP/portico-gosec-build" "$RUNNER_TEMP/portico-gosec-bin"
+          (
+            cd "$RUNNER_TEMP/portico-gosec-build"
+            go mod init portico-gosec-compat
+            go get github.com/securego/gosec/v2/cmd/gosec@v2.29.0
+            go get golang.org/x/tools@v0.51.0
+            go build -o "$RUNNER_TEMP/portico-gosec-bin/gosec" github.com/securego/gosec/v2/cmd/gosec
+          )
+          "$RUNNER_TEMP/portico-gosec-bin/gosec" -fmt=json -out=gosec.json ./...
+          python3 - <<'PY'
+          import json
+          report=json.load(open("gosec.json"))
+          errors=report.get("Golang errors") or {}
+          if errors:
+              print(f"SECURITY BLOCKED: {len(errors)} paths have incomplete Gosec type/SSA analysis")
+              raise SystemExit(1)
+          print("GOSEC SSA: complete")
+          PY
+      - name: Fail closed on repository secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          go install github.com/zricethezav/gitleaks/v8@v8.24.3
+          "$(go env GOPATH)/bin/gitleaks" dir . --redact --exit-code=2 --report-format=json --report-path=results.json
+
+  image-security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [gateway, broker, cloud-node]
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build publish-equivalent target and architecture without pushing
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform "linux/${{ matrix.arch }}" \
+            --target "${{ matrix.target }}" \
+            --load \
+            --tag "portico-release-preflight:${{ matrix.target }}-${{ matrix.arch }}" .
+      - name: Fail closed on critical image vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: portico-release-preflight:${{ matrix.target }}-${{ matrix.arch }}
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+  prepare-tag:
+    needs: [validate, security, image-security]
+    runs-on: ubuntu-24.04
+    # Read-only preflight. Never expose an update-visible tag before all
+    # images, provenance and source assets have been built and signed.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Ensure exact release tag
+      - name: Refuse tag reuse from another commit
         shell: bash
         run: |
           set -euo pipefail
-          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
-            tagged_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
+          git fetch --tags origin
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG^{commit}" >/dev/null; then
+            tagged_sha="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
             test "$tagged_sha" = "$GITHUB_SHA" || {
-              echo "existing tag $RELEASE_TAG points to $tagged_sha, expected $GITHUB_SHA" >&2
+              echo "existing tag $RELEASE_TAG points to a different commit" >&2
               exit 1
             }
-            echo "Release tag already points to this commit."
-          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            git tag "$RELEASE_TAG" "$GITHUB_SHA"
-            git push origin "refs/tags/$RELEASE_TAG"
-            echo "Created release tag $RELEASE_TAG at $GITHUB_SHA."
-          else
-            echo "tag event did not provide a resolvable release tag" >&2
-            exit 1
           fi
 
   images:
     needs: prepare-tag
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     strategy:
       matrix:
         include:
@@ -116,6 +229,15 @@ jobs:
           sbom: true
           provenance: mode=max
           tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ env.RELEASE_TAG }}
+      - name: Scan exactly the published immutable image digest
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
       - uses: sigstore/cosign-installer@v4.1.2
       - name: Keyless-sign and verify release image
         shell: bash
@@ -125,16 +247,19 @@ jobs:
         run: |
           set -euo pipefail
           ref="$IMAGE@$DIGEST"
-          identity='^https://github\.com/${{ github.repository }}/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)$'
+          identity="https://github.com/${{ github.repository }}/.github/workflows/release.yml@$GITHUB_REF"
           issuer='https://token.actions.githubusercontent.com'
           cosign sign --yes "$ref"
           cosign verify "$ref" \
-            --certificate-identity-regexp "$identity" \
+            --certificate-identity "$identity" \
             --certificate-oidc-issuer "$issuer"
 
   github-release:
     needs: images
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -146,23 +271,28 @@ jobs:
           mkdir -p dist
           git archive --format=tar --prefix=mcp-vps-agent/ "$GITHUB_SHA" | gzip -n > dist/mcp-vps-agent-source-package.tar.gz
           sha256sum dist/mcp-vps-agent-source-package.tar.gz > dist/mcp-vps-agent-source-package.tar.gz.sha256
+          # Signed provenance binds the release to the exact reviewed main SHA.
+          digest="$(cut -d ' ' -f1 dist/mcp-vps-agent-source-package.tar.gz.sha256)"
+          printf '{"schema":1,"tag":"%s","commit_sha":"%s","source_sha256":"%s"}\n' \
+            "$RELEASE_TAG" "$GITHUB_SHA" "$digest" > dist/RELEASE-PROVENANCE.json
       - uses: sigstore/cosign-installer@v4.1.2
       - name: Keyless-sign and verify source artifacts
         shell: bash
         run: |
           set -euo pipefail
-          identity='^https://github\.com/${{ github.repository }}/\.github/workflows/release\.yml@refs/(heads/main|tags/v.*)$'
+          identity="https://github.com/${{ github.repository }}/.github/workflows/release.yml@$GITHUB_REF"
           issuer='https://token.actions.githubusercontent.com'
 
           for artifact in \
             dist/mcp-vps-agent-source-package.tar.gz \
-            dist/mcp-vps-agent-source-package.tar.gz.sha256
+            dist/mcp-vps-agent-source-package.tar.gz.sha256 \
+            dist/RELEASE-PROVENANCE.json
           do
             bundle="$artifact.sigstore.json"
             cosign sign-blob "$artifact" --bundle "$bundle" --yes
             cosign verify-blob "$artifact" \
               --bundle "$bundle" \
-              --certificate-identity-regexp "$identity" \
+              --certificate-identity "$identity" \
               --certificate-oidc-issuer "$issuer"
           done
 
@@ -172,6 +302,25 @@ jobs:
           Verification binds signatures to the Portico release workflow identity and the GitHub Actions OIDC issuer.
           The preferred updateable installation remains a tagged Git checkout.
           EOF
+      - name: Create tag only after all signed assets and images are ready
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags origin
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG^{commit}" >/dev/null; then
+            test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$GITHUB_SHA"
+          else
+            git tag "$RELEASE_TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+          # Never trust a tag that may have changed concurrently on remote.
+          remote_lines="$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}")"
+          remote_sha="$(printf '%s\n' "$remote_lines" | awk -v ref="refs/tags/$RELEASE_TAG" '
+            $2 == ref { direct=$1 }
+            $2 == ref "^{}" { peeled=$1 }
+            END { if (peeled != "") print peeled; else print direct }
+          ')"
+          test "$remote_sha" = "$GITHUB_SHA"
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -186,5 +335,7 @@ jobs:
             dist/mcp-vps-agent-source-package.tar.gz.sha256 \
             dist/mcp-vps-agent-source-package.tar.gz.sigstore.json \
             dist/mcp-vps-agent-source-package.tar.gz.sha256.sigstore.json \
+            dist/RELEASE-PROVENANCE.json \
+            dist/RELEASE-PROVENANCE.json.sigstore.json \
             dist/RELEASE-INTEGRITY.txt \
             "${flags[@]}"

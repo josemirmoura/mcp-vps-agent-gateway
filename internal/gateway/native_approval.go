@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,110 +10,7 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/google/jsonschema-go/jsonschema"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
-
-const nativeApprovalInputKey = "portico_approval"
-
-type nativeApprovalState struct {
-	Version       int    `json:"v"`
-	Kind          string `json:"kind"`
-	RequestID     string `json:"request_id"`
-	ApprovalToken string `json:"approval_token"`
-}
-
-func supportsNativeElicitation(req *mcp.CallToolRequest) bool {
-	if req == nil {
-		return false
-	}
-	caps := req.ClientCapabilities()
-	return caps != nil && caps.Elicitation != nil
-}
-
-func encodeNativeApprovalState(state nativeApprovalState) (string, error) {
-	if state.Version == 0 {
-		state.Version = 1
-	}
-	if state.Kind == "" || state.RequestID == "" || state.ApprovalToken == "" {
-		return "", errors.New("incomplete approval state")
-	}
-	raw, err := json.Marshal(state)
-	if err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(raw), nil
-}
-
-func decodeNativeApprovalState(raw, expectedKind string) (nativeApprovalState, error) {
-	var state nativeApprovalState
-	payload, err := base64.RawURLEncoding.DecodeString(raw)
-	if err != nil {
-		return state, errors.New("invalid approval request state")
-	}
-	if err := json.Unmarshal(payload, &state); err != nil {
-		return state, errors.New("invalid approval request state")
-	}
-	if state.Version != 1 || state.Kind != expectedKind || state.RequestID == "" || state.ApprovalToken == "" {
-		return state, errors.New("approval request state does not match this operation")
-	}
-	return state, nil
-}
-
-func nativeApprovalResult(kind string, brokerResult map[string]any, approvalToken string) (*mcp.CallToolResult, error) {
-	requestID, _ := brokerResult["request_id"].(string)
-	state, err := encodeNativeApprovalState(nativeApprovalState{
-		Version:       1,
-		Kind:          kind,
-		RequestID:     requestID,
-		ApprovalToken: approvalToken,
-	})
-	if err != nil {
-		return nil, err
-	}
-	message, err := validatedApprovalMessage(kind, brokerResult)
-	if err != nil {
-		return nil, err
-	}
-	return &mcp.CallToolResult{
-		InputRequests: mcp.InputRequestMap{
-			nativeApprovalInputKey: &mcp.ElicitParams{
-				Message: message,
-				RequestedSchema: &jsonschema.Schema{
-					Type: "object",
-				},
-			},
-		},
-		RequestState: state,
-	}, nil
-}
-
-func nativeApprovalDecision(req *mcp.CallToolRequest, expectedKind string) (nativeApprovalState, string, bool, error) {
-	if req == nil || len(req.Params.InputResponses) == 0 {
-		return nativeApprovalState{}, "", false, nil
-	}
-	state, err := decodeNativeApprovalState(req.Params.RequestState, expectedKind)
-	if err != nil {
-		return nativeApprovalState{}, "", true, err
-	}
-	raw, ok := req.Params.InputResponses[nativeApprovalInputKey]
-	if !ok {
-		return nativeApprovalState{}, "", true, errors.New("native approval response is missing")
-	}
-	result, ok := raw.(*mcp.ElicitResult)
-	if !ok || result == nil {
-		return nativeApprovalState{}, "", true, errors.New("native approval response has an unexpected type")
-	}
-	switch result.Action {
-	case "accept":
-		return state, "approve", true, nil
-	case "decline", "cancel":
-		return state, "deny", true, nil
-	default:
-		return nativeApprovalState{}, "", true, fmt.Errorf("unsupported approval action %q", result.Action)
-	}
-}
 
 // validatedApprovalMessage never asks a user to approve a scope that cannot
 // be displayed legibly, completely, and without attacker-controlled line breaks.

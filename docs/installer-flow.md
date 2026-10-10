@@ -1,5 +1,7 @@
 # Portico MCP first-run flow
 
+[Português (Brasil)](installer-flow.pt-BR.md) · [Installation contract](installation-contract.md)
+
 ## Product objective
 
 Installation is declarative and terminal-first.
@@ -77,11 +79,11 @@ After the MCP is connected, project roots are granted through explicit runtime a
 ~~~text
 permissions.request_root_access
         -> pending Broker request
-        -> native MCP elicitation / host-owned confirmation UI
-        -> active subject-bound delegation
+        -> host-owned MCP elicitation (only when the client supports it)
+        -> Broker-controlled subject-bound authorization
 ~~~
 
-`read` grants filesystem read. `work` grants filesystem read/write plus scoped shell cwd. `compose` adds Compose authority only for Compose actions already enabled by the static action policy. On clients that advertise MCP elicitation, Portico asks the client to render the confirmation natively; no custom approval iframe is part of the normal ChatGPT path. Clients without elicitation leave the request pending for the separate operator fallback.
+`read` grants filesystem read. `work` grants filesystem read/write plus scoped shell cwd. `compose` adds Compose authority only for Compose actions already enabled by the static action policy. On clients that advertise MCP elicitation, Portico asks the client to render the confirmation natively; no custom approval iframe is part of the normal ChatGPT path. Clients without elicitation leave the request pending. A portal HTTPS or CLI/SSH fallback must actually be present in the installed runtime and must authenticate the operator; do not promise MCP Apps or a working native ChatGPT approval UI before the corresponding PRs are integrated and real client acceptance passes. A request URL or request ID is not itself authorization.
 
 Protected secret-bearing paths form a second boundary inside authorized projects. Their temporary exception uses the same native MCP elicitation flow when the client supports it. By default `.env` and `.env.*` remain locked while `.env.example`, `.env.sample` and `.env.template` remain ordinary readable templates. Reading or modifying a protected path requires a separate temporary `permissions.request_sensitive_access` approval. The grant is exact-path, subject-bound, auditable, expiring and independently revocable. Scoped shell jobs mask protected paths, including hardlink aliases discovered inside the delegated roots, unless a temporary protected-file `work` grant explicitly exposes that exact path.
 
@@ -209,7 +211,7 @@ The release review runs `python3 scripts/check-installation-contract.py` to dete
 bash scripts/update.sh
 ~~~
 
-The update helper backs up .env, policy and Broker state, applies a fast-forward Git update, rebuilds, verifies, and rolls code/state back if verification fails. The policy and .env remain operator-controlled configuration.
+The updater is designed to back up .env, policy and Broker state, enforce fast-forward Git updates, rebuild, verify and restore code/state on failure. It must still pass the separate lifecycle failure and rollback acceptance before being described as reliable across incomplete backup/migration/volume failures. The policy and .env remain operator-controlled configuration.
 
 ## Removal
 
@@ -234,3 +236,5 @@ bash scripts/remove.sh --purge --remove-source
 ~~~
 
 The package never deletes arbitrary delegated project directories, third-party images, applications, services, containers, databases or files merely because it was authorized to manage them.
+
+[Guia de instalação em português](installer-flow.pt-BR.md).

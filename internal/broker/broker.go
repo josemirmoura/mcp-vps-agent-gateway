@@ -2,20 +2,21 @@ package broker
 
 import (
 	"context"
-	"errors"
 	"crypto/hmac"
-	"crypto/subtle"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/hostexec"
@@ -28,39 +29,116 @@ import (
 )
 
 type Broker struct {
-	Policy     *policy.Config
-	FS         *securefs.Manager
-	State      *state.Store
-	Services   ServiceManager
-	Docker     DockerManager
-	Jobs       *jobs.Manager
+	Policy          *policy.Config
+	FS              *securefs.Manager
+	State           *state.Store
+	Services        ServiceManager
+	Docker          DockerManager
+	Jobs            *jobs.Manager
 	AdminToken      string
 	ExpectedSubject string
 	InstanceID      string
 	InstanceName    string
 	elevationMu     sync.Mutex
+	// Serialize mutating requests through pre-intent and final journal outcome.
+	// No second mutation can pass the health fence while another is failing.
+	auditMutationMu   sync.Mutex
+	// Once durable audit fails, refuse new external mutations until an operator
+	// reconciles and restarts the Broker. Never automatically clear this latch.
+	auditDegraded    atomic.Bool
+	// Fault injection for package-local tests; production always uses State.
+	auditAppendForTest func(context.Context, state.AuditEvent) (string, error)
+}
+
+// auditedReadOnlyTool is deliberately an allowlist. New Broker operations
+// require a durable audit intent unless they are explicitly classified as
+// read-only. A missing/unknown tool cannot bypass this guard by its name.
+func auditedReadOnlyTool(tool string) bool {
+	switch tool {
+	case "system.info", "system.health", "system.disk", "system.memory",
+		"process.list", "process.inspect", "network.listen", "network.check",
+		"permissions.status", "permissions.discover_scope",
+		"permissions.list_sensitive_access", "permissions.approval_status",
+		"permissions.list_root_access",
+		"file.read", "file.read_test", "file.list", "file.stat", "file.hash",
+		"service.list", "service.status", "service.logs",
+		"docker.list", "docker.inspect", "docker.logs",
+		"compose.validate", "job.status", "job.tail", "package.list",
+		"user.list", "user.inspect", "group.list", "group.inspect",
+		"firewall.status", "admin.approval.list", "admin.audit.tail",
+		"admin.health", "admin.audit.status":
+		return true
+	default:
+		return false
+	}
+}
+
+func (b *Broker) appendRequestAudit(ctx context.Context, ev state.AuditEvent) (string, error) {
+	if b.auditAppendForTest != nil {
+		return b.auditAppendForTest(ctx, ev)
+	}
+	return b.State.AppendAudit(ctx, ev)
 }
 
 func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
 	if req.ID == "" {
 		req.ID = fmt.Sprintf("req-%d", time.Now().UnixNano())
 	}
+	mutation := !auditedReadOnlyTool(req.Tool)
+	if mutation {
+		b.auditMutationMu.Lock()
+		defer b.auditMutationMu.Unlock()
+	}
+	actionID := req.InvocationID
+	if actionID == "" {
+		actionID = req.ID
+	}
+	ev := state.AuditEvent{
+		InstanceID: b.InstanceID, InstanceName: b.InstanceName,
+		Subject: req.Subject, Tool: req.Tool, Resource: req.Resource,
+		ActionID: actionID,
+	}
+	// An external effect cannot be rolled back by a later SQLite failure.
+	// Record durable intent BEFORE invoking any potentially mutating handler.
+	// This also prevents new privileged work when audit storage is unavailable.
+	if mutation {
+		if b.auditDegraded.Load() {
+			return deny(req.ID, "reconcile_required", "audit storage was degraded; operator reconciliation required before mutations resume")
+		}
+		if b.State == nil {
+			return deny(req.ID, "audit_unavailable", "mutations require durable audit storage")
+		}
+		ev.Decision = "intent"
+		if _, err := b.appendRequestAudit(ctx, ev); err != nil {
+			b.auditDegraded.Store(true)
+			slog.ErrorContext(ctx, "audit_intent_failed", "tool", req.Tool,
+				"request_id", req.ID, "invocation_id", req.InvocationID,
+				"error", err)
+			return deny(req.ID, "audit_unavailable", "cannot record operation intent; no operation executed")
+		}
+	}
+
 	resp := b.handle(ctx, req)
 	decision := "allow"
 	if !resp.OK {
 		decision = "deny"
 	}
 	if b.State != nil {
-		if _, err := b.State.AppendAudit(ctx, state.AuditEvent{
-			InstanceID: b.InstanceID, InstanceName: b.InstanceName,
-			Subject: req.Subject, Tool: req.Tool, Resource: req.Resource,
-			Decision: decision, ActionID: req.InvocationID,
-		}); err != nil {
+		ev.Decision = decision
+		if _, err := b.appendRequestAudit(ctx, ev); err != nil {
+			b.auditDegraded.Store(true)
 			slog.ErrorContext(ctx, "audit_append_failed",
 				"instance_id", b.InstanceID, "instance_name", b.InstanceName,
 				"request_id", req.ID, "invocation_id", req.InvocationID,
 				"subject", req.Subject, "tool", req.Tool, "resource", req.Resource,
 				"error", err)
+			// A durable intent exists but completion cannot be confirmed.
+			// Never report an unaudited external effect as successful.
+			if mutation {
+				return deny(req.ID, "reconcile_required",
+					"operation outcome could not be audited; effects may have occurred; reconcile before retrying")
+			}
+			return deny(req.ID, "audit_unavailable", "request outcome could not be audited")
 		}
 	}
 	slog.InfoContext(ctx, "broker_request",
@@ -88,7 +166,7 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			"hostname": host, "goos": runtime.GOOS, "goarch": runtime.GOARCH,
 			"cpus": runtime.NumCPU(), "instance_id": b.InstanceID, "instance_name": b.InstanceName,
 			"physical_scope_root": os.Getenv("VPS_AGENT_PHYSICAL_SCOPE_ROOT"),
-			"whole_host": os.Getenv("VPS_AGENT_WHOLE_HOST") == "1",
+			"whole_host":          os.Getenv("VPS_AGENT_WHOLE_HOST") == "1",
 		})
 	case "system.health":
 		return ok(req.ID, b.healthSnapshot(ctx))
@@ -114,7 +192,9 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if !b.Policy.CanDiagnostic("process.list") {
 			return deny(req.ID, "permission_denied", "process listing is disabled by policy")
 		}
-		var in struct { Limit int `json:"limit"` }
+		var in struct {
+			Limit int `json:"limit"`
+		}
 		if len(req.Args) > 0 {
 			if err := json.Unmarshal(req.Args, &in); err != nil {
 				return deny(req.ID, "invalid_args", err.Error())
@@ -142,7 +222,9 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if !b.Policy.CanDiagnostic("network.listen") {
 			return deny(req.ID, "permission_denied", "network listener diagnostics are disabled by policy")
 		}
-		var in struct { Limit int `json:"limit"` }
+		var in struct {
+			Limit int `json:"limit"`
+		}
 		if len(req.Args) > 0 {
 			if err := json.Unmarshal(req.Args, &in); err != nil {
 				return deny(req.ID, "invalid_args", err.Error())
@@ -160,7 +242,9 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if !b.Policy.CanNetworkDestination(req.Resource) {
 			return deny(req.ID, "permission_denied", "network destination is outside policy")
 		}
-		var in struct { TimeoutSeconds int `json:"timeout_seconds"` }
+		var in struct {
+			TimeoutSeconds int `json:"timeout_seconds"`
+		}
 		if len(req.Args) > 0 {
 			if err := json.Unmarshal(req.Args, &in); err != nil {
 				return deny(req.ID, "invalid_args", err.Error())
@@ -623,7 +707,9 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		}
 		return ok(req.ID, map[string]any{"job_id": req.Resource, "cancelled": true})
 	case "package.list":
-		var in struct { Limit int `json:"limit"` }
+		var in struct {
+			Limit int `json:"limit"`
+		}
 		if len(req.Args) > 0 {
 			if err := json.Unmarshal(req.Args, &in); err != nil {
 				return deny(req.ID, "invalid_args", err.Error())
@@ -683,7 +769,9 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		if req.InvocationID == "" {
 			return deny(req.ID, "invocation_required", "user action requires invocation id")
 		}
-		var in struct { CreateHome bool `json:"create_home"` }
+		var in struct {
+			CreateHome bool `json:"create_home"`
+		}
 		if len(req.Args) > 0 {
 			if err := json.Unmarshal(req.Args, &in); err != nil {
 				return deny(req.ID, "invalid_args", err.Error())
@@ -756,9 +844,20 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 			out, err := firewallAction(ctx, in.Action, in.Port, in.Protocol, in.Source)
 			return map[string]any{"action": in.Action, "port": in.Port, "protocol": in.Protocol, "source": in.Source, "output": out}, err
 		})
+	case "permissions.approval_status":
+		return b.approvalStatus(ctx, req)
+	case "permissions.cancel_approval":
+		b.elevationMu.Lock()
+		defer b.elevationMu.Unlock()
+		return b.cancelApproval(ctx, req)
 	case "permissions.request_root_access":
 		return b.requestRootAccess(ctx, req)
 	case "permissions.confirm_root_access":
+		if !b.adminOK(req.AdminToken) {
+			return deny(req.ID, "operator_required", "MCP client acceptance is not operator authentication")
+		}
+		b.elevationMu.Lock()
+		defer b.elevationMu.Unlock()
 		return b.confirmRootAccess(ctx, req)
 	case "permissions.revoke_root_access":
 		return b.revokeRootAccess(ctx, req)
@@ -773,11 +872,11 @@ func (b *Broker) handle(ctx context.Context, req wire.Request) wire.Response {
 		return ok(req.ID, map[string]any{
 			"physical_scope_root": os.Getenv("VPS_AGENT_PHYSICAL_SCOPE_ROOT"),
 			"static": map[string]any{
-				"filesystem_read": b.Policy.Filesystem.Read,
+				"filesystem_read":  b.Policy.Filesystem.Read,
 				"filesystem_write": b.Policy.Filesystem.Write,
-				"shell_cwd_roots": b.Policy.Shell.CWDRoots,
-				"compose_inspect": b.Policy.Compose.Inspect,
-				"compose_manage": b.Policy.Compose.Manage,
+				"shell_cwd_roots":  b.Policy.Shell.CWDRoots,
+				"compose_inspect":  b.Policy.Compose.Inspect,
+				"compose_manage":   b.Policy.Compose.Manage,
 			},
 			"dynamic": delegations,
 		})
@@ -881,12 +980,12 @@ func (b *Broker) healthSnapshot(ctx context.Context) map[string]any {
 		}
 	}
 	return map[string]any{
-		"ok":               true,
-		"audit_chain_ok":   auditOK,
-		"state_configured": b.State != nil,
+		"ok":                true,
+		"audit_chain_ok":    auditOK,
+		"state_configured":  b.State != nil,
 		"docker_configured": b.Docker != nil,
-		"jobs_configured":  b.Jobs != nil,
-		"active_jobs":      activeJobs,
+		"jobs_configured":   b.Jobs != nil,
+		"active_jobs":       activeJobs,
 	}
 }
 
@@ -1257,7 +1356,7 @@ func (b *Broker) requestRootAccess(ctx context.Context, req wire.Request) wire.R
 	if err != nil {
 		return deny(req.ID, "permission_denied", err.Error())
 	}
-	if in.TTLSeconds < 0 {
+	if in.TTLSeconds < 0 || in.TTLSeconds > int64(b.Policy.MaxGrantTTL()/time.Second) {
 		return deny(req.ID, "invalid_ttl", "ttl_seconds cannot be negative")
 	}
 	ttl := time.Duration(in.TTLSeconds) * time.Second
@@ -1294,18 +1393,18 @@ func (b *Broker) requestRootAccess(ctx context.Context, req wire.Request) wire.R
 	}
 	physical := filepath.Clean(os.Getenv("VPS_AGENT_PHYSICAL_SCOPE_ROOT"))
 	result, _ := json.Marshal(map[string]any{
-		"request_id": a.ID,
-		"status": a.Status,
-		"root": root,
-		"access": access,
-		"permanent": ttl == 0,
+		"request_id":             a.ID,
+		"status":                 a.Status,
+		"root":                   root,
+		"access":                 access,
+		"permanent":              ttl == 0,
 		"delegation_ttl_seconds": in.TTLSeconds,
-		"approval_expires_at": a.ExpiresAt,
-		"approval_required": true,
-		"kind": "root",
-		"ceiling_wide": root == physical,
-		"physical_ceiling": physical,
-		"approval_token": approvalToken,
+		"approval_expires_at":    a.ExpiresAt,
+		"approval_required":      true,
+		"kind":                   "root",
+		"ceiling_wide":           root == physical,
+		"physical_ceiling":       physical,
+		"approval_token":         approvalToken,
 	})
 	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
 		return deny(req.ID, "state_error", "approval request created but operation journal update failed: "+err.Error())
@@ -1410,10 +1509,10 @@ func (b *Broker) revokeRootAccess(ctx context.Context, req wire.Request) wire.Re
 		}
 	}
 	result, _ := json.Marshal(map[string]any{
-		"root": root,
-		"revoked": count > 0,
+		"root":                        root,
+		"revoked":                     count > 0,
 		"revoked_dynamic_delegations": count,
-		"cancelled_dependent_jobs": cancelledJobs,
+		"cancelled_dependent_jobs":    cancelledJobs,
 	})
 	if err := b.State.CompleteOperation(ctx, req.InvocationID, result); err != nil {
 		return deny(req.ID, "state_error", "delegation revoked but operation journal update failed: "+err.Error())
@@ -1435,10 +1534,10 @@ func (b *Broker) requestElevation(ctx context.Context, req wire.Request) wire.Re
 	if err := json.Unmarshal(req.Args, &in); err != nil {
 		return deny(req.ID, "invalid_args", err.Error())
 	}
-	ttl := time.Duration(in.TTLSeconds) * time.Second
-	if ttl <= 0 || ttl > b.Policy.MaxGrantTTL() {
+	if in.TTLSeconds <= 0 || in.TTLSeconds > int64(b.Policy.MaxGrantTTL()/time.Second) {
 		return deny(req.ID, "invalid_ttl", "ttl exceeds policy")
 	}
+	ttl := time.Duration(in.TTLSeconds) * time.Second
 	for _, cap := range in.Capabilities {
 		if !b.Policy.CanGrant(cap) {
 			return deny(req.ID, "permission_denied", "requested capability is not grantable by policy: "+cap)
@@ -1455,7 +1554,9 @@ func (b *Broker) requestElevation(ctx context.Context, req wire.Request) wire.Re
 
 func (b *Broker) decideApproval(ctx context.Context, req wire.Request, decision string) wire.Response {
 	var in struct {
-		RequestID string `json:"request_id"`
+		RequestID   string `json:"request_id"`
+		Fingerprint string `json:"snapshot_hash"`
+		NodeID      string `json:"node_id"`
 	}
 	if err := json.Unmarshal(req.Args, &in); err != nil {
 		return deny(req.ID, "invalid_args", err.Error())
@@ -1463,6 +1564,15 @@ func (b *Broker) decideApproval(ctx context.Context, req wire.Request, decision 
 	pending, err := b.State.GetApproval(ctx, in.RequestID)
 	if err != nil {
 		return deny(req.ID, "state_error", err.Error())
+	}
+	if in.Fingerprint != "" && (in.NodeID != b.InstanceID || in.Fingerprint != state.ApprovalFingerprint(pending, b.InstanceID)) {
+		return deny(req.ID, "scope_mismatch", "operator snapshot or destination changed")
+	}
+	if decision == "approved" && b.ExpectedSubject != "" && pending.Subject != b.ExpectedSubject {
+		return deny(req.ID, "identity_mismatch", "request no longer belongs to this Broker operator binding")
+	}
+	if decision == "approved" && b.Policy == nil {
+		return deny(req.ID, "permission_denied", "current policy is required")
 	}
 	if decision == "approved" && pending.Kind == "root" {
 		root, access, err := b.normalizeDelegatedRoot(pending.Resource, pending.Access)
@@ -1472,40 +1582,41 @@ func (b *Broker) decideApproval(ctx context.Context, req wire.Request, decision 
 		pending.Resource = root
 		pending.Access = access
 	}
-	if decision == "approved" && pending.Kind == "capability" && len(pending.Capabilities) == 1 {
-		if _, _, ok := decodeSensitiveCapability(pending.Capabilities[0]); ok {
+	if decision == "approved" && pending.Kind == "capability" {
+		sensitiveGrant := false
+		if len(pending.Capabilities) == 1 {
+			_, _, sensitiveGrant = decodeSensitiveCapability(pending.Capabilities[0])
+		}
+		if sensitiveGrant {
 			if err := b.validateSensitiveApproval(ctx, pending); err != nil {
 				return deny(req.ID, "permission_denied", "protected-file approval no longer satisfies the current authority boundary: "+err.Error())
 			}
+		} else {
+			for _, cap := range pending.Capabilities {
+				if !b.Policy.CanGrant(cap) {
+					return deny(req.ID, "permission_denied", "capability is no longer grantable by current policy")
+				}
+			}
 		}
 	}
-	a, err := b.State.DecideApproval(ctx, in.RequestID, decision)
+	if decision == "approved" && pending.TTL > b.Policy.MaxGrantTTL() {
+		return deny(req.ID, "invalid_ttl", "grant exceeds current policy")
+	}
+	resolved, err := b.State.ResolveApproval(ctx, pending, decision, state.AuditEvent{InstanceID: b.InstanceID, InstanceName: b.InstanceName, Subject: req.Subject, Tool: req.Tool, Resource: pending.Resource, ActionID: req.InvocationID})
 	if err != nil {
 		return deny(req.ID, "state_error", err.Error())
 	}
-	if decision == "denied" {
-		return ok(req.ID, map[string]any{"request_id": a.ID, "status": "denied", "kind": a.Kind})
+	out := map[string]any{"request_id": pending.ID, "status": resolved.Approval.Status, "kind": pending.Kind}
+	if resolved.Root != nil {
+		out["delegation"] = resolved.Root
 	}
-	if a.Kind == "root" {
-		d, err := b.State.IssueRootDelegation(ctx, a.Subject, a.Resource, a.Access, a.ID, a.TTL)
-		if err != nil {
-			return deny(req.ID, "state_error", err.Error())
-		}
-		return ok(req.ID, map[string]any{
-			"request_id": a.ID,
-			"status": "approved",
-			"kind": "root",
-			"delegation": d,
-		})
+	if resolved.Grant != nil {
+		out["grant_id"] = resolved.Grant.ID
+		out["subject"] = resolved.Grant.Subject
+		out["capabilities"] = resolved.Grant.Capabilities
+		out["expires_at"] = resolved.Grant.ExpiresAt
 	}
-	g, err := b.State.IssueGrant(ctx, a.Subject, a.Capabilities, a.TTL)
-	if err != nil {
-		return deny(req.ID, "state_error", err.Error())
-	}
-	return ok(req.ID, map[string]any{
-		"request_id": a.ID, "status": "approved", "kind": "capability", "grant_id": g.ID,
-		"subject": g.Subject, "capabilities": g.Capabilities, "expires_at": g.ExpiresAt,
-	})
+	return ok(req.ID, out)
 }
 
 func (b *Broker) revokeAllElevatedAccess(ctx context.Context) (int, error) {
@@ -1561,8 +1672,6 @@ func (b *Broker) adminOK(token string) bool {
 	}
 	return subtle.ConstantTimeCompare([]byte(token), []byte(b.AdminToken)) == 1
 }
-
-
 
 func (b *Broker) fileMutation(ctx context.Context, req wire.Request, fingerprint any, fn func() (any, error)) wire.Response {
 	if b.State == nil {

@@ -1,0 +1,34 @@
+# Never include production configuration or runtime state in Docker build contexts.
+# Dockerfile copies the repository into a temporary Go build stage.
+/.git
+/.git/
+/.env
+/.env.*
+!/.env.example
+**/.env
+**/.env.*
+!**/.env.example
+/state
+/state/
+/state/**
+/backup
+/backup/
+/backups
+/backups/
+/portico-operator-validation
+/portico-operator-validation/
+**/*.db
+**/*.db-wal
+**/*.db-shm
+**/*.sqlite
+**/*.sqlite3
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/id_rsa
+**/id_ed25519
+__pycache__/
+**/__pycache__/
+*.pyc
+**/*.pyc

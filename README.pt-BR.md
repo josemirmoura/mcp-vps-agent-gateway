@@ -6,7 +6,7 @@ Este repositório contém o runtime público do Portico Community.
 
 O caminho validado atualmente conecta o ChatGPT Web ou outro cliente MCP compatível a um único host Linux por meio de um Gateway sem privilégios e de um Broker local privilegiado. O proprietário da máquina define a autoridade; o Broker aplica essa autoridade.
 
-> **Status: candidato Community em pré-release.** Os workflows em Ubuntu 24.04 validam o pacote de ponta a ponta. A release estável, a confiabilidade prolongada em produção e o licenciamento futuro ainda dependem de gates específicos.
+> **Status: candidato Community em pré-release.** Os workflows em Ubuntu 24.04 exercitam o runtime/pacote em ambientes descartáveis. O aceite real no ChatGPT Web/celular, a verificação de artefatos assinados, a confiabilidade e a licença final da Community dependem de gates separados.
 
 ## Limite do produto Community
 
@@ -79,10 +79,11 @@ O fluxo guiado cobre pré-requisitos, escopo de autoridade, containers, verifica
 
 Veja:
 
-- [Quick Start](docs/quick-start.md)
-- [Contrato de instalação](docs/installation-contract.md)
-- [Fluxo de instalação](docs/installer-flow.md)
-- [Integração ChatGPT](docs/chatgpt-integration.md)
+- [Início rápido (PT-BR)](docs/quick-start.pt-BR.md) | [English](docs/quick-start.md)
+- [Minha primeira instalação, com roteiro de aceite (PT-BR)](docs/first-install-acceptance.pt-BR.md) | [English](docs/first-install-acceptance.md)
+- [Contrato de instalação (PT-BR)](docs/installation-contract.pt-BR.md) | [English](docs/installation-contract.md)
+- [Fluxo de instalação (PT-BR)](docs/installer-flow.pt-BR.md) | [English](docs/installer-flow.md)
+- [Integração ChatGPT (PT-BR)](docs/chatgpt-integration.pt-BR.md) | [English](docs/chatgpt-integration.md)
 
 ## Autoridade
 
@@ -124,7 +125,7 @@ Veja [Conector de nó do Portico Cloud](docs/cloud-node-connector.pt-BR.md).
 
 ## Documentação
 
-- [Mapa da documentação](docs/README.md)
+- [Mapa da documentação EN/PT-BR](docs/README.md)
 - [Modelo do produto](docs/product-model.md)
 - [Arquitetura](docs/architecture.md)
 - [Matriz de segurança](docs/security-release.md)

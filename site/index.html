@@ -42,7 +42,7 @@
       </div>
     </nav>
     <div class="hero-copy">
-      <p class="eyebrow">v0.1.0-rc.7 · self-hosted MCP · policy-enforced · auditable</p>
+      <p class="eyebrow">Community pre-release · self-hosted MCP · policy-enforced · auditable</p>
       <h1>Connect a web AI to Linux securely.</h1>
       <p class="lede">Portico Community gives ChatGPT Web or another compatible MCP client a secure, auditable execution path to one owner-controlled Linux computer. The machine keeps authority through server-side policy.</p>
       <div class="actions">
@@ -181,7 +181,9 @@ cd mcp-vps-agent-gateway
 bash scripts/install.sh</code></pre>
       </div>
       <p>The terminal runs a prerequisite preflight, asks for Standard / Project / Whole Host, displays the effective authority, starts the runtime, verifies it, configures public OAuth and then guides the real ChatGPT completion call.</p>
+      <p>Follow the full guide: <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/quick-start.md">Quick Start</a>, <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/installer-flow.md">Installer flow</a>, <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/installation-contract.md">Installation contract</a> and <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/chatgpt-integration.md">ChatGPT integration</a>. Each has a PT-BR counterpart.</p>
       <p><strong>Standard is the recommended default.</strong> It uses <code>/opt</code> as the physical ceiling with no project root authorized initially. Whole Host sets the filesystem ceiling to <code>/</code>, but does not enable Full or unrestricted network.</p>
+    <p>New here? Use our <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/first-install-acceptance.md">step-by-step beginner acceptance guide</a> (also available <a href="https://github.com/josemirmoura/mcp-vps-agent-gateway/blob/main/docs/first-install-acceptance.pt-BR.md" lang="pt-BR">em português</a>). It describes what to click, what to expect and how to safely stop the test. This is a pre-release rehearsal, not a published stable version.</p>
     </section>
 
     <section id="connect-chatgpt" class="quick">

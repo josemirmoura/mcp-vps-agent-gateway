@@ -1,5 +1,7 @@
 # Installation contract
 
+[Português (Brasil)](installation-contract.pt-BR.md)
+
 Status: **normative project decision**.
 
 This document defines the boundary between temporary development/validation procedures and the supported end-user installation experience. Implementation, tests, README/tutorials and release review must follow it.
@@ -19,7 +21,7 @@ The normal user installs and operates the package directly on the VPS. ChatGPT i
 
 ## Secrets and remote access
 
-The supported tutorial must **never instruct the user to give ChatGPT or a project maintainer**:
+The supported tutorial must **never solicit any of the following items for delivery to an AI assistant or the project's maintainers**:
 
 - the VPS password;
 - a private SSH key;
@@ -103,10 +105,12 @@ Before a release is declared ready:
 4. remove development-only hostnames, IPs, branch names, runner names and ad-hoc diagnostics;
 5. verify the tutorial never asks the user to share VPS credentials or private keys;
 6. verify every unavoidable manual action has a reason and a validation step;
-7. run the installation-document contract check in CI;
+7. run `python3 scripts/check-installation-contract.py` in CI;
 8. run the full installation from a clean supported VPS state;
 9. finish with a real ChatGPT Web MCP call and Broker audit evidence.
 
 ## Engineering rule
 
 **NATIVE FIRST.** Prefer official APIs, supported configuration, Docker/Compose, MCP, OAuth/OIDC and native platform mechanisms. Custom code is used only when the native path is insufficient, and then must be minimal, centralized, documented and reversible.
+
+[Português (Brasil)](installation-contract.pt-BR.md).
