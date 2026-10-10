@@ -43,7 +43,7 @@ class UpdateSerializationTests(unittest.TestCase):
 
     def test_second_concurrent_update_fails_before_mutation(self):
         first = subprocess.Popen(
-            ["bash", "-c", self.prelude + "\nprintf 'LOCKED\\n'\nsleep 15\n",
+            ["bash", "-c", self.prelude + "\nprintf 'LOCKED\\n'\nexec sleep 15\n",
              str(self.script_path)],
             cwd=self.root, text=True, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
