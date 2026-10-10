@@ -205,7 +205,12 @@ fi
 
 case "$PROFILE" in
   custom|project) ;;
-  whole-host) SCOPE="/" ;;
+  whole-host)
+    if [ -n "$SCOPE" ] && [ "$SCOPE" != "/" ]; then
+      echo "$(vps_agent_text 'ERROR: Whole Host cannot use a different --scope; remove --scope or select a Scoped profile.' 'ERRO: Whole Host não permite outro --scope; retire --scope ou selecione um perfil Scoped.')" >&2
+      exit 2
+    fi
+    SCOPE="/" ;;
   *) echo "$(vps_agent_text 'ERROR: --profile must be custom, project or whole-host.' 'ERRO: --profile deve ser custom, project ou whole-host.')" >&2; exit 2 ;;
 esac
 
