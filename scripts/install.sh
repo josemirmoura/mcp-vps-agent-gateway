@@ -365,9 +365,9 @@ if [ "$ASSUME_YES" -ne 1 ]; then
   printf '%s' "$(vps_agent_text     'Type CONTINUE to start the runtime with the authority shown above: '     'Digite CONTINUAR para iniciar com a autoridade exibida acima: ')"
   read -r confirm
   if vps_agent_is_pt_br; then
-    [ "$confirm" = "CONTINUAR" ] || { echo "$(vps_agent_text 'Installation stopped.' 'Instalação interrompida.')"; exit 0; }
+    [ "$confirm" = "CONTINUAR" ] || { echo "$(vps_agent_text 'Installation cancelled before starting containers; settings preserved. Run this installer again to resume.' 'Instalação cancelada antes de iniciar os contêineres; configurações preservadas. Execute este instalador novamente para retomar.')"; exit 2; }
   else
-    [ "$confirm" = "CONTINUE" ] || { echo "$(vps_agent_text 'Installation stopped.' 'Instalação interrompida.')"; exit 0; }
+    [ "$confirm" = "CONTINUE" ] || { echo "$(vps_agent_text 'Installation cancelled before starting containers; settings preserved. Run this installer again to resume.' 'Instalação cancelada antes de iniciar os contêineres; configurações preservadas. Execute este instalador novamente para retomar.')"; exit 2; }
   fi
 fi
 

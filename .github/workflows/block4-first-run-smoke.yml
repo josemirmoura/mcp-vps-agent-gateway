@@ -7,6 +7,7 @@ on:
       - 'scripts/lib/product.sh'
       - 'scripts/check-installation-contract.py'
       - 'tests/scripts/test_first_run_installer.py'
+      - 'tests/scripts/test_install_authority_confirmation.py'
       - 'docs/first-install-acceptance*.md'
       - '.github/workflows/block4-first-run-smoke.yml'
   workflow_dispatch:
@@ -28,9 +29,11 @@ jobs:
         run: |
           set -euo pipefail
           bash -n scripts/install.sh
-          python3 -m py_compile tests/scripts/test_first_run_installer.py
+          python3 -m py_compile tests/scripts/test_first_run_installer.py tests/scripts/test_install_authority_confirmation.py
       - name: No-mutation argument and ownership tests (no Docker)
         run: python3 -m unittest discover -s tests/scripts -p 'test_first_run_installer.py' -v
+      - name: Operator cancellation fails closed in real Bash interactive PT-BR/EN
+        run: python3 -m unittest discover -s tests/scripts -p 'test_install_authority_confirmation.py' -v
       - name: Installation EN/PT parity and documentation safety
         run: python3 scripts/check-installation-contract.py
 
