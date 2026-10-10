@@ -146,6 +146,24 @@ rollback() {
     exit "$failed_status"
   fi
 
+  # An update may change credentials or policy. Restoring a stale snapshot
+  # over a newly tightened policy or a rotated secret could revive authority.
+  # Refuse that rollback until the operator explicitly reconciles the files.
+  if ! cmp -s -- .env "$stage/.env" || \
+     ! cmp -s -- config/policy.yaml "$stage/config/policy.yaml"; then
+    echo "ROLLBACK BLOCKED: live credentials or policy differ from snapshot; no permissions restored. Preserve both copies and reconcile manually." >&2
+    exit "$failed_status"
+  fi
+
+  # Snapshot can contain privileges valid at backup time but revoked later.
+  # Invalidate all restored grants/delegations and pending approvals BEFORE
+  # starting the old Broker. Audit is appended to the staged SQLite chain.
+  if ! python3 scripts/lib/invalidate-update-authority.py \
+      --db "$stage/state/state.db"; then
+    echo "ROLLBACK BLOCKED: elevated authority could not be invalidated on staged DB." >&2
+    exit "$failed_status"
+  fi
+
   # This helper must remain available after git reset returns to the old
   # checkout, where it may not have existed yet.
   helper_copy="$PWD/$backup_dir/restore-identity-volume.sh"
