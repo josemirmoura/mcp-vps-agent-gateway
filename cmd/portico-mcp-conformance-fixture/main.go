@@ -163,6 +163,7 @@ func fixtureServer() (*mcp.Server, error) {
 	if err := registerLabInputTools(server); err != nil { return nil, err }
 	if err := registerOtherLabInputTools(server); err != nil { return nil, err }
 	if err := registerLabInputPrompt(server); err != nil { return nil, err }
+	registerStatelessLabDiagnostics(server)
 
 	syntheticTool(server, "test_simple_text", func() *mcp.CallToolResult {
 		return &mcp.CallToolResult{Content: textResult("This is a simple text response for testing.")}
