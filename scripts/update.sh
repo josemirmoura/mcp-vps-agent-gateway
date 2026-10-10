@@ -65,11 +65,6 @@ else
   fi
 fi
 
-stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-# Same-second retries must NEVER reuse and overwrite a previous snapshot.
-backup_dir="$(mktemp -d "backups/$stamp.XXXXXXXX")"
-chmod 700 "$backup_dir"
-
 compose=(docker compose -f compose.yaml)
 if [ "${VPS_AGENT_WHOLE_HOST:-0}" = "1" ]; then
   compose+=(-f compose.host.yaml)
@@ -85,7 +80,13 @@ vps_agent_banner
 echo "$(vps_agent_text 'Update channel' 'Canal de atualização'):  $channel"
 echo "$(vps_agent_text 'Current version' 'Versão atual'): $current_label"
 echo "$(vps_agent_text 'Current commit' 'Commit atual'):  $current"
-target_sha="$(git rev-parse "$target")"
+# Reject moving branches, arbitrary commits and local-only refs before any
+# operational backup or service interruption.
+if [[ ! "$target" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+  echo "UPDATE BLOCKED: only published SemVer release tags are accepted." >&2
+  exit 1
+fi
+target_sha="$(git rev-parse "refs/tags/$target^{commit}")"
 target_label="$target"
 target_product_version="$(git show "$target_sha:VERSION" 2>/dev/null | tr -d '[:space:]' || true)"
 [ -n "$target_product_version" ] && target_label="$target_product_version ($target)"
@@ -102,6 +103,21 @@ if ! git merge-base --is-ancestor "$current" "$target_sha"; then
   echo "$(vps_agent_text "Refusing non-fast-forward update: target $target_sha is not a descendant of $current." "Atualização non-fast-forward recusada: o alvo $target_sha não descende de $current.")" >&2
   exit 1
 fi
+
+# Publication preflight MUST precede stop, backup, Git reset or live mutations.
+# It verifies remote tag SHA, completed GitHub Release, signed source/checksums,
+# signed exact-commit provenance, reproducible Git tree and signed image digests.
+# A partially published release (including a valid orphan tag) is never trusted.
+if ! python3 scripts/verify-update-publication.py \
+    --tag "$target" --commit "$target_sha" --repo "$PWD"; then
+  echo "UPDATE BLOCKED: release publication verification failed before stopping services." >&2
+  exit 1
+fi
+
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+# Same-second retries must NEVER reuse and overwrite a previous snapshot.
+backup_dir="$(mktemp -d "backups/$stamp.XXXXXXXX")"
+chmod 700 "$backup_dir"
 
 # At this point the live package has not been modified. An offline backup
 # requires stopping the services, but backup creation can fail (full disk,
