@@ -118,6 +118,13 @@ esac
         self.assertIn("Whole Host", proc.stderr)
         self.assert_no_scope_creation()
 
+    def test_whole_host_rejects_ignored_custom_scope(self):
+        proc = self.run_installer("--profile", "whole-host", "--scope", self.scope,
+                                  "--yes", "--ack-whole-host", "--run-as", "deploy")
+        self.assertEqual(proc.returncode, 2, proc.stdout + proc.stderr)
+        self.assertIn("--scope", proc.stderr)
+        self.assert_no_scope_creation()
+
     def test_rejects_unsupported_language(self):
         proc = self.run_installer("--profile", "custom", "--scope", "/opt",
                                   "--yes", "--run-as", "deploy", "--lang", "fr")
