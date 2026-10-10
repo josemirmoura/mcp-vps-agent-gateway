@@ -173,27 +173,25 @@ jobs:
   prepare-tag:
     needs: [validate, security, image-security]
     runs-on: ubuntu-24.04
+    # Read-only preflight. Never expose an update-visible tag before all
+    # images, provenance and source assets have been built and signed.
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Ensure exact release tag
+      - name: Refuse tag reuse from another commit
         shell: bash
         run: |
           set -euo pipefail
-          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
-            tagged_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
+          git fetch --tags origin
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG^{commit}" >/dev/null; then
+            tagged_sha="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
             test "$tagged_sha" = "$GITHUB_SHA" || {
-              echo "existing tag $RELEASE_TAG points to $tagged_sha, expected $GITHUB_SHA" >&2
+              echo "existing tag $RELEASE_TAG points to a different commit" >&2
               exit 1
             }
-            echo "Release tag already points to this commit."
-          else
-            git tag "$RELEASE_TAG" "$GITHUB_SHA"
-            git push origin "refs/tags/$RELEASE_TAG"
-            echo "Created release tag $RELEASE_TAG at $GITHUB_SHA."
           fi
 
   images:
@@ -273,6 +271,10 @@ jobs:
           mkdir -p dist
           git archive --format=tar --prefix=mcp-vps-agent/ "$GITHUB_SHA" | gzip -n > dist/mcp-vps-agent-source-package.tar.gz
           sha256sum dist/mcp-vps-agent-source-package.tar.gz > dist/mcp-vps-agent-source-package.tar.gz.sha256
+          # Signed provenance binds the release to the exact reviewed main SHA.
+          digest="$(cut -d ' ' -f1 dist/mcp-vps-agent-source-package.tar.gz.sha256)"
+          printf '{"schema":1,"tag":"%s","commit_sha":"%s","source_sha256":"%s"}\\n' \
+            "$RELEASE_TAG" "$GITHUB_SHA" "$digest" > dist/RELEASE-PROVENANCE.json
       - uses: sigstore/cosign-installer@v4.1.2
       - name: Keyless-sign and verify source artifacts
         shell: bash
@@ -283,7 +285,8 @@ jobs:
 
           for artifact in \
             dist/mcp-vps-agent-source-package.tar.gz \
-            dist/mcp-vps-agent-source-package.tar.gz.sha256
+            dist/mcp-vps-agent-source-package.tar.gz.sha256 \
+            dist/RELEASE-PROVENANCE.json
           do
             bundle="$artifact.sigstore.json"
             cosign sign-blob "$artifact" --bundle "$bundle" --yes
@@ -299,6 +302,19 @@ jobs:
           Verification binds signatures to the Portico release workflow identity and the GitHub Actions OIDC issuer.
           The preferred updateable installation remains a tagged Git checkout.
           EOF
+      - name: Create tag only after all signed assets and images are ready
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags origin
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG^{commit}" >/dev/null; then
+            test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$GITHUB_SHA"
+          else
+            git tag "$RELEASE_TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+          # Never trust a tag that may have changed concurrently on remote.
+          test "$(git ls-remote --tags origin "refs/tags/$RELEASE_TAG" | cut -f1)" = "$GITHUB_SHA"
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -313,5 +329,7 @@ jobs:
             dist/mcp-vps-agent-source-package.tar.gz.sha256 \
             dist/mcp-vps-agent-source-package.tar.gz.sigstore.json \
             dist/mcp-vps-agent-source-package.tar.gz.sha256.sigstore.json \
+            dist/RELEASE-PROVENANCE.json \
+            dist/RELEASE-PROVENANCE.json.sigstore.json \
             dist/RELEASE-INTEGRITY.txt \
             "${flags[@]}"
