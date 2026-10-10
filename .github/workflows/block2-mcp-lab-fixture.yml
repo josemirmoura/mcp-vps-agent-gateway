@@ -42,7 +42,7 @@ jobs:
         run: |
           set -euo pipefail
           go build -trimpath -o "$RUNNER_TEMP/portico-production-gateway" ./cmd/vps-agent-gateway
-          go test ./internal/gateway -run 'TestIntegratedOAuthResourceServerBoundaryE2E|TestMCPInitializeAdvertisesPackagedVersion|TestMCPCompletionCapabilityIsAbsentAndMethodIsClosed|TestProductionMCPServerDoesNotExposeConformanceFixtures|TestGateCStatelessHTTPRejectsHeaderSpoofingBeforeExecutor' -count=1 -v
+          go test ./internal/gateway -run 'TestIntegratedOAuthResourceServerBoundaryE2E|TestMCPInitializeAdvertisesPackagedVersion|TestMCPCompletionCapabilityIsAbsentAndMethodIsClosed|TestProductionMCPServerDoesNotExposeConformanceFixtures|TestGateCStatelessHTTPRejectsHeaderSpoofingBeforeExecutor|TestGateCOriginAuthorityPreventsDNSRebinding' -count=1 -v
           python3 -m unittest discover -s tests/scripts -p 'test_mcp_release_scope_audit.py' -v
           python3 -m unittest discover -s tests/scripts -p 'test_mcp_gate_c_diagnostic.py' -v
       - name: Build test-only MCP server fixture
