@@ -189,6 +189,14 @@ def create_nonce(session, item):
     return nonce
 
 
+def expired_session_cookie(embedded=False):
+    """Invalidate the browser cookie for the exact authorization channel."""
+    key = EMBED_COOKIE if embedded else COOKIE
+    cookie_path = "/operator/embed" if embedded else "/operator"
+    return (f"{key}=; HttpOnly; Secure; Path={cookie_path}; Max-Age=0; "
+            + ("SameSite=None; Partitioned" if embedded else "SameSite=Strict"))
+
+
 def pending_details(item):
     return {"request_id": item["id"], "node": os.environ.get("PORTICO_OPERATOR_NODE_LABEL", "Local"),
             "node_id": item["node_id"], "operator": identity(), "subject": item["subject"],
@@ -364,7 +372,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == prefix + "/logout":
             with LOCK:
                 discard_session(session[0])
-            self.reply(200, {"status": "signed_out"}); return
+            self.reply(200, {"status": "signed_out"}, {"Set-Cookie": expired_session_cookie(embedded)}); return
         try:
             request = self.body()
             nonce = request.get("decision_nonce")
