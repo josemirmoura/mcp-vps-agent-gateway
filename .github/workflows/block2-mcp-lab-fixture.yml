@@ -46,7 +46,309 @@ jobs:
           go test ./internal/gateway -run 'TestIntegratedOAuthResourceServerBoundaryE2E|TestMCPInitializeAdvertisesPackagedVersion|TestMCPCompletionCapabilityIsAbsentAndMethodIsClosed|TestProductionMCPServerDoesNotExposeConformanceFixtures|TestGateCStatelessHTTPRejectsHeaderSpoofingBeforeExecutor|TestGateCOriginAuthorityPreventsDNSRebinding' -count=1 -v
           python3 -m unittest discover -s tests/scripts -p 'test_mcp_release_scope_audit.py' -v
           python3 -m unittest discover -s tests/scripts -p 'test_mcp_gate_c_diagnostic.py' -v
-          go test ./tests/integration -run '^TestGateCOAuthStatelessRealBrokerFailClosed      - name: Build test-only MCP server fixture
+          go test ./tests/integration -run '^TestGateCOAuthStatelessRealBrokerFailClosed
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -tags=portico_conformance_fixture ./cmd/portico-mcp-conformance-fixture -count=1 -v
+          go build -tags=portico_conformance_fixture -trimpath \
+            -o "$RUNNER_TEMP/portico-conformance-fixture" ./cmd/portico-mcp-conformance-fixture
+      - name: Build immutable official conformance runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --quiet --filter=blob:none https://github.com/modelcontextprotocol/conformance.git "$RUNNER_TEMP/mcp-conformance"
+          git -C "$RUNNER_TEMP/mcp-conformance" checkout --quiet --detach c37eec888e1c6ff140af79987a40008548b7cc5f
+          test "$(git -C "$RUNNER_TEMP/mcp-conformance" rev-parse HEAD)" = c37eec888e1c6ff140af79987a40008548b7cc5f
+          cd "$RUNNER_TEMP/mcp-conformance"
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Baseline actual production Gateway without diagnostic fixtures
+        shell: bash
+        env:
+          VPS_AGENT_AUTH_MODE: none
+          VPS_AGENT_LISTEN: 127.0.0.1:18995
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          export VPS_AGENT_POC_ROOT="$RUNNER_TEMP/portico-production-safe-root"
+          "$RUNNER_TEMP/portico-production-gateway" > evidence/production-gateway.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          ready=0
+          for _ in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:18995/healthz >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              break
+            fi
+            sleep 0.2
+          done
+          if [ "$ready" != 1 ]; then
+            tail -70 evidence/production-gateway.log >&2
+            exit 1
+          fi
+          rc=0
+          timeout 550s node "$RUNNER_TEMP/mcp-conformance/dist/index.js" \
+            server --url http://127.0.0.1:18995/mcp \
+            --output-dir results-production \
+            --requirements 2026-07-28 \
+            > evidence/official-production-run.log 2>&1 || rc=$?
+          printf '%s\n' "$rc" > evidence/production-runner-exit.txt
+          python3 scripts/mcp_conformance_matrix.py \
+            --requirements "$RUNNER_TEMP/mcp-conformance/requirements/2026-07-28.yaml" \
+            --results results-production --runner-exit "$rc" \
+            --output evidence/production-matrix.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("evidence/production-matrix.json").read_text())
+          if report["required_server_scenarios"] != 37 or sum(report["score"].values()) != 37:
+              raise SystemExit("Incomplete real production Gateway baseline evidence")
+          print("PRODUCTION GATEWAY BASELINE:", json.dumps(report["score"], sort_keys=True))
+          print("PRODUCTION RELEASE GATE:", report["release_gate_passed"])
+          PY
+      - name: Execute official frozen 2026 requirements on real MCP server plus synthetic catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          "$RUNNER_TEMP/portico-conformance-fixture" > evidence/fixture-server.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          ready=0
+          for _ in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:18996/healthz >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              break
+            fi
+            sleep 0.2
+          done
+          if [ "$ready" != 1 ]; then
+            tail -70 evidence/fixture-server.log
+            exit 1
+          fi
+          rc=0
+          timeout 1100s node "$RUNNER_TEMP/mcp-conformance/dist/index.js" \
+            server --url http://127.0.0.1:18996/mcp \
+            --output-dir results-fixture \
+            --requirements 2026-07-28 \
+            > evidence/official-fixture-run.log 2>&1 || rc=$?
+          printf '%s\n' "$rc" > evidence/runner-exit.txt
+          python3 scripts/mcp_conformance_matrix.py \
+            --requirements "$RUNNER_TEMP/mcp-conformance/requirements/2026-07-28.yaml" \
+            --results results-fixture --runner-exit "$rc" \
+            --output evidence/fixture-matrix.json
+          python3 scripts/mcp_release_scope_audit.py \
+            --official evidence/production-matrix.json \
+            --output evidence/production-applicability.json
+          python3 scripts/mcp_release_scope_audit.py \
+            --official evidence/fixture-matrix.json \
+            --output evidence/fixture-applicability.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r = json.loads(Path("evidence/fixture-matrix.json").read_text())
+          print("TEST-ONLY FIXTURE RESULTS:", json.dumps(r["score"], sort_keys=True))
+          print("FIXTURE RUN RELEASE GATE:", r["release_gate_passed"])
+          print("CAUTION: This fixture adds upstream test_* features not shipped in Portico.")
+          baseline=json.loads(Path("evidence/production-matrix.json").read_text())
+          print("SAME-SHA PRODUCTION BASELINE:", json.dumps(baseline["score"], sort_keys=True))
+          assert baseline["upstream_commit"] == r["upstream_commit"]
+          assert baseline["required_server_scenarios"] == r["required_server_scenarios"]
+          assert r["required_server_scenarios"] == 37
+          assert sum(r["score"].values()) == 37
+          PY
+          # Do not make an artificially successful fixture run certify production.
+          # Fail only if infrastructure cannot create an honest matrix.
+      - name: Verify all 37 original per-check records and archive redacted manifest
+        shell: bash
+        env:
+          GATE_C_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/mcp_gate_c_diagnostic.py             --official evidence/production-matrix.json             --results results-production             --gateway-sha "$GATE_C_SOURCE_SHA"             --output evidence/production-original-checks-redacted.json
+          python3 scripts/mcp_gate_c_diagnostic.py             --official evidence/fixture-matrix.json             --results results-fixture             --gateway-sha "$GATE_C_SOURCE_SHA"             --output evidence/fixture-original-checks-redacted.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          a = json.loads(Path("evidence/production-original-checks-redacted.json").read_text())
+          b = json.loads(Path("evidence/fixture-original-checks-redacted.json").read_text())
+          assert len(a["scenarios"]) == len(b["scenarios"]) == 37
+          assert a["gateway_sha"] == b["gateway_sha"]
+          assert not a["release_gate_passed"] and not b["release_gate_passed"]
+          assert a["waivers_applied"] == b["waivers_applied"] == 0
+          print("ORIGINAL RUNNER EVIDENCE RECONCILED, BOTH FROZEN GATES STILL BLOCKED")
+          PY
+      - name: Preserve test fixture and frozen official evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: block2-mcp-fixture-${{ github.run_id }}
+          path: |
+            evidence/
+            results-fixture/
+            results-production/
+          if-no-files-found: warn
+          retention-days: 30
+ -count=1 -v
+      - name: Build test-only MCP server fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -tags=portico_conformance_fixture ./cmd/portico-mcp-conformance-fixture -count=1 -v
+          go build -tags=portico_conformance_fixture -trimpath \
+            -o "$RUNNER_TEMP/portico-conformance-fixture" ./cmd/portico-mcp-conformance-fixture
+      - name: Build immutable official conformance runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --quiet --filter=blob:none https://github.com/modelcontextprotocol/conformance.git "$RUNNER_TEMP/mcp-conformance"
+          git -C "$RUNNER_TEMP/mcp-conformance" checkout --quiet --detach c37eec888e1c6ff140af79987a40008548b7cc5f
+          test "$(git -C "$RUNNER_TEMP/mcp-conformance" rev-parse HEAD)" = c37eec888e1c6ff140af79987a40008548b7cc5f
+          cd "$RUNNER_TEMP/mcp-conformance"
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Baseline actual production Gateway without diagnostic fixtures
+        shell: bash
+        env:
+          VPS_AGENT_AUTH_MODE: none
+          VPS_AGENT_LISTEN: 127.0.0.1:18995
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          export VPS_AGENT_POC_ROOT="$RUNNER_TEMP/portico-production-safe-root"
+          "$RUNNER_TEMP/portico-production-gateway" > evidence/production-gateway.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          ready=0
+          for _ in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:18995/healthz >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              break
+            fi
+            sleep 0.2
+          done
+          if [ "$ready" != 1 ]; then
+            tail -70 evidence/production-gateway.log >&2
+            exit 1
+          fi
+          rc=0
+          timeout 550s node "$RUNNER_TEMP/mcp-conformance/dist/index.js" \
+            server --url http://127.0.0.1:18995/mcp \
+            --output-dir results-production \
+            --requirements 2026-07-28 \
+            > evidence/official-production-run.log 2>&1 || rc=$?
+          printf '%s\n' "$rc" > evidence/production-runner-exit.txt
+          python3 scripts/mcp_conformance_matrix.py \
+            --requirements "$RUNNER_TEMP/mcp-conformance/requirements/2026-07-28.yaml" \
+            --results results-production --runner-exit "$rc" \
+            --output evidence/production-matrix.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("evidence/production-matrix.json").read_text())
+          if report["required_server_scenarios"] != 37 or sum(report["score"].values()) != 37:
+              raise SystemExit("Incomplete real production Gateway baseline evidence")
+          print("PRODUCTION GATEWAY BASELINE:", json.dumps(report["score"], sort_keys=True))
+          print("PRODUCTION RELEASE GATE:", report["release_gate_passed"])
+          PY
+      - name: Execute official frozen 2026 requirements on real MCP server plus synthetic catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          "$RUNNER_TEMP/portico-conformance-fixture" > evidence/fixture-server.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          ready=0
+          for _ in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:18996/healthz >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              break
+            fi
+            sleep 0.2
+          done
+          if [ "$ready" != 1 ]; then
+            tail -70 evidence/fixture-server.log
+            exit 1
+          fi
+          rc=0
+          timeout 1100s node "$RUNNER_TEMP/mcp-conformance/dist/index.js" \
+            server --url http://127.0.0.1:18996/mcp \
+            --output-dir results-fixture \
+            --requirements 2026-07-28 \
+            > evidence/official-fixture-run.log 2>&1 || rc=$?
+          printf '%s\n' "$rc" > evidence/runner-exit.txt
+          python3 scripts/mcp_conformance_matrix.py \
+            --requirements "$RUNNER_TEMP/mcp-conformance/requirements/2026-07-28.yaml" \
+            --results results-fixture --runner-exit "$rc" \
+            --output evidence/fixture-matrix.json
+          python3 scripts/mcp_release_scope_audit.py \
+            --official evidence/production-matrix.json \
+            --output evidence/production-applicability.json
+          python3 scripts/mcp_release_scope_audit.py \
+            --official evidence/fixture-matrix.json \
+            --output evidence/fixture-applicability.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r = json.loads(Path("evidence/fixture-matrix.json").read_text())
+          print("TEST-ONLY FIXTURE RESULTS:", json.dumps(r["score"], sort_keys=True))
+          print("FIXTURE RUN RELEASE GATE:", r["release_gate_passed"])
+          print("CAUTION: This fixture adds upstream test_* features not shipped in Portico.")
+          baseline=json.loads(Path("evidence/production-matrix.json").read_text())
+          print("SAME-SHA PRODUCTION BASELINE:", json.dumps(baseline["score"], sort_keys=True))
+          assert baseline["upstream_commit"] == r["upstream_commit"]
+          assert baseline["required_server_scenarios"] == r["required_server_scenarios"]
+          assert r["required_server_scenarios"] == 37
+          assert sum(r["score"].values()) == 37
+          PY
+          # Do not make an artificially successful fixture run certify production.
+          # Fail only if infrastructure cannot create an honest matrix.
+      - name: Verify all 37 original per-check records and archive redacted manifest
+        shell: bash
+        env:
+          GATE_C_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/mcp_gate_c_diagnostic.py             --official evidence/production-matrix.json             --results results-production             --gateway-sha "$GATE_C_SOURCE_SHA"             --output evidence/production-original-checks-redacted.json
+          python3 scripts/mcp_gate_c_diagnostic.py             --official evidence/fixture-matrix.json             --results results-fixture             --gateway-sha "$GATE_C_SOURCE_SHA"             --output evidence/fixture-original-checks-redacted.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          a = json.loads(Path("evidence/production-original-checks-redacted.json").read_text())
+          b = json.loads(Path("evidence/fixture-original-checks-redacted.json").read_text())
+          assert len(a["scenarios"]) == len(b["scenarios"]) == 37
+          assert a["gateway_sha"] == b["gateway_sha"]
+          assert not a["release_gate_passed"] and not b["release_gate_passed"]
+          assert a["waivers_applied"] == b["waivers_applied"] == 0
+          print("ORIGINAL RUNNER EVIDENCE RECONCILED, BOTH FROZEN GATES STILL BLOCKED")
+          PY
+      - name: Preserve test fixture and frozen official evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: block2-mcp-fixture-${{ github.run_id }}
+          path: |
+            evidence/
+            results-fixture/
+            results-production/
+          if-no-files-found: warn
+          retention-days: 30
+ -count=1 -v
+      - name: Build test-only MCP server fixture
         shell: bash
         run: |
           set -euo pipefail
