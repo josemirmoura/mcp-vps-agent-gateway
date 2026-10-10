@@ -128,6 +128,38 @@ Fail closed:
 6. reconcile active job units
 7. re-enable only after integrity checks
 
+### Broker audit write failure (AUD-03)
+
+Privileged or potentially state-changing requests follow a fail-closed audit
+protocol. The Broker commits an append-only hash-chain `intent` event (bound to
+the request invocation ID when present) **before** invoking an external effect;
+it records a separate `allow` or `deny` outcome afterward. New or unknown
+tool names are **mutating by default** unless explicitly reviewed as read-only.
+Potentially mutating requests are serialized through this boundary.
+
+- If durable intent cannot be written, the Broker rejects the operation
+  **before** any external mutation.
+- If the effect happened but the outcome cannot be written, the response is
+  `reconcile_required`, **not** a success or a claim that the effect was
+  rolled back. The intent remains in the audit chain.
+- On any audit append failure, the Broker latches a degraded state and refuses
+  subsequent state-changing requests, even if SQLite immediately recovers.
+  A new Broker process is required **after deliberate operator reconciliation**.
+  An operator must not retry unsafe actions automatically or clear the database
+  to bypass the fence.
+- The operator should independently check the affected resource's actual
+  state, match audit `intent` to its invocation ID and operation journal,
+  inspect hash-chain integrity, repair storage safely, and decide whether a
+  restart is warranted. For operations with idempotency keys, replays use the
+  stored operation status; without stable keys, do not assume retry safety.
+- Hash-chained intent and result are distinct database commits; they do not
+  make an external shell command, Docker call or filesystem write an atomic
+  transaction. A crash may leave a valid unmatched `intent` that requires
+  explicit inspection.
+
+Audit events contain metadata, never request-body secrets. This gate does not
+replace transactional approval/grant resolution, OAuth checks or revocation.
+
 ### Erroneously issued grant
 
 Provide an operator command outside the AI surface:

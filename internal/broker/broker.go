@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/josemirmoura/mcp-vps-agent-gateway/internal/hostexec"
@@ -39,28 +40,105 @@ type Broker struct {
 	InstanceID      string
 	InstanceName    string
 	elevationMu     sync.Mutex
+	// Serialize mutating requests through pre-intent and final journal outcome.
+	// No second mutation can pass the health fence while another is failing.
+	auditMutationMu   sync.Mutex
+	// Once durable audit fails, refuse new external mutations until an operator
+	// reconciles and restarts the Broker. Never automatically clear this latch.
+	auditDegraded    atomic.Bool
+	// Fault injection for package-local tests; production always uses State.
+	auditAppendForTest func(context.Context, state.AuditEvent) (string, error)
+}
+
+// auditedReadOnlyTool is deliberately an allowlist. New Broker operations
+// require a durable audit intent unless they are explicitly classified as
+// read-only. A missing/unknown tool cannot bypass this guard by its name.
+func auditedReadOnlyTool(tool string) bool {
+	switch tool {
+	case "system.info", "system.health", "system.disk", "system.memory",
+		"process.list", "process.inspect", "network.listen", "network.check",
+		"permissions.status", "permissions.discover_scope",
+		"permissions.list_sensitive_access", "permissions.approval_status",
+		"permissions.list_root_access",
+		"file.read", "file.read_test", "file.list", "file.stat", "file.hash",
+		"service.list", "service.status", "service.logs",
+		"docker.list", "docker.inspect", "docker.logs",
+		"compose.validate", "job.status", "job.tail", "package.list",
+		"user.list", "user.inspect", "group.list", "group.inspect",
+		"firewall.status", "admin.approval.list", "admin.audit.tail",
+		"admin.health", "admin.audit.status":
+		return true
+	default:
+		return false
+	}
+}
+
+func (b *Broker) appendRequestAudit(ctx context.Context, ev state.AuditEvent) (string, error) {
+	if b.auditAppendForTest != nil {
+		return b.auditAppendForTest(ctx, ev)
+	}
+	return b.State.AppendAudit(ctx, ev)
 }
 
 func (b *Broker) Handle(ctx context.Context, req wire.Request) wire.Response {
 	if req.ID == "" {
 		req.ID = fmt.Sprintf("req-%d", time.Now().UnixNano())
 	}
+	mutation := !auditedReadOnlyTool(req.Tool)
+	if mutation {
+		b.auditMutationMu.Lock()
+		defer b.auditMutationMu.Unlock()
+	}
+	actionID := req.InvocationID
+	if actionID == "" {
+		actionID = req.ID
+	}
+	ev := state.AuditEvent{
+		InstanceID: b.InstanceID, InstanceName: b.InstanceName,
+		Subject: req.Subject, Tool: req.Tool, Resource: req.Resource,
+		ActionID: actionID,
+	}
+	// An external effect cannot be rolled back by a later SQLite failure.
+	// Record durable intent BEFORE invoking any potentially mutating handler.
+	// This also prevents new privileged work when audit storage is unavailable.
+	if mutation {
+		if b.auditDegraded.Load() {
+			return deny(req.ID, "reconcile_required", "audit storage was degraded; operator reconciliation required before mutations resume")
+		}
+		if b.State == nil {
+			return deny(req.ID, "audit_unavailable", "mutations require durable audit storage")
+		}
+		ev.Decision = "intent"
+		if _, err := b.appendRequestAudit(ctx, ev); err != nil {
+			b.auditDegraded.Store(true)
+			slog.ErrorContext(ctx, "audit_intent_failed", "tool", req.Tool,
+				"request_id", req.ID, "invocation_id", req.InvocationID,
+				"error", err)
+			return deny(req.ID, "audit_unavailable", "cannot record operation intent; no operation executed")
+		}
+	}
+
 	resp := b.handle(ctx, req)
 	decision := "allow"
 	if !resp.OK {
 		decision = "deny"
 	}
 	if b.State != nil {
-		if _, err := b.State.AppendAudit(ctx, state.AuditEvent{
-			InstanceID: b.InstanceID, InstanceName: b.InstanceName,
-			Subject: req.Subject, Tool: req.Tool, Resource: req.Resource,
-			Decision: decision, ActionID: req.InvocationID,
-		}); err != nil {
+		ev.Decision = decision
+		if _, err := b.appendRequestAudit(ctx, ev); err != nil {
+			b.auditDegraded.Store(true)
 			slog.ErrorContext(ctx, "audit_append_failed",
 				"instance_id", b.InstanceID, "instance_name", b.InstanceName,
 				"request_id", req.ID, "invocation_id", req.InvocationID,
 				"subject", req.Subject, "tool", req.Tool, "resource", req.Resource,
 				"error", err)
+			// A durable intent exists but completion cannot be confirmed.
+			// Never report an unaudited external effect as successful.
+			if mutation {
+				return deny(req.ID, "reconcile_required",
+					"operation outcome could not be audited; effects may have occurred; reconcile before retrying")
+			}
+			return deny(req.ID, "audit_unavailable", "request outcome could not be audited")
 		}
 	}
 	slog.InfoContext(ctx, "broker_request",
