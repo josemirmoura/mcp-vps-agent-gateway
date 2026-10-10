@@ -93,9 +93,7 @@ print("sha256:"+"a"*64)
             "commit", "-qm", "fixture", cwd=self.repo)
 
     def create_assets(self, commit, signed_sha=None):
-        archive = run("git", "archive", "--format=tar", "--prefix=mcp-vps-agent/",
-                      commit, cwd=self.repo).stdout
-        # subprocess in text mode can decode arbitrary binary bytes incorrectly.
+        # Capture binary git archive output directly, without Unicode decoding.
         raw = subprocess.run(["git", "archive", "--format=tar",
                               "--prefix=mcp-vps-agent/", commit],
                              cwd=self.repo, capture_output=True, check=True).stdout
