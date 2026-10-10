@@ -58,7 +58,6 @@ jobs:
           set -euo pipefail
           bash scripts/install.sh --lang "$PORTICO_FIRST_RUN_LANGUAGE" --profile custom --scope /opt --run-as runner --local-only --yes > first-run.log 2>&1 || {
             echo "First install failed (redacted logs not uploaded)."
-            tail -n 50 first-run.log
             exit 1
           }
           grep -Eq 'LOCAL CHECKPOINT COMPLETE|CHECKPOINT LOCAL CONCLUÍDO' first-run.log
@@ -74,7 +73,6 @@ jobs:
           before_policy="$(sha256sum config/policy.yaml | cut -d' ' -f1)"
           bash scripts/install.sh --lang "$PORTICO_FIRST_RUN_LANGUAGE" --profile custom --scope /opt --run-as runner --local-only --yes > second-run.log 2>&1 || {
             echo "Restarting guided installer failed (redacted logs not uploaded)." >&2
-            tail -n 50 second-run.log
             exit 1
           }
           test "$before_env" = "$(sha256sum .env | cut -d' ' -f1)"
