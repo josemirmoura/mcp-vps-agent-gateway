@@ -70,10 +70,16 @@ Follow OAuth sign-in if prompted, verify tools are discovered and test read-only
 
 [VS Code: Add and manage MCP servers](https://code.visualstudio.com/docs/agent-customization/mcp-servers) · [MCP configuration reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration).
 
+## Local MCP-capable agent hosts and other AI providers
+
+Portico is **model/provider neutral** at the protocol boundary. An LLM or API endpoint cannot directly invoke MCP unless an agent host/client implements the requisite MCP transport, tool schema and authentication. A local agent runtime, including a future Hermes/Nara host, may be evaluated using the same Portico endpoint or an explicitly reviewed local bridge; **Portico + Hermes/Nara E2E has not been verified**.
+
+For any new host: document exact version, supported transport, OAuth/client identity, discovered tools; execute authenticated `system.info` and a read-only operation; verify matching Broker audit and a denial case; record findings in [compatibility](compatibility.md). Do not bypass TLS, OAuth or local Broker policy to accommodate an agent.
+
 ## Safety and troubleshooting
 
 Check DNS, valid HTTPS, the `/mcp` path, OAuth discovery and successful consent. Do not bypass OAuth/TLS or paste credentials into a chat to make a client connect. Directory grants and Broker audit controls remain independent of the chosen client.
 
 *Vendor supports remote MCP* is not the same as *Portico E2E verified*. The latter requires a real authorized tool invocation with audit evidence.
 
-Follow [Community E2E #153](https://github.com/josemirmoura/mcp-vps-agent-gateway/issues/153) and [multi-client documentation issue #159](https://github.com/josemirmoura/mcp-vps-agent-gateway/issues/159).
+Follow [Community E2E #153](https://github.com/josemirmoura/portico-community/issues/153) and [multi-client documentation issue #159](https://github.com/josemirmoura/portico-community/issues/159).
