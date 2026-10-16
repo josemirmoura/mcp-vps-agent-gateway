@@ -32,6 +32,7 @@ Start here:
 
 ## Developer / security
 
+- [competitive-landscape-and-interoperability.md](competitive-landscape-and-interoperability.md) - public competitor benchmark, vendor-neutral MCP compatibility and future engineering candidates.
 - [project-status.md](project-status.md) - current public runtime maturity.
 - [productization-status.md](productization-status.md) - public Community productization status.
 - [execution-plan.md](execution-plan.md) - active public Community release path.
