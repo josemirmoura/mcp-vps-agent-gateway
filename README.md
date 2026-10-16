@@ -126,6 +126,10 @@ The public node runtime now includes an optional outbound Cloud connector. It en
 
 See [Portico Cloud node connector](docs/cloud-node-connector.md).
 
+## Open MCP interoperability and technical benchmark
+
+Portico is built for compatible **AI clients and agents across providers**, with authenticated MCP access and machine-local Broker authorization. Individual client support requires real end-to-end evidence; availability of MCP in a product alone does not prove Portico compatibility. See the [client guide](docs/connect-ai-clients.md) and [public competitor benchmark and engineering watchlist](docs/competitive-landscape-and-interoperability.md).
+
 ## Documentation
 
 - [Documentation map](docs/README.md)
