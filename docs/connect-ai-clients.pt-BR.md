@@ -73,10 +73,16 @@ A descoberta OAuth poderá abrir uma janela de autorização. Confirme as ferram
 
 [Guia oficial de configuração VS Code](https://code.visualstudio.com/docs/agent-customization/mcp-servers) · [Referência do arquivo MCP](https://code.visualstudio.com/docs/agents/reference/mcp-configuration).
 
+## Hosts locais com MCP e outras IAs
+
+O Pórtico adota arquitetura **agnóstica de modelo e fornecedor**. Um LLM/API isolado precisa de um **host de agente/cliente** que implemente o transporte, as ferramentas e a autenticação MCP compatíveis. Um runtime local de agentes, inclusive o futuro host Hermes/Nara, pode ser avaliado pela mesma URL MCP ou por adaptador local aprovado; **a integração Pórtico + Hermes/Nara ainda não possui E2E certificado**.
+
+Para cada novo host, registrar versão, transporte, OAuth/identidade do cliente e ferramentas descobertas; executar `system.info` autenticado e leitura permitida; verificar evento correspondente no Broker e uma negativa de política; acrescentar evidências à [matriz de compatibilidade](compatibility.md). Nunca desativar TLS, OAuth ou a política local para forçar compatibilidade.
+
 ## Diagnóstico e segurança
 
 Se ocorrer falha de conexão, confira DNS, HTTPS válido, endpoint terminando em `/mcp`, seleção de OAuth e autorização efetivamente concluída. Não enfraqueça a configuração para HTTP sem TLS ou tokens colados no chat para contornar o problema. A política de pastas, o escopo e os registros de auditoria precisam continuar ativos.
 
 **Legenda de validação:** *suporte do cliente documentado* significa apenas que o fabricante anuncia o recurso; *Pórtico E2E verificado* exige uma conexão autenticada real e evidência de chamada auditada, não somente um teste de descoberta OAuth.
 
-Acompanhe o [ensaio de instalação #153](https://github.com/josemirmoura/mcp-vps-agent-gateway/issues/153) e as [melhorias deste guia #159](https://github.com/josemirmoura/mcp-vps-agent-gateway/issues/159).
+Acompanhe o [ensaio de instalação #153](https://github.com/josemirmoura/portico-community/issues/153) e as [melhorias deste guia #159](https://github.com/josemirmoura/portico-community/issues/159).
